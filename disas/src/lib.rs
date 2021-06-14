@@ -88,7 +88,8 @@ fn add_reg_operand(arg: u8) -> Option<Operand> {
 pub fn disas(ins: &[u8]) -> Option<OpCode> {
     match ins[0] >> 3 {
         0x10 => {
-            // ADD
+            // ADD a, r
+            // ADD a, (HL)
             let arg = ins[0] & 0x7;
             let opcode = OpCode{
                 data: vec!(ins[0]),
@@ -109,7 +110,8 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             return Some(opcode)
         }
         0x11 => {
-            //ADC
+            //ADC a, r
+            //ADC a, (HL)
             let arg = ins[0] & 0x7;
             let opcode = OpCode{
                 data: vec!(ins[0]),
@@ -130,6 +132,38 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             return Some(opcode)
         }
         _ => {}
+    }
+    match ins[0] {
+        0xC6 => {
+            // ADD a, n
+            let arg = ins[1];
+            let opcode = OpCode{
+                data: vec!(ins[0], ins[1]),
+                length: 2,
+                ins: Instruction::ADD,
+                op1: Some(Operand::Reg8(Reg8::A)),
+                op2: Some(Operand::Imm8(arg)),
+                mcycles: 2,
+                tstates: vec!(4, 3),
+            };
+            return Some(opcode)
+        },
+        0xCE => {
+            // ADC a, n
+            let arg = ins[1];
+            let opcode = OpCode{
+                data: vec!(ins[0], ins[1]),
+                length: 2,
+                ins: Instruction::ADC,
+                op1: Some(Operand::Reg8(Reg8::A)),
+                op2: Some(Operand::Imm8(arg)),
+                mcycles: 2,
+                tstates: vec!(4, 3),
+            };
+            return Some(opcode)
+        },
+        0xDD => {},
+        _ =>{},
     }
     None
 }
@@ -166,6 +200,26 @@ mod tests {
             ins: Instruction::ADC,
             op1: Some(Operand::Reg8(Reg8::A)),
             op2: Some(Operand::RegAddr(Reg16::HL)),
+            mcycles: 2,
+            tstates: vec!(4, 3),
+        }));
+        // ADD A, n
+        assert_eq!(disas(&[0xC6, 0x42]) , Some(OpCode{
+            data: vec!(0xC6, 0x42),
+            length: 2,
+            ins: Instruction::ADD,
+            op1: Some(Operand::Reg8(Reg8::A)),
+            op2: Some(Operand::Imm8(0x42)),
+            mcycles: 2,
+            tstates: vec!(4, 3),
+        }));
+        // ADD A, n
+        assert_eq!(disas(&[0xCE, 0x55]) , Some(OpCode{
+            data: vec!(0xCE, 0x55),
+            length: 2,
+            ins: Instruction::ADC,
+            op1: Some(Operand::Reg8(Reg8::A)),
+            op2: Some(Operand::Imm8(0x55)),
             mcycles: 2,
             tstates: vec!(4, 3),
         }));
