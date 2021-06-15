@@ -170,7 +170,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
 
 #[cfg(test)]
 mod tests {
-    use crate::*;
+    use crate::disas::*;
     #[test]
     fn disas_add() {
         // ADD a, a

@@ -1,5 +1,5 @@
 [package]
-name = "disas"
+name = "gears"
 version = "0.1.0"
 authors = ["Anisse Astier <anisse@astier.eu>"]
 edition = "2018"
