@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Reg8 {
     A,
     F,
@@ -17,14 +17,14 @@ pub enum Reg8 {
     Hp,
     Lp,
 }
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RegSpe {
     I,
     R,
     PC,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Reg16 {
     AF,
     BC,
@@ -32,7 +32,7 @@ pub enum Reg16 {
     HL,
     SP,
 }
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RegI {
     IX,
     IY,
@@ -40,7 +40,7 @@ pub enum RegI {
 
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Operand {
     Reg8(Reg8), // 8 bit register
     Reg16(Reg16), // 16 bit register
@@ -53,21 +53,21 @@ pub enum Operand {
     RegI(u8), // indexed addressing
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone,)]
 pub enum Instruction {
     ADD,
     ADC,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct OpCode {
-    data: Vec<u8>,
-    length: u8,
-    ins: Instruction,
-    op1: Option<Operand>,
-    op2: Option<Operand>,
-    mcycles: u8,
-    tstates: Vec<u8>,
+    pub data: Vec<u8>,
+    pub length: u8,
+    pub ins: Instruction,
+    pub op1: Option<Operand>,
+    pub op2: Option<Operand>,
+    pub mcycles: u8,
+    pub tstates: Vec<u8>,
 }
 
 fn add_reg_operand(arg: u8) -> Option<Operand> {
