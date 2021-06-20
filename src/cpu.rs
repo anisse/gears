@@ -66,8 +66,7 @@ fn set_flag(s: &mut State, f: Flag, val: bool) {
 }
 
 pub fn init() -> State {
-    let mut s = State::default();
-    s
+    State::default()
 }
 
 pub fn run_op(s: &mut State, op: &disas::OpCode) {
@@ -93,7 +92,6 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) {
                 set_flag(s, Flag::N, false);
                 set_flag(s, Flag::C, (a as u8).overflowing_add(b as u8).1);
             }
-
         },
         _ => {}
     }
@@ -105,7 +103,6 @@ pub fn run(s: &mut State, ins: &[u8]) {
         if let Some(op) = disas::disas(&ins[i..ins.len()]) {
             run_op(s, &op);
             i += op.length as usize;
-
         }
     }
 }
