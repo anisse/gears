@@ -22,5 +22,5 @@ pub fn main() {
     }
 
     let mut cpu = cpu::init();
-    cpu::run(&mut cpu, &data)
+    cpu::run(&mut cpu, &data).unwrap();
 }
