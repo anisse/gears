@@ -1,9 +1,9 @@
-mod disas;
 mod cpu;
+mod disas;
 
 use std::env;
-use std::io::prelude::*;
 use std::fs::File;
+use std::io::prelude::*;
 use std::path::Path;
 
 pub fn main() {
@@ -16,7 +16,7 @@ pub fn main() {
         Ok(f) => f,
     };
 
-    let mut data: Vec<u8> = vec!();
+    let mut data: Vec<u8> = vec![];
     if let Err(why) = file.read_to_end(&mut data) {
         panic!("Could not read {}: {}", path.display(), why);
     }

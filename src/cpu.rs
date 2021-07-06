@@ -7,7 +7,7 @@ enum Flag {
     H,
     PV,
     N,
-    C
+    C,
 }
 
 #[derive(Default, Debug, PartialEq, Clone, Copy)]
@@ -18,34 +18,44 @@ pub struct State {
 
 fn flag(s: &str, f: u8) -> &str {
     if f != 0 {
-        return s
+        return s;
     }
     ""
 }
 
 impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "A: {:X} ({}) F: {} {} {} {} {} {}", self.A, self.A as i8,
-               flag("S", self.F & 0x80),
-               flag("Z", self.F & 0x40),
-               flag("H", self.F & 0x10),
-               flag("PV", self.F & 0x04),
-               flag("N", self.F & 0x02),
-               flag("C", self.F & 0x01)
-               )
+        write!(
+            f,
+            "A: {:X} ({}) F: {} {} {} {} {} {}",
+            self.A,
+            self.A as i8,
+            flag("S", self.F & 0x80),
+            flag("Z", self.F & 0x40),
+            flag("H", self.F & 0x10),
+            flag("PV", self.F & 0x04),
+            flag("N", self.F & 0x02),
+            flag("C", self.F & 0x01)
+        )
     }
 }
-fn get_op8(s: &State, op: disas::Operand) -> u8 { // TODO: size
+fn get_op8(s: &State, op: disas::Operand) -> u8 {
+    // TODO: size
     match op {
         disas::Operand::Reg8(disas::Reg8::A) => s.A,
-        _ => { panic!("Unknown operand") },
+        _ => {
+            panic!("Unknown operand")
+        }
     }
 }
 
-fn set_op8(s: &mut State, op: disas::Operand, val: u8) { // TODO: size
+fn set_op8(s: &mut State, op: disas::Operand, val: u8) {
+    // TODO: size
     match op {
         disas::Operand::Reg8(disas::Reg8::A) => s.A = val,
-        _ => { panic!("Unknown operand")},
+        _ => {
+            panic!("Unknown operand")
+        }
     }
 }
 
@@ -56,12 +66,13 @@ fn set_flag(s: &mut State, f: Flag, val: bool) {
         Flag::H => 4,
         Flag::PV => 2,
         Flag::N => 1,
-        Flag::C => 0
+        Flag::C => 0,
     };
-    if val { //set
-        s.F = s.F | (1<<shift);
+    if val {
+        //set
+        s.F = s.F | (1 << shift);
     } else {
-        s.F = s.F & !(1<<shift);
+        s.F = s.F & !(1 << shift);
     }
 }
 
@@ -88,23 +99,27 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) {
                 set_flag(s, Flag::H, ((a & 0xF) + (b & 0xF)) != res & 0xF);
                 dbg!(((a & 0xF) + (b & 0xF)) != res & 0xF);
                 //set_flag(s, Flag::PV, real_res < i8::MIN as i16 || real_res > i8::MAX as i16);
-                set_flag(s, Flag::PV, a.signum() == b.signum() && a.signum() != res.signum());
+                set_flag(
+                    s,
+                    Flag::PV,
+                    a.signum() == b.signum() && a.signum() != res.signum(),
+                );
                 set_flag(s, Flag::N, false);
                 set_flag(s, Flag::C, (a as u8).overflowing_add(b as u8).1);
             }
-        },
+        }
         _ => {}
     }
 }
 
 pub fn run(s: &mut State, ins: &[u8]) -> Result<(), String> {
     let mut i = 0;
-    while ins[i.. ins.len()].len() > 0 {
+    while ins[i..ins.len()].len() > 0 {
         if let Some(op) = disas::disas(&ins[i..ins.len()]) {
             run_op(s, &op);
             i += op.length as usize;
         } else {
-            return Err(format!("Unknown instruction {:#X}", ins[i]))
+            return Err(format!("Unknown instruction {:#X}", ins[i]));
         }
     }
     Ok(())
@@ -118,21 +133,24 @@ mod tests {
         let mut s = init();
         s.A = 1;
         run(&mut s, &[0x87]);
-        assert_eq!(s, State{
-            A: 2,
-            F: 0,
-        });
+        assert_eq!(s, State { A: 2, F: 0 });
         s.A = 64;
         run(&mut s, &[0x87]);
-        assert_eq!(s, State{
-            A: (-128 as i8) as u8,
-            F: 0x84,
-        });
+        assert_eq!(
+            s,
+            State {
+                A: (-128 as i8) as u8,
+                F: 0x84,
+            }
+        );
         s.A = (-1 as i8) as u8;
         run(&mut s, &[0x87]);
-        assert_eq!(s, State{
-            A: (-2 as i8) as u8,
-            F: 0x91,
-        })
+        assert_eq!(
+            s,
+            State {
+                A: (-2 as i8) as u8,
+                F: 0x91,
+            }
+        )
     }
 }
