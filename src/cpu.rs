@@ -135,7 +135,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) {
 
 pub fn run(s: &mut State, ins: &[u8]) -> Result<(), String> {
     let mut i = 0;
-    while ins[i..ins.len()].len() > 0 {
+    while !ins[i..ins.len()].is_empty() {
         if let Some(op) = disas::disas(&ins[i..ins.len()]) {
             run_op(s, &op);
             i += op.length as usize;
