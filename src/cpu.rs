@@ -12,8 +12,8 @@ enum Flag {
 
 #[derive(Default, Debug, PartialEq, Clone, Copy)]
 pub struct State {
-    A: u8,
-    F: u8,
+    pub A: u8,
+    pub F: u8,
 }
 
 fn flag(s: &str, f: u8) -> &str {
