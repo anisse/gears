@@ -11,6 +11,7 @@ enum Flag {
 }
 
 #[derive(Default, Debug, PartialEq, Clone, Copy)]
+#[allow(non_snake_case)]
 pub struct State {
     pub A: u8,
     pub F: u8,
