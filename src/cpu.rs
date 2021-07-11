@@ -15,6 +15,26 @@ enum Flag {
 pub struct State {
     pub A: u8,
     pub F: u8,
+    pub B: u8,
+    pub C: u8,
+    pub D: u8,
+    pub E: u8,
+    pub H: u8,
+    pub L: u8,
+    pub Ap: u8,
+    pub Fp: u8,
+    pub Bp: u8,
+    pub Cp: u8,
+    pub Dp: u8,
+    pub Ep: u8,
+    pub Hp: u8,
+    pub Lp: u8,
+    pub I: u8,
+    pub R: u8,
+    pub IX: u16,
+    pub IY: u16,
+    pub SP: u16,
+    pub PC: u16,
 }
 
 fn flag(s: &str, f: u8) -> &str {
@@ -133,8 +153,9 @@ mod tests {
     fn run_add() {
         let mut s = init();
         s.A = 1;
+        let default = State::default();
         run(&mut s, &[0x87]).unwrap();
-        assert_eq!(s, State { A: 2, F: 0 });
+        assert_eq!(s, State { A: 2, F: 0, ..default });
         s.A = 64;
         run(&mut s, &[0x87]).unwrap();
         assert_eq!(
@@ -142,6 +163,7 @@ mod tests {
             State {
                 A: (-128 as i8) as u8,
                 F: 0x84,
+                ..default
             }
         );
         s.A = (-1 as i8) as u8;
@@ -151,6 +173,7 @@ mod tests {
             State {
                 A: (-2 as i8) as u8,
                 F: 0x91,
+                ..default
             }
         )
     }
