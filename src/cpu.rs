@@ -71,9 +71,9 @@ fn set_flag(s: &mut State, f: Flag, val: bool) {
     };
     if val {
         //set
-        s.F = s.F | (1 << shift);
+        s.F |= 1 << shift;
     } else {
-        s.F = s.F & !(1 << shift);
+        s.F &= !(1 << shift);
     }
 }
 
