@@ -133,10 +133,10 @@ mod tests {
     fn run_add() {
         let mut s = init();
         s.A = 1;
-        run(&mut s, &[0x87]);
+        run(&mut s, &[0x87]).unwrap();
         assert_eq!(s, State { A: 2, F: 0 });
         s.A = 64;
-        run(&mut s, &[0x87]);
+        run(&mut s, &[0x87]).unwrap();
         assert_eq!(
             s,
             State {
@@ -145,7 +145,7 @@ mod tests {
             }
         );
         s.A = (-1 as i8) as u8;
-        run(&mut s, &[0x87]);
+        run(&mut s, &[0x87]).unwrap();
         assert_eq!(
             s,
             State {
