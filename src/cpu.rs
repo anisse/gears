@@ -161,17 +161,17 @@ mod tests {
         assert_eq!(
             s,
             State {
-                A: (-128 as i8) as u8,
+                A: -128_i8 as u8,
                 F: 0x84,
                 ..default
             }
         );
-        s.A = (-1 as i8) as u8;
+        s.A = -1_i8 as u8;
         run(&mut s, &[0x87]).unwrap();
         assert_eq!(
             s,
             State {
-                A: (-2 as i8) as u8,
+                A: -2_i8 as u8,
                 F: 0x91,
                 ..default
             }
