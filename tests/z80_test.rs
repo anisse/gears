@@ -175,6 +175,20 @@ fn parse_tests(input: &str, expected: &str) -> Option<Vec<Test>> {
     Some(tests)
 }
 
+fn setup_memory(values: &[MemValues]) -> Vec<u8> {
+    let mut mem = Vec::new();
+    let mut offset: usize = 0;
+    for i in values.iter() {
+        if i.base_addr as usize > offset {
+            mem.append(&mut vec!(0; i.base_addr as usize - offset));
+        }
+        offset+=i.values.len();
+        mem.append(&mut i.values.clone());
+    }
+
+    mem
+}
+
 #[test]
 fn run_instructions() {
     let mut cpu = cpu::init();
@@ -187,8 +201,7 @@ fn run_instructions() {
 
     for t in tests.iter() {
         let mut state = t.start_state;
-        let mut data = vec![42];
-        // TODO: setup memory
+        let mut data = setup_memory(&t.memory_values);
 
         dbg!(t);
         cpu::run(&mut state, &data).unwrap();
