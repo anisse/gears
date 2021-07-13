@@ -35,6 +35,7 @@ pub struct State {
     pub IY: u16,
     pub SP: u16,
     pub PC: u16,
+    pub MEMPTR: u16,
 }
 
 fn flag(s: &str, f: u8) -> &str {
