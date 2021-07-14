@@ -200,14 +200,16 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) {
     s.R = (s.R + 1) & 0x7F;
 }
 
-pub fn run(s: &mut State, ins: &[u8]) -> Result<(), String> {
-    let mut i = 0;
-    while !ins[i..ins.len()].is_empty() {
-        if let Some(op) = disas::disas(&ins[i..ins.len()]) {
+pub fn run(s: &mut State, mem: &[u8], len: usize) -> Result<(), String> {
+    let mut len = len;
+    while len > 0 {
+        // TODO: split into m states, fetch etc
+        let disas_target = &mem[s.PC as usize..mem.len()];
+        if let Some(op) = disas::disas(disas_target) {
             run_op(s, &op);
-            i += op.length as usize;
+            len -= op.length as usize;
         } else {
-            return Err(format!("Unknown instruction {:#X}", ins[i]));
+            return Err(format!("Unknown instruction {:#X}", disas_target[0]));
         }
     }
     Ok(())
@@ -221,7 +223,7 @@ mod tests {
         let mut s = init();
         s.A = 1;
         let default = State::default();
-        run(&mut s, &[0x87]).unwrap();
+        run(&mut s, &[0x87], 1).unwrap();
         assert_eq!(
             s,
             State {
@@ -234,7 +236,7 @@ mod tests {
         );
         s = default;
         s.A = 64;
-        run(&mut s, &[0x87]).unwrap();
+        run(&mut s, &[0x87], 1).unwrap();
         assert_eq!(
             s,
             State {
@@ -247,7 +249,7 @@ mod tests {
         );
         s = default;
         s.A = -1_i8 as u8;
-        run(&mut s, &[0x87]).unwrap();
+        run(&mut s, &[0x87], 1).unwrap();
         assert_eq!(
             s,
             State {

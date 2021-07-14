@@ -270,7 +270,7 @@ fn run_instructions() {
 
         dbg!(t);
         dbg!(&data);
-        cpu::run(&mut state, &data).unwrap();
+        cpu::run(&mut state, &data, t.tstate_to_run as usize).unwrap();
         assert_eq!(t.end_state, state);
     }
 }
