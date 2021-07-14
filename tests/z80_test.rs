@@ -61,12 +61,65 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
         st.set_regpair(*reg, val);
     }
 
-    let len = match input[1].split_ascii_whitespace().collect::<Vec<&str>>()[6].parse() {
-        Ok(x) => x,
-        Err(_) => return Err(format!("bad tstate_len at end of {}", input[1])),
-    };
+    for (i, (name, reg)) in vec![
+        ("IX", &mut st.IX),
+        ("IY", &mut st.IY),
+        ("SP", &mut st.SP),
+        ("PC", &mut st.PC),
+        ("MEMPTR", &mut st.MEMPTR),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        *reg = match u16::from_str_radix(regs[i + 8], 16) {
+            Ok(x) => x,
+            Err(_) => {
+                return Err(format!(
+                    "bad {} at line {}: {}",
+                    name,
+                    input[0],
+                    regs[i + 8]
+                ))
+            }
+        };
+    }
 
-    Ok(len)
+    let regs: Vec<&str> = input[1].split_ascii_whitespace().collect();
+    for (i, (name, reg)) in vec![("I", &mut st.I), ("R", &mut st.R)]
+        .into_iter()
+        .enumerate()
+    {
+        *reg = match u8::from_str_radix(regs[i], 16) {
+            Ok(x) => x,
+            Err(_) => return Err(format!("bad {} at line {}: {}", name, input[0], regs[i])),
+        };
+    }
+    for (i, (name, reg)) in vec![
+        ("IFF1", &mut st.IFF1),
+        ("IFF2", &mut st.IFF2),
+        ("Int Mode", &mut st.IM),
+        ("halted ", &mut st.halted),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        *reg = match u8::from_str_radix(regs[i + 2], 16) {
+            Ok(x) => x != 0,
+            Err(_) => {
+                return Err(format!(
+                    "bad {} at line {}: {}",
+                    name,
+                    input[0],
+                    regs[i + 2]
+                ))
+            }
+        };
+    }
+    match regs[6].parse() {
+        /* return expression is number of tstates to run */
+        Ok(x) => Ok(x),
+        Err(_) => Err(format!("bad tstate_len at end of {}", input[1])),
+    }
 }
 fn parse_memory_values(input: Vec<&str>, memory_values: &mut Vec<MemValues>) -> Result<(), String> {
     for l in input.iter().filter(|l| **l != "-1") {
