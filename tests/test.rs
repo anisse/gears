@@ -269,6 +269,7 @@ fn run_instructions() {
         let mut data = setup_memory(&t.memory_values);
 
         dbg!(t);
+        dbg!(&data);
         cpu::run(&mut state, &data).unwrap();
         assert_eq!(t.end_state, state);
     }
