@@ -188,6 +188,9 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) {
                 set_flag(s, Flag::C, (a as u8).overflowing_add(b as u8).1);
             }
         }
+        disas::Instruction::NOP => {
+            // nothing to do
+        },
         _ => {
             // TODO: return error instead
             panic!("Unsupported opcode {:?}", op.ins);
