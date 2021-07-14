@@ -194,6 +194,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) {
         }
     }
     s.PC += op.length as u16;
+    s.R = (s.R + 1) & 0x7F;
 }
 
 pub fn run(s: &mut State, ins: &[u8]) -> Result<(), String> {
@@ -224,10 +225,11 @@ mod tests {
                 A: 2,
                 F: 0,
                 PC: 1,
+                R: 1,
                 ..default
             }
         );
-        s.PC = 0;
+        s = default;
         s.A = 64;
         run(&mut s, &[0x87]).unwrap();
         assert_eq!(
@@ -236,11 +238,12 @@ mod tests {
                 A: -128_i8 as u8,
                 F: 0x84,
                 PC: 1,
+                R: 1,
                 ..default
             }
         );
+        s = default;
         s.A = -1_i8 as u8;
-        s.PC = 0;
         run(&mut s, &[0x87]).unwrap();
         assert_eq!(
             s,
@@ -248,6 +251,7 @@ mod tests {
                 A: -2_i8 as u8,
                 F: 0x91,
                 PC: 1,
+                R: 1,
                 ..default
             }
         )
