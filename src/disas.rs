@@ -55,6 +55,7 @@ pub enum Operand {
 pub enum Instruction {
     ADD,
     ADC,
+    NOP,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -130,6 +131,17 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         _ => {}
     }
     match ins[0] {
+        0x00 => {
+            return Some(OpCode {
+                data: vec![ins[0]],
+                length: 1,
+                ins: Instruction::NOP,
+                op1: None,
+                op2: None,
+                mcycles: 1,
+                tstates: vec![4],
+            });
+        }
         0xC6 => {
             // ADD a, n
             let arg = ins[1];
