@@ -215,7 +215,15 @@ mod tests {
         s.A = 1;
         let default = State::default();
         run(&mut s, &[0x87]).unwrap();
-        assert_eq!(s, State { A: 2, F: 0, PC: 1, ..default });
+        assert_eq!(
+            s,
+            State {
+                A: 2,
+                F: 0,
+                PC: 1,
+                ..default
+            }
+        );
         s.PC = 0;
         s.A = 64;
         run(&mut s, &[0x87]).unwrap();

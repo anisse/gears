@@ -133,15 +133,13 @@ fn parse_memory_values(input: Vec<&str>, memory_values: &mut Vec<MemValues>) -> 
             .iter()
             .skip(1)
             .filter(|s| **s != "-1")
-            .map(|s| {
-                match u8::from_str_radix(s, 16) {
-                    Err(_) => Err(format!("bad mem val {}", s)),
-                    Ok(x) => Ok(x),
-                }
+            .map(|s| match u8::from_str_radix(s, 16) {
+                Err(_) => Err(format!("bad mem val {}", s)),
+                Ok(x) => Ok(x),
             })
-        .collect();
+            .collect();
         let values = values?;
-        memory_values.push(MemValues{base_addr, values})
+        memory_values.push(MemValues { base_addr, values })
     }
     Ok(())
 }
@@ -171,9 +169,8 @@ fn parse_tests(input: &str, expected: &str) -> Option<Vec<Test>> {
         let len = parse_cpu_regs(lines[1..=2].to_vec(), &mut t.start_state)
             .unwrap_or_else(|s| panic!("test {} ({}): {}", t.desc, i, s));
         t.tstate_to_run = len;
-        parse_memory_values(lines[3..lines.len()].to_vec(), &mut t.memory_values).unwrap_or_else(|e| {
-                     panic!("test {} ({}): {}", t.desc, i, e)
-        });
+        parse_memory_values(lines[3..lines.len()].to_vec(), &mut t.memory_values)
+            .unwrap_or_else(|e| panic!("test {} ({}): {}", t.desc, i, e));
 
         t.events = res
             .iter()
@@ -234,9 +231,8 @@ fn parse_tests(input: &str, expected: &str) -> Option<Vec<Test>> {
             .filter(|l| !l.starts_with("  "))
             .skip(2)
             .collect();
-        parse_memory_values(memval, &mut t.memory_values).unwrap_or_else(|e| {
-                     panic!("test res {} ({}): {}", t.desc, i, e)
-        });
+        parse_memory_values(memval, &mut t.memory_values)
+            .unwrap_or_else(|e| panic!("test res {} ({}): {}", t.desc, i, e));
         tests.push(t)
     }
     Some(tests)
@@ -247,9 +243,9 @@ fn setup_memory(values: &[MemValues]) -> Vec<u8> {
     let mut offset: usize = 0;
     for i in values.iter() {
         if i.base_addr as usize > offset {
-            mem.append(&mut vec!(0; i.base_addr as usize - offset));
+            mem.append(&mut vec![0; i.base_addr as usize - offset]);
         }
-        offset+=i.values.len();
+        offset += i.values.len();
         mem.append(&mut i.values.clone());
     }
 
