@@ -36,6 +36,11 @@ pub struct State {
     pub SP: u16,
     pub PC: u16,
     pub MEMPTR: u16,
+    /* Interrupts */
+    pub IFF1: bool,
+    pub IFF2: bool,
+    pub IM: bool,
+    pub halted: bool,
 }
 
 fn flag(s: &str, f: u8) -> &str {
