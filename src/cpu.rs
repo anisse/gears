@@ -10,6 +10,18 @@ enum Flag {
     C,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum RegPair {
+    AF,
+    BC,
+    DE,
+    HL,
+    AFp,
+    BCp,
+    DEp,
+    HLp,
+}
+
 #[derive(Default, Debug, PartialEq, Clone, Copy)]
 #[allow(non_snake_case)]
 pub struct State {
@@ -41,6 +53,47 @@ pub struct State {
     pub IFF2: bool,
     pub IM: bool,
     pub halted: bool,
+}
+
+impl State {
+    pub fn set_regpair(&mut self, reg: RegPair, val: u16) {
+        let r1 = (val & 0xFF00 >> 8) as u8;
+        let r2 = (val & 0x00FF) as u8;
+        match reg {
+            RegPair::AF => {
+                self.A = r1;
+                self.F = r2
+            }
+            RegPair::BC => {
+                self.B = r1;
+                self.C = r2
+            }
+            RegPair::DE => {
+                self.D = r1;
+                self.E = r2
+            }
+            RegPair::HL => {
+                self.H = r1;
+                self.L = r2
+            }
+            RegPair::AFp => {
+                self.Ap = r1;
+                self.Fp = r2
+            }
+            RegPair::BCp => {
+                self.Bp = r1;
+                self.Cp = r2
+            }
+            RegPair::DEp => {
+                self.Dp = r1;
+                self.Ep = r2
+            }
+            RegPair::HLp => {
+                self.Hp = r1;
+                self.Lp = r2
+            }
+        }
+    }
 }
 
 fn flag(s: &str, f: u8) -> &str {

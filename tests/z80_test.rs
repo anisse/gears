@@ -1,4 +1,5 @@
 use gears::cpu;
+use gears::cpu::RegPair;
 
 #[derive(Debug, Clone, Copy)]
 enum EventType {
@@ -39,13 +40,26 @@ struct Test {
 
 fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> {
     let regs: Vec<&str> = input[0].split(' ').collect();
-    let af: u16 = match u16::from_str_radix(regs[0], 16) {
-        Ok(x) => x,
-        Err(_) => return Err(format!("bad af at line {}", input[0])),
-    };
+    for (i, (name, reg)) in vec![
+        ("AF", RegPair::AF),
+        ("BC", RegPair::BC),
+        ("DE", RegPair::DE),
+        ("HL", RegPair::HL),
+        ("AF'", RegPair::AFp),
+        ("BC'", RegPair::BCp),
+        ("DE'", RegPair::DEp),
+        ("HL'", RegPair::HLp),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let val: u16 = match u16::from_str_radix(regs[i], 16) {
+            Ok(x) => x,
+            Err(_) => return Err(format!("bad {} at line {}: {}", name, input[0], regs[i])),
+        };
 
-    st.A = (af & 0xFF00 >> 8) as u8;
-    st.F = (af & 0xFF) as u8;
+        st.set_regpair(*reg, val);
+    }
 
     let len = match input[1].split_ascii_whitespace().collect::<Vec<&str>>()[6].parse() {
         Ok(x) => x,
