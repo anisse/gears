@@ -49,9 +49,9 @@ pub struct State {
     pub PC: u16,
     pub MEMPTR: u16,
     /* Interrupts */
+    pub IM: u8, // TODO: enum ?
     pub IFF1: bool,
     pub IFF2: bool,
-    pub IM: bool,
     pub halted: bool,
 }
 

@@ -85,19 +85,18 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
     }
 
     let regs: Vec<&str> = input[1].split_ascii_whitespace().collect();
-    for (i, (name, reg)) in vec![("I", &mut st.I), ("R", &mut st.R)]
+    for (i, (name, reg)) in vec![("I", &mut st.I), ("R", &mut st.R), ("Int Mode", &mut st.IM)]
         .into_iter()
         .enumerate()
     {
         *reg = match u8::from_str_radix(regs[i], 16) {
             Ok(x) => x,
-            Err(_) => return Err(format!("bad {} at line {}: {}", name, input[0], regs[i])),
+            Err(_) => return Err(format!("bad {} at line {}: {}", name, input[1], regs[i])),
         };
     }
     for (i, (name, reg)) in vec![
         ("IFF1", &mut st.IFF1),
         ("IFF2", &mut st.IFF2),
-        ("Int Mode", &mut st.IM),
         ("halted ", &mut st.halted),
     ]
     .into_iter()
@@ -109,7 +108,7 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
                 return Err(format!(
                     "bad {} at line {}: {}",
                     name,
-                    input[0],
+                    input[1],
                     regs[i + 2]
                 ))
             }
@@ -118,7 +117,10 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
     match regs[6].parse() {
         /* return expression is number of tstates to run */
         Ok(x) => Ok(x),
-        Err(_) => Err(format!("bad tstate_len at end of {}", input[1])),
+        Err(_) => Err(format!(
+            "bad tstate_len at end of {}: {}",
+            input[1], regs[6]
+        )),
     }
 }
 fn parse_memory_values(input: Vec<&str>, memory_values: &mut Vec<MemValues>) -> Result<(), String> {
