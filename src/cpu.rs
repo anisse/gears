@@ -160,44 +160,39 @@ pub fn init() -> State {
     State::default()
 }
 
-pub fn run_op(s: &mut State, op: &disas::OpCode) {
+pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
     match op.ins {
         disas::Instruction::ADD => {
-            if let Some(op1) = &op.op1 {
-                let a = get_op8(s, *op1) as i8;
-                let b: i8;
-                if let Some(op2) = op.op2 {
-                    b = get_op8(s, op2) as i8;
-                } else {
-                    panic!("Add with no second operand")
-                }
-                let real_res = a as i16 + b as i16; // easier for overflows, etc
-                let res = (real_res & 0xFF) as i8;
-                set_op8(s, *op1, res as u8);
-                set_flag(s, Flag::S, res < 0);
-                set_flag(s, Flag::Z, res == 0);
-                set_flag(s, Flag::H, ((a & 0xF) + (b & 0xF)) != res & 0xF);
-                dbg!(((a & 0xF) + (b & 0xF)) != res & 0xF);
-                //set_flag(s, Flag::PV, real_res < i8::MIN as i16 || real_res > i8::MAX as i16);
-                set_flag(
-                    s,
-                    Flag::PV,
-                    a.signum() == b.signum() && a.signum() != res.signum(),
-                );
-                set_flag(s, Flag::N, false);
-                set_flag(s, Flag::C, (a as u8).overflowing_add(b as u8).1);
-            }
+            let op1 = op.op1.ok_or("add op1 missing")?;
+            let op2 = op.op2.ok_or("add op2 missing")?;
+            let a = get_op8(s, op1) as i8;
+            let b: i8;
+            b = get_op8(s, op2) as i8;
+            let real_res = a as i16 + b as i16; // easier for overflows, etc
+            let res = (real_res & 0xFF) as i8;
+            set_op8(s, op1, res as u8);
+            set_flag(s, Flag::S, res < 0);
+            set_flag(s, Flag::Z, res == 0);
+            set_flag(s, Flag::H, ((a & 0xF) + (b & 0xF)) != res & 0xF);
+            dbg!(((a & 0xF) + (b & 0xF)) != res & 0xF);
+            //set_flag(s, Flag::PV, real_res < i8::MIN as i16 || real_res > i8::MAX as i16);
+            set_flag(
+                s,
+                Flag::PV,
+                a.signum() == b.signum() && a.signum() != res.signum(),
+            );
+            set_flag(s, Flag::N, false);
+            set_flag(s, Flag::C, (a as u8).overflowing_add(b as u8).1);
         }
         disas::Instruction::NOP => {
             // nothing to do
-        },
-        _ => {
-            // TODO: return error instead
-            panic!("Unsupported opcode {:?}", op.ins);
         }
+        _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     s.PC += op.length as u16;
     s.R = (s.R + 1) & 0x7F;
+
+    Ok(())
 }
 
 pub fn run(s: &mut State, mem: &[u8], len: usize) -> Result<(), String> {
@@ -206,7 +201,7 @@ pub fn run(s: &mut State, mem: &[u8], len: usize) -> Result<(), String> {
         // TODO: split into m states, fetch etc
         let disas_target = &mem[s.PC as usize..mem.len()];
         if let Some(op) = disas::disas(disas_target) {
-            run_op(s, &op);
+            run_op(s, &op)?;
             len -= op.length as usize;
         } else {
             return Err(format!("Unknown instruction {:#X}", disas_target[0]));
