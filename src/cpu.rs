@@ -94,6 +94,45 @@ impl State {
             }
         }
     }
+    pub fn get_regpair(self, reg: RegPair) -> u16 {
+        let r1;
+        let r2;
+        match reg {
+            RegPair::AF => {
+                r1 = self.A;
+                r2 = self.F
+            }
+            RegPair::BC => {
+                r1 =self.B;
+                r2 = self.C
+            }
+            RegPair::DE => {
+                r1 =self.D;
+                r2 = self.E
+            }
+            RegPair::HL => {
+                r1 =self.H;
+                r2 = self.L
+            }
+            RegPair::AFp => {
+                r1 =self.Ap;
+                r2 = self.Fp
+            }
+            RegPair::BCp => {
+                r1 =self.Bp;
+                r2 = self.Cp
+            }
+            RegPair::DEp => {
+                r1 =self.Dp;
+                r2 = self.Ep
+            }
+            RegPair::HLp => {
+                r1 =self.Hp;
+                r2 = self.Lp
+            }
+        }
+        (r1 as u16) << 8 | r2 as u16
+    }
 }
 
 fn flag(s: &str, f: u8) -> &str {
@@ -122,27 +161,64 @@ impl fmt::Display for State {
 fn get_op8(s: &State, op: disas::Operand) -> u8 {
     // TODO: size
     match op {
-        disas::Operand::Reg8(disas::Reg8::A) => s.A,
-        _ => {
-            panic!("Unknown operand")
-        }
+        disas::Operand::Reg8(reg) => match reg {
+            disas::Reg8::A => s.A,
+            disas::Reg8::F => s.F,
+            disas::Reg8::B => s.B,
+            disas::Reg8::C => s.C,
+            disas::Reg8::D => s.D,
+            disas::Reg8::E => s.E,
+            disas::Reg8::H => s.H,
+            disas::Reg8::L => s.L,
+            disas::Reg8::Ap => s.Ap,
+            disas::Reg8::Fp => s.Fp,
+            disas::Reg8::Bp => s.Bp,
+            disas::Reg8::Cp => s.Cp,
+            disas::Reg8::Dp => s.Dp,
+            disas::Reg8::Ep => s.Ep,
+            disas::Reg8::Hp => s.Hp,
+            disas::Reg8::Lp => s.Lp,
+        },
+        _ => panic!("Unknown operand {:?} or size not 8", op),
     }
 }
 
 fn set_op8(s: &mut State, op: disas::Operand, val: u8) {
     // TODO: size
     match op {
-        disas::Operand::Reg8(disas::Reg8::A) => s.A = val,
-        _ => {
-            panic!("Unknown operand")
-        }
+        disas::Operand::Reg8(reg) => match reg {
+            disas::Reg8::A => s.A = val,
+            disas::Reg8::F => s.F = val,
+            disas::Reg8::B => s.B = val,
+            disas::Reg8::C => s.C = val,
+            disas::Reg8::D => s.D = val,
+            disas::Reg8::E => s.E = val,
+            disas::Reg8::H => s.H = val,
+            disas::Reg8::L => s.L = val,
+            disas::Reg8::Ap => s.Ap = val,
+            disas::Reg8::Fp => s.Fp = val,
+            disas::Reg8::Bp => s.Bp = val,
+            disas::Reg8::Cp => s.Cp = val,
+            disas::Reg8::Dp => s.Dp = val,
+            disas::Reg8::Ep => s.Ep = val,
+            disas::Reg8::Hp => s.Hp = val,
+            disas::Reg8::Lp => s.Lp = val,
+        },
+        _ => panic!("Unknown operand {:?} or size not 8, or writing unsupported", op),
     }
 }
 
 fn get_op16(s: &State, op: disas::Operand) -> u16 {
     match op {
         disas::Operand::Imm16(x) => x,
-        _ => panic!("Unknown operand")
+        disas::Operand::Reg16(reg) => match reg {
+            disas::Reg16::AF => s.get_regpair(RegPair::AF),
+            disas::Reg16::BC => s.get_regpair(RegPair::BC),
+            disas::Reg16::DE => s.get_regpair(RegPair::DE),
+            disas::Reg16::HL => s.get_regpair(RegPair::HL),
+            disas::Reg16::SP => s.SP,
+        },
+        _ => panic!("Unknown operand {:?} or size not 16", op),
     }
 }
 
@@ -154,8 +230,8 @@ fn set_op16(s: &mut State, op: disas::Operand, val: u16) {
             disas::Reg16::DE => s.set_regpair(RegPair::DE, val),
             disas::Reg16::HL => s.set_regpair(RegPair::HL, val),
             disas::Reg16::SP => s.SP = val,
-        }
-        _ => panic!("Unknown operand")
+        },
+        _ => panic!("Unknown operand {:?} or size not 16, or writing unsupported", op),
     }
 }
 
