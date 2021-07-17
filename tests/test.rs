@@ -177,7 +177,7 @@ fn parse_tests(input: &str, expected: &str) -> Option<Vec<Test>> {
         t.events = res
             .iter()
             .skip(1)
-            .filter(|l| l.starts_with(" "))
+            .filter(|l| l.starts_with(' '))
             .map(|l| {
                 let event: Vec<&str> = l.split_ascii_whitespace().collect();
                 let time = event[0].parse().unwrap_or_else(|_| {
