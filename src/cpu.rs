@@ -195,14 +195,15 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
     Ok(())
 }
 
-pub fn run(s: &mut State, mem: &[u8], len: usize) -> Result<(), String> {
-    let mut len = len;
-    while len > 0 {
+pub fn run(s: &mut State, mem: &[u8], tstates_len: usize) -> Result<(), String> {
+    let mut tstates_len = tstates_len;
+    while tstates_len > 0 {
         // TODO: split into m states, fetch etc
         let disas_target = &mem[s.PC as usize..mem.len()];
         if let Some(op) = disas::disas(disas_target) {
             run_op(s, &op)?;
-            len -= op.length as usize;
+            let op_len: usize = op.tstates.iter().fold(0, |sum, x| sum + (*x as usize));
+            tstates_len = usize::saturating_sub(tstates_len, op_len);
         } else {
             return Err(format!("Unknown instruction {:#X}", disas_target[0]));
         }
