@@ -56,6 +56,7 @@ pub enum Instruction {
     ADD,
     ADC,
     NOP,
+    LD,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -80,6 +81,16 @@ fn add_reg_operand(arg: u8) -> Option<Operand> {
         0x5 => Some(Operand::Reg8(Reg8::L)),
         0x6 => Some(Operand::RegAddr(Reg16::HL)),
         _ => None,
+    }
+}
+
+fn decode_operand_reg_dd(arg: u8) -> Reg16 {
+    match arg & 0x3 {
+        0 => Reg16::BC,
+        1 => Reg16::DE,
+        2 => Reg16::HL,
+        3 => Reg16::SP,
+        _ => panic!("unreachable"),
     }
 }
 
@@ -173,6 +184,21 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         0xDD => {}
         _ => {}
     }
+    if (ins[0] & 0xCF) == 0x01 {
+        // LD dd, nn
+        let arg = (ins[2] as u16) << 8 | ins[1] as u16;
+        let reg = decode_operand_reg_dd((ins[0] >> 4) & 0x3);
+        let opcode = OpCode {
+            data: vec![ins[0], ins[1], ins[2]],
+            length: 3,
+            ins: Instruction::LD,
+            op1: Some(Operand::Reg16(reg)),
+            op2: Some(Operand::Imm16(arg)),
+            mcycles: 3, // error in datasheet page 99 ?
+            tstates: vec![4, 3, 3],
+        };
+        return Some(opcode);
+    }
     None
 }
 
@@ -244,6 +270,32 @@ mod tests {
                 op2: Some(Operand::Imm8(0x55)),
                 mcycles: 2,
                 tstates: vec!(4, 3),
+            })
+        );
+        // LD dd, nn
+        assert_eq!(
+            disas(&[0x01, 0x42, 0x10]),
+            Some(OpCode {
+                data: vec!(0x01, 0x42, 0x10),
+                length: 3,
+                ins: Instruction::LD,
+                op1: Some(Operand::Reg16(Reg16::BC)),
+                op2: Some(Operand::Imm16(0x1042)),
+                mcycles: 3,
+                tstates: vec!(4, 3, 3),
+            })
+        );
+        // LD dd, nn
+        assert_eq!(
+            disas(&[0x21, 0x42, 0x10]),
+            Some(OpCode {
+                data: vec!(0x21, 0x42, 0x10),
+                length: 3,
+                ins: Instruction::LD,
+                op1: Some(Operand::Reg16(Reg16::HL)),
+                op2: Some(Operand::Imm16(0x1042)),
+                mcycles: 3,
+                tstates: vec!(4, 3, 3),
             })
         );
     }
