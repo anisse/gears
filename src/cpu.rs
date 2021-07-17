@@ -139,6 +139,26 @@ fn set_op8(s: &mut State, op: disas::Operand, val: u8) {
     }
 }
 
+fn get_op16(s: &State, op: disas::Operand) -> u16 {
+    match op {
+        disas::Operand::Imm16(x) => x,
+        _ => panic!("Unknown operand")
+    }
+}
+
+fn set_op16(s: &mut State, op: disas::Operand, val: u16) {
+    match op {
+        disas::Operand::Reg16(reg) => match reg {
+            disas::Reg16::AF => s.set_regpair(RegPair::AF, val),
+            disas::Reg16::BC => s.set_regpair(RegPair::BC, val),
+            disas::Reg16::DE => s.set_regpair(RegPair::DE, val),
+            disas::Reg16::HL => s.set_regpair(RegPair::HL, val),
+            disas::Reg16::SP => s.SP = val,
+        }
+        _ => panic!("Unknown operand")
+    }
+}
+
 fn set_flag(s: &mut State, f: Flag, val: bool) {
     let shift = match f {
         Flag::S => 7,
@@ -174,7 +194,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
             set_flag(s, Flag::S, res < 0);
             set_flag(s, Flag::Z, res == 0);
             set_flag(s, Flag::H, ((a & 0xF) + (b & 0xF)) != res & 0xF);
-            dbg!(((a & 0xF) + (b & 0xF)) != res & 0xF);
+            //dbg!(((a & 0xF) + (b & 0xF)) != res & 0xF);
             //set_flag(s, Flag::PV, real_res < i8::MIN as i16 || real_res > i8::MAX as i16);
             set_flag(
                 s,
@@ -186,6 +206,14 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
         }
         disas::Instruction::NOP => {
             // nothing to do
+        }
+        disas::Instruction::LD => {
+            let op1 = op.op1.ok_or("LD op1 missing")?;
+            let op2 = op.op2.ok_or("LD op2 missing")?;
+            let val = get_op16(s, op2);
+            dbg!(op1);
+            dbg!(op2);
+            set_op16(s, op1, val);
         }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
