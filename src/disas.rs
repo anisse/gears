@@ -17,12 +17,14 @@ pub enum Reg8 {
     Hp,
     Lp,
 }
+/*
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RegSpe {
     I,
     R,
     PC,
 }
+*/
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Reg16 {
@@ -40,15 +42,37 @@ pub enum RegI {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Operand {
-    Reg8(Reg8),     // 8 bit register
-    Reg16(Reg16),   // 16 bit register
-    RegSpe(RegSpe), // special register
-    Address(u16),   // extended addressing
-    RegAddr(Reg16),
-    RelAddr(i8), // Relative addressing
-    Imm8(u8),    // immediate addressing
-    Imm16(u16),  // immediate extended adressing
-    RegI(u8),    // indexed addressing
+    Imm8(u8),     // immediate addressing
+    Imm16(u16),   // immediate extended adressing
+    RelAddr(i8),  // Relative addressing
+    Address(u16), // extended addressing
+    RegI(u8),     // indexed addressing
+    Reg8(Reg8),   // 8 bit register
+    Reg16(Reg16), // 16 bit register
+    RegAddr(Reg16), //register indirect addressing
+
+                  //RegSpe(RegSpe), // special register ? XXX ?
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum OpSize {
+    S1,
+    S2,
+}
+
+impl Operand {
+    pub fn size(&self) -> Option<OpSize> {
+        match self {
+            Operand::Imm8(_) => Some(OpSize::S1),
+            Operand::Imm16(_) => Some(OpSize::S2),
+            Operand::RelAddr(_) => None,
+            Operand::Address(_) => None,
+            Operand::RegI(_) => None,
+            Operand::Reg8(_) => Some(OpSize::S1),
+            Operand::Reg16(_) => Some(OpSize::S2),
+            Operand::RegAddr(_) => None,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -151,6 +175,23 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 op2: None,
                 mcycles: 1,
                 tstates: vec![4],
+            });
+        }
+        0x02 | 0x12 => {
+            // LD (BC), A
+            // LD (DE), A
+            let reg = match ins[0] & 0x10 {
+                0x10 => Reg16::DE,
+                _ => Reg16::BC,
+            };
+            return Some(OpCode {
+                data: vec![ins[0]],
+                length: 1,
+                ins: Instruction::LD,
+                op1: Some(Operand::RegAddr(reg)),
+                op2: Some(Operand::Reg8(Reg8::A)),
+                mcycles: 2,
+                tstates: vec![4, 3],
             });
         }
         0xC6 => {
@@ -296,6 +337,19 @@ mod tests {
                 op2: Some(Operand::Imm16(0x1042)),
                 mcycles: 3,
                 tstates: vec!(4, 3, 3),
+            })
+        );
+        // LD (DE), A
+        assert_eq!(
+            disas(&[0x12]),
+            Some(OpCode {
+                data: vec!(0x12),
+                length: 1,
+                ins: Instruction::LD,
+                op1: Some(Operand::RegAddr(Reg16::DE)),
+                op2: Some(Operand::Reg8(Reg8::A)),
+                mcycles: 2,
+                tstates: vec!(4, 3),
             })
         );
     }

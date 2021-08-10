@@ -1,5 +1,6 @@
 mod cpu;
 mod disas;
+mod mem;
 
 use std::env;
 use std::fs::File;
@@ -22,5 +23,6 @@ pub fn main() {
     }
 
     let mut cpu = cpu::init();
-    cpu::run(&mut cpu, &data, 9999999999).unwrap();
+    cpu.mem = mem::Memory::from(data);
+    cpu::run(&mut cpu, 9999999999).unwrap();
 }

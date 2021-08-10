@@ -1,5 +1,5 @@
-use gears::cpu;
 use gears::cpu::RegPair;
+use gears::{cpu, mem};
 
 #[derive(Debug, Clone, Copy)]
 enum EventType {
@@ -58,15 +58,15 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
             Err(_) => return Err(format!("bad {} at line {}: {}", name, input[0], regs[i])),
         };
 
-        st.set_regpair(*reg, val);
+        st.r.set_regpair(*reg, val);
     }
 
     for (i, (name, reg)) in vec![
-        ("IX", &mut st.IX),
-        ("IY", &mut st.IY),
-        ("SP", &mut st.SP),
-        ("PC", &mut st.PC),
-        ("MEMPTR", &mut st.MEMPTR),
+        ("IX", &mut st.r.IX),
+        ("IY", &mut st.r.IY),
+        ("SP", &mut st.r.SP),
+        ("PC", &mut st.r.PC),
+        ("MEMPTR", &mut st.r.MEMPTR),
     ]
     .into_iter()
     .enumerate()
@@ -85,9 +85,13 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
     }
 
     let regs: Vec<&str> = input[1].split_ascii_whitespace().collect();
-    for (i, (name, reg)) in vec![("I", &mut st.I), ("R", &mut st.R), ("Int Mode", &mut st.IM)]
-        .into_iter()
-        .enumerate()
+    for (i, (name, reg)) in vec![
+        ("I", &mut st.r.I),
+        ("R", &mut st.r.R),
+        ("Int Mode", &mut st.r.IM),
+    ]
+    .into_iter()
+    .enumerate()
     {
         *reg = match u8::from_str_radix(regs[i], 16) {
             Ok(x) => x,
@@ -95,8 +99,8 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
         };
     }
     for (i, (name, reg)) in vec![
-        ("IFF1", &mut st.IFF1),
-        ("IFF2", &mut st.IFF2),
+        ("IFF1", &mut st.r.IFF1),
+        ("IFF2", &mut st.r.IFF2),
         ("halted ", &mut st.halted),
     ]
     .into_iter()
@@ -240,18 +244,22 @@ fn parse_tests(input: &str, expected: &str) -> Option<Vec<Test>> {
     Some(tests)
 }
 
-fn setup_memory(values: &[MemValues]) -> Vec<u8> {
-    let mut mem = Vec::new();
+// TODO can panic ?
+fn setup_memory(values: &[MemValues], mem: &mut mem::Memory) {
+    //let mut mem = Vec::new();
     let mut offset: usize = 0;
-    for i in values.iter() {
+    for (i, m) in values.iter().enumerate() {
+        for (j, v) in m.values.iter().enumerate() {
+            mem.set_u8(m.base_addr + j as u16, *v)
+        }
+        /*
         if i.base_addr as usize > offset {
             mem.append(&mut vec![0; i.base_addr as usize - offset]);
         }
         offset += i.values.len();
         mem.append(&mut i.values.clone());
+        */
     }
-
-    mem
 }
 
 #[test]
@@ -265,12 +273,17 @@ fn run_instructions() {
     .unwrap();
 
     for t in tests.iter() {
-        let mut state = t.start_state;
-        let mut data = setup_memory(&t.memory_values);
+        let mut state = t.start_state.clone();
+        let mut data = mem::Memory::default();
+        setup_memory(&t.memory_values, &mut data);
+        let mut end_state = t.end_state.clone();
+        end_state.mem = data.clone();
+        setup_memory(&t.changed_mem_values, &mut end_state.mem);
+        state.mem = data;
 
         dbg!(t);
-        dbg!(&data);
-        cpu::run(&mut state, &data, t.tstate_to_run as usize).unwrap();
-        assert_eq!(t.end_state, state);
+        cpu::run(&mut state, t.tstate_to_run as usize).unwrap();
+        assert_eq!(end_state, state);
+        //assert_eq!(state.mem, mem_result);
     }
 }
