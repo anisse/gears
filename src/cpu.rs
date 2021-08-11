@@ -243,15 +243,13 @@ fn set_op8(s: &mut State, op: disas::Operand, val: u8) {
             disas::Reg8::Hp => s.r.Hp = val,
             disas::Reg8::Lp => s.r.Lp = val,
         },
-        /*
         disas::Operand::RegAddr(reg) => match reg {
-            disas::Reg16::AF => s.set_regpair(RegPair::AF, val),
-            disas::Reg16::BC => s.set_regpair(RegPair::BC, val),
-            disas::Reg16::DE => s.set_regpair(RegPair::DE, val),
-            disas::Reg16::HL => s.set_regpair(RegPair::HL, val),
-            disas::Reg16::SP => s.SP = val,
+            disas::Reg16::AF => s.mem.set_u8(s.r.get_regpair(RegPair::AF), val),
+            disas::Reg16::BC => s.mem.set_u8(s.r.get_regpair(RegPair::BC), val),
+            disas::Reg16::DE => s.mem.set_u8(s.r.get_regpair(RegPair::DE), val),
+            disas::Reg16::HL => s.mem.set_u8(s.r.get_regpair(RegPair::HL), val),
+            disas::Reg16::SP => s.mem.set_u8(s.r.SP, val),
         },
-        */
         _ => panic!(
             "Unknown operand {:?} or size not 8, or writing unsupported",
             op
@@ -350,6 +348,27 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
                 disas::OpSize::S2 => {
                     let val = get_op16(s, op2);
                     set_op16(s, op1, val);
+                }
+            }
+            // MEMPTR
+            if op2 == disas::Operand::Reg8(disas::Reg8::A) {
+                match op1 {
+                    disas::Operand::Address(_) => {
+                        // MEMPTR_low = (addr + 1) & #FF,  MEMPTR_hi = A
+                        todo!()
+                    }
+                    disas::Operand::RegAddr(x) => {
+                        let r = match x {
+                            disas::Reg16::BC => s.r.get_regpair(RegPair::BC),
+                            disas::Reg16::DE => s.r.get_regpair(RegPair::DE),
+                            _ => panic!("Unsupported MEMPTR LD {:?}", x),
+                        };
+                        // MEMPTR_low = (rp + 1) & #FF,  MEMPTR_hi = A
+                        s.r.MEMPTR = (r + 1) & 0xFF | ((s.r.A as u16) << 8);
+                    }
+                    _ => {
+                        panic!("Unknown MEMPTR LD update op1 {:?}", op1)
+                    }
                 }
             }
         }
