@@ -81,6 +81,7 @@ pub enum Instruction {
     ADC,
     NOP,
     LD,
+    INC,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -108,7 +109,7 @@ fn add_reg_operand(arg: u8) -> Option<Operand> {
     }
 }
 
-fn decode_operand_reg_dd(arg: u8) -> Reg16 {
+fn decode_operand_reg_ddss(arg: u8) -> Reg16 {
     match arg & 0x3 {
         0 => Reg16::BC,
         1 => Reg16::DE,
@@ -228,7 +229,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
     if (ins[0] & 0xCF) == 0x01 {
         // LD dd, nn
         let arg = (ins[2] as u16) << 8 | ins[1] as u16;
-        let reg = decode_operand_reg_dd((ins[0] >> 4) & 0x3);
+        let reg = decode_operand_reg_ddss((ins[0] >> 4) & 0x3);
         let opcode = OpCode {
             data: vec![ins[0], ins[1], ins[2]],
             length: 3,
@@ -240,6 +241,21 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         };
         return Some(opcode);
     }
+    if (ins[0] & 0xCF) == 0x03 {
+        // INC ss
+        let reg = decode_operand_reg_ddss((ins[0] >> 4) & 0x3);
+        let opcode = OpCode {
+            data: vec![ins[0]],
+            length: 1,
+            ins: Instruction::INC,
+            op1: Some(Operand::Reg16(reg)),
+            op2: None,
+            mcycles: 1, // error in datasheet page 99 ?
+            tstates: vec![6],
+        };
+        return Some(opcode);
+    }
+
     None
 }
 
@@ -350,6 +366,19 @@ mod tests {
                 op2: Some(Operand::Reg8(Reg8::A)),
                 mcycles: 2,
                 tstates: vec!(4, 3),
+            })
+        );
+        // INC SP
+        assert_eq!(
+            disas(&[0x33]),
+            Some(OpCode {
+                data: vec!(0x33),
+                length: 1,
+                ins: Instruction::INC,
+                op1: Some(Operand::Reg16(Reg16::SP)),
+                op2: None,
+                mcycles: 1,
+                tstates: vec!(6),
             })
         );
     }

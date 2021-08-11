@@ -369,7 +369,20 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
                     }
                 }
             }
-        }
+        },
+        disas::Instruction::INC => {
+            let op1 = op.op1.ok_or("INC op1 missing")?;
+            match op1.size().ok_or("unsupported INC source size")? {
+                disas::OpSize::S1 => {
+                    let val = get_op8(s, op1);
+                    set_op8(s, op1, val + 1);
+                }
+                disas::OpSize::S2 => {
+                    let val = get_op16(s, op1);
+                    set_op16(s, op1, val + 1);
+                }
+            }
+        },
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     s.r.PC += op.length as u16;
