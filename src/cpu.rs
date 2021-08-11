@@ -141,6 +141,22 @@ impl Regs {
         }
         (r1 as u16) << 8 | r2 as u16
     }
+    fn set_flag(&mut self, f: Flag, val: bool) {
+        let shift = match f {
+            Flag::S => 7,
+            Flag::Z => 6,
+            Flag::H => 4,
+            Flag::PV => 2,
+            Flag::N => 1,
+            Flag::C => 0,
+        };
+        if val {
+            //set
+            self.F |= 1 << shift;
+        } else {
+            self.F &= !(1 << shift);
+        }
+    }
 }
 
 fn flag(s: &str, f: u8) -> &str {
@@ -287,21 +303,22 @@ fn set_op16(s: &mut State, op: disas::Operand, val: u16) {
     }
 }
 
-fn set_flag(s: &mut Regs, f: Flag, val: bool) {
-    let shift = match f {
-        Flag::S => 7,
-        Flag::Z => 6,
-        Flag::H => 4,
-        Flag::PV => 2,
-        Flag::N => 1,
-        Flag::C => 0,
-    };
-    if val {
-        //set
-        s.F |= 1 << shift;
-    } else {
-        s.F &= !(1 << shift);
-    }
+fn set_conditions_add_8(r: &mut Regs, a: i8, b: i8) -> u8 {
+    let real_res = a as i16 + b as i16; // easier for overflows, etc
+    let res = (real_res & 0xFF) as i8;
+    r.set_flag(Flag::S, res < 0);
+    r.set_flag(Flag::Z, res == 0);
+    r.set_flag(Flag::H, ((a & 0xF) + (b & 0xF)) != res & 0xF);
+    //dbg!(((a & 0xF) + (b & 0xF)) != res & 0xF);
+    //s.r.set_flag(Flag::PV, real_res < i8::MIN as i16 || real_res > i8::MAX as i16);
+    r.set_flag(
+        Flag::PV,
+        a.signum() == b.signum() && a.signum() != res.signum(),
+        );
+    r.set_flag(Flag::N, false);
+    r.set_flag(Flag::C, (a as u8).overflowing_add(b as u8).1);
+
+    res as u8
 }
 
 pub fn init() -> State {
@@ -314,23 +331,9 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
             let op1 = op.op1.ok_or("add op1 missing")?;
             let op2 = op.op2.ok_or("add op2 missing")?;
             let a = get_op8(s, op1) as i8;
-            let b: i8;
-            b = get_op8(s, op2) as i8;
-            let real_res = a as i16 + b as i16; // easier for overflows, etc
-            let res = (real_res & 0xFF) as i8;
-            set_op8(s, op1, res as u8);
-            set_flag(&mut s.r, Flag::S, res < 0);
-            set_flag(&mut s.r, Flag::Z, res == 0);
-            set_flag(&mut s.r, Flag::H, ((a & 0xF) + (b & 0xF)) != res & 0xF);
-            //dbg!(((a & 0xF) + (b & 0xF)) != res & 0xF);
-            //set_flag(s, Flag::PV, real_res < i8::MIN as i16 || real_res > i8::MAX as i16);
-            set_flag(
-                &mut s.r,
-                Flag::PV,
-                a.signum() == b.signum() && a.signum() != res.signum(),
-            );
-            set_flag(&mut s.r, Flag::N, false);
-            set_flag(&mut s.r, Flag::C, (a as u8).overflowing_add(b as u8).1);
+            let b = get_op8(s, op2) as i8;
+            let res = set_conditions_add_8(&mut s.r, a, b);
+            set_op8(s, op1, res);
         }
         disas::Instruction::NOP => {
             // nothing to do
