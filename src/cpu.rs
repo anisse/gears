@@ -338,8 +338,6 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
         disas::Instruction::LD => {
             let op1 = op.op1.ok_or("LD op1 missing")?;
             let op2 = op.op2.ok_or("LD op2 missing")?;
-            dbg!(op1);
-            dbg!(op2);
             match op2.size().ok_or("unsupported ld source size")? {
                 disas::OpSize::S1 => {
                     let val = get_op8(s, op2);
