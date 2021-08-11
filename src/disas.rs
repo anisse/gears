@@ -119,6 +119,19 @@ fn decode_operand_reg_ddss(arg: u8) -> Reg16 {
     }
 }
 
+fn decode_operand_reg_r(arg: u8) -> Reg8 {
+    match arg & 0x7 {
+        0 => Reg8::B,
+        1 => Reg8::C,
+        2 => Reg8::D,
+        3 => Reg8::E,
+        4 => Reg8::H,
+        5 => Reg8::L,
+        7 => Reg8::A,
+        _ => panic!("unknown reg arg {}", arg),
+    }
+}
+
 // An instruction can be one to four bytes
 pub fn disas(ins: &[u8]) -> Option<OpCode> {
     match ins[0] >> 3 {
@@ -255,6 +268,27 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         };
         return Some(opcode);
     }
+    if (ins[0] & 0xC7) == 0x04 {
+        // INC r
+        let op;
+        let opraw = (ins[0] >> 3) & 0x7;
+        if opraw == 0x6 {
+            op = Operand::RegAddr(Reg16::HL);
+        } else {
+            let reg = decode_operand_reg_r(opraw);
+            op = Operand::Reg8(reg);
+        }
+        let opcode = OpCode {
+            data: vec![ins[0]],
+            length: 1,
+            ins: Instruction::INC,
+            op1: Some(op),
+            op2: None,
+            mcycles: 1, // error in datasheet page 99 ?
+            tstates: vec![4],
+        };
+        return Some(opcode);
+    }
 
     None
 }
@@ -379,6 +413,19 @@ mod tests {
                 op2: None,
                 mcycles: 1,
                 tstates: vec!(6),
+            })
+        );
+        // INC D
+        assert_eq!(
+            disas(&[0x14]),
+            Some(OpCode {
+                data: vec!(0x14),
+                length: 1,
+                ins: Instruction::INC,
+                op1: Some(Operand::Reg8(Reg8::D)),
+                op2: None,
+                mcycles: 1,
+                tstates: vec!(4),
             })
         );
     }
