@@ -65,7 +65,7 @@ pub struct State {
 
 impl Regs {
     pub fn set_regpair(&mut self, reg: RegPair, val: u16) {
-        let r1 = (val & 0xFF00 >> 8) as u8;
+        let r1 = ((val & 0xFF00) >> 8) as u8;
         let r2 = (val & 0x00FF) as u8;
         match reg {
             RegPair::AF => {
