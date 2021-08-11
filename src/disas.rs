@@ -82,6 +82,7 @@ pub enum Instruction {
     NOP,
     LD,
     INC,
+    DEC,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -268,8 +269,17 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         };
         return Some(opcode);
     }
-    if (ins[0] & 0xC7) == 0x04 {
+    if (ins[0] & 0xC7) == 0x04 || //INC
+       (ins[0] & 0xC7) == 0x05 { // DEC
         // INC r
+        // INC (HL)
+        // DEC r
+        // DEC (HL)
+        let typ = if (ins[0] & 0xC7) == 0x04 {
+            Instruction::INC
+        } else {
+            Instruction::DEC
+        };
         let op;
         let tstates;
         let opraw = (ins[0] >> 3) & 0x7;
@@ -284,7 +294,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         let opcode = OpCode {
             data: vec![ins[0]],
             length: 1,
-            ins: Instruction::INC,
+            ins: typ,
             op1: Some(op),
             op2: None,
             mcycles: tstates.len() as u8,
@@ -426,6 +436,19 @@ mod tests {
                 length: 1,
                 ins: Instruction::INC,
                 op1: Some(Operand::Reg8(Reg8::D)),
+                op2: None,
+                mcycles: 1,
+                tstates: vec!(4),
+            })
+        );
+        // DEC A
+        assert_eq!(
+            disas(&[0x3D]),
+            Some(OpCode {
+                data: vec!(0x3D),
+                length: 1,
+                ins: Instruction::DEC,
+                op1: Some(Operand::Reg8(Reg8::A)),
                 op2: None,
                 mcycles: 1,
                 tstates: vec!(4),
