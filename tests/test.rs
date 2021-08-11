@@ -247,18 +247,10 @@ fn parse_tests(input: &str, expected: &str) -> Option<Vec<Test>> {
 // TODO can panic ?
 fn setup_memory(values: &[MemValues], mem: &mut mem::Memory) {
     //let mut mem = Vec::new();
-    let mut offset: usize = 0;
-    for (i, m) in values.iter().enumerate() {
+    for m in values.iter() {
         for (j, v) in m.values.iter().enumerate() {
             mem.set_u8(m.base_addr + j as u16, *v)
         }
-        /*
-        if i.base_addr as usize > offset {
-            mem.append(&mut vec![0; i.base_addr as usize - offset]);
-        }
-        offset += i.values.len();
-        mem.append(&mut i.values.clone());
-        */
     }
 }
 
