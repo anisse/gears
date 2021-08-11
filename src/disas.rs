@@ -263,7 +263,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             ins: Instruction::INC,
             op1: Some(Operand::Reg16(reg)),
             op2: None,
-            mcycles: 1, // error in datasheet page 99 ?
+            mcycles: 1,
             tstates: vec![6],
         };
         return Some(opcode);
@@ -271,12 +271,15 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
     if (ins[0] & 0xC7) == 0x04 {
         // INC r
         let op;
+        let tstates;
         let opraw = (ins[0] >> 3) & 0x7;
         if opraw == 0x6 {
             op = Operand::RegAddr(Reg16::HL);
+            tstates = vec![4, 4, 3];
         } else {
             let reg = decode_operand_reg_r(opraw);
             op = Operand::Reg8(reg);
+            tstates = vec![4];
         }
         let opcode = OpCode {
             data: vec![ins[0]],
@@ -284,8 +287,8 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             ins: Instruction::INC,
             op1: Some(op),
             op2: None,
-            mcycles: 1, // error in datasheet page 99 ?
-            tstates: vec![4],
+            mcycles: tstates.len() as u8,
+            tstates,
         };
         return Some(opcode);
     }
