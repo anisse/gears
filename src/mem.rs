@@ -58,7 +58,7 @@ impl fmt::Debug for Memory {
                 if i > 0 {
                     if i >= 16 && self.mem.len() > i + 16 {
                         if self.mem[i - 16..i] == self.mem[i..i + 16] {
-                            if ! star {
+                            if !star {
                                 f.write_str("\n*")?;
                             }
                             i += 16;

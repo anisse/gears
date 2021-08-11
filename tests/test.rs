@@ -57,7 +57,6 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
             Ok(x) => x,
             Err(_) => return Err(format!("bad {} at line {}: {}", name, input[0], regs[i])),
         };
-
         st.r.set_regpair(*reg, val);
     }
 
@@ -266,7 +265,7 @@ fn run_instructions() {
 
     for t in tests.iter() {
         let mut state = t.start_state.clone();
-        let mut data = mem::Memory::from(vec![0; 48*1024]); // This test suite is for machines with more RAM
+        let mut data = mem::Memory::from(vec![0; 48 * 1024]); // This test suite is for machines with more RAM
         setup_memory(&t.memory_values, &mut data);
         let mut end_state = t.end_state.clone();
         end_state.mem = data.clone();
