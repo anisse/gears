@@ -8,7 +8,7 @@ pub struct Memory {
 
 // TODO: mem errors
 impl Memory {
-    fn init(size: usize) -> Memory {
+    pub fn init(size: usize) -> Memory {
         Memory { mem: vec![0; size] }
     }
     // TODO: implement memory map (e.g ROM read-only)
