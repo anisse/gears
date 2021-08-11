@@ -314,9 +314,21 @@ fn set_conditions_add_8(r: &mut Regs, a: i8, b: i8) -> u8 {
     r.set_flag(
         Flag::PV,
         a.signum() == b.signum() && a.signum() != res.signum(),
-        );
+    );
     r.set_flag(Flag::N, false);
     r.set_flag(Flag::C, (a as u8).overflowing_add(b as u8).1);
+
+    res as u8
+}
+fn set_conditions_inc_8(r: &mut Regs, a: i8) -> u8 {
+    let b = 1_i8;
+    let real_res = a as i16 + b as i16; // easier for overflows, etc
+    let res = (real_res & 0xFF) as i8;
+    r.set_flag(Flag::S, res < 0);
+    r.set_flag(Flag::Z, res == 0);
+    r.set_flag(Flag::H, ((a & 0xF) + (b & 0xF)) != res & 0xF);
+    r.set_flag(Flag::PV, a == 0x7F);
+    r.set_flag(Flag::N, false);
 
     res as u8
 }
@@ -372,20 +384,23 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
                     }
                 }
             }
-        },
+        }
         disas::Instruction::INC => {
             let op1 = op.op1.ok_or("INC op1 missing")?;
             match op1.size().ok_or("unsupported INC source size")? {
                 disas::OpSize::S1 => {
-                    let val = get_op8(s, op1);
-                    set_op8(s, op1, val + 1);
+                    // Sets conditions
+                    let val = get_op8(s, op1) as i8;
+                    let res = set_conditions_inc_8(&mut s.r, val);
+                    set_op8(s, op1, res);
                 }
                 disas::OpSize::S2 => {
+                    // Does not set conditions
                     let val = get_op16(s, op1);
                     set_op16(s, op1, val + 1);
                 }
             }
-        },
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     s.r.PC += op.length as u16;
