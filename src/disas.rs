@@ -83,6 +83,10 @@ pub enum Instruction {
     LD,
     INC,
     DEC,
+    RLCA,
+    RLA,
+    RRCA,
+    RRA,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -180,6 +184,15 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         }
         _ => {}
     }
+    let rlca = OpCode {
+        data: vec![ins[0]],
+        length: 1,
+        ins: Instruction::RLCA,
+        op1: Some(Operand::Reg8(Reg8::A)),
+        op2: None,
+        mcycles: 1,
+        tstates: vec![4],
+    };
     match ins[0] {
         0x00 => {
             return Some(OpCode {
@@ -208,6 +221,25 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 mcycles: 2,
                 tstates: vec![4, 3],
             });
+        }
+        0x07 => return Some(rlca),
+        0x17 => {
+            return Some(OpCode {
+                ins: Instruction::RLA,
+                ..rlca
+            })
+        }
+        0x0F => {
+            return Some(OpCode {
+                ins: Instruction::RRCA,
+                ..rlca
+            })
+        }
+        0x1F => {
+            return Some(OpCode {
+                ins: Instruction::RRA,
+                ..rlca
+            })
         }
         0xC6 => {
             // ADD a, n
