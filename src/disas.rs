@@ -255,6 +255,31 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         };
         return Some(opcode);
     }
+    if (ins[0] & 0xC7) == 0x06 {
+        // LD r, n
+        // LD (HL), n
+        let op;
+        let tstates;
+        let opraw = (ins[0] >> 3) & 0x7;
+        if opraw == 0x6 {
+            op = Operand::RegAddr(Reg16::HL);
+            tstates = vec![4, 3, 3];
+        } else {
+            let reg = decode_operand_reg_r(opraw);
+            op = Operand::Reg8(reg);
+            tstates = vec![4, 3];
+        }
+        let opcode = OpCode {
+            data: vec![ins[0], ins[1]],
+            length: 2,
+            ins: Instruction::LD,
+            op1: Some(op),
+            op2: Some(Operand::Imm8(ins[1])),
+            mcycles: tstates.len() as u8,
+            tstates,
+        };
+        return Some(opcode);
+    }
     if (ins[0] & 0xCF) == 0x03 {
         // INC ss
         let reg = decode_operand_reg_ddss((ins[0] >> 4) & 0x3);
@@ -415,6 +440,32 @@ mod tests {
                 op2: Some(Operand::Reg8(Reg8::A)),
                 mcycles: 2,
                 tstates: vec!(4, 3),
+            })
+        );
+        // LD r, n
+        assert_eq!(
+            disas(&[0x3E, 0x42]),
+            Some(OpCode {
+                data: vec!(0x3E, 0x42),
+                length: 2,
+                ins: Instruction::LD,
+                op1: Some(Operand::Reg8(Reg8::A)),
+                op2: Some(Operand::Imm8(0x42)),
+                mcycles: 2,
+                tstates: vec!(4, 3),
+            })
+        );
+        // LD (HL), n
+        assert_eq!(
+            disas(&[0x36, 0x33]),
+            Some(OpCode {
+                data: vec!(0x36, 0x33),
+                length: 2,
+                ins: Instruction::LD,
+                op1: Some(Operand::RegAddr(Reg16::HL)),
+                op2: Some(Operand::Imm8(0x33)),
+                mcycles: 3,
+                tstates: vec!(4, 3, 3),
             })
         );
         // INC SP
