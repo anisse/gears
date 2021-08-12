@@ -464,6 +464,7 @@ pub fn run(s: &mut State, tstates_len: usize) -> Result<(), String> {
         // TODO: split into m states, fetch etc
         let disas_target = s.mem.fetch_range(s.r.PC, s.mem.len() as u16);
         if let Some(op) = disas::disas(disas_target) {
+            dbg!(&op);
             run_op(s, &op)?;
             let op_len: usize = op.tstates.iter().fold(0, |sum, x| sum + (*x as usize));
             tstates_len = usize::saturating_sub(tstates_len, op_len);
