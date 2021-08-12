@@ -88,6 +88,7 @@ pub enum Instruction {
     RLA,
     RRCA,
     RRA,
+    EX,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -241,6 +242,28 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 ins: Instruction::RRA,
                 ..rlca
             })
+        }
+        0x08 | 0xEB => {
+            // EX AF, AF'
+            // EX DE, HL
+            let op1;
+            let op2;
+            if ins[0] == 0x08 {
+                op1 = Some(Operand::Reg16(Reg16::AF));
+                op2 = Some(Operand::Reg16(Reg16::AFp));
+            } else {
+                op1 = Some(Operand::Reg16(Reg16::DE));
+                op2 = Some(Operand::Reg16(Reg16::HL));
+            }
+            return Some(OpCode {
+                data: vec![ins[0]],
+                length: 1,
+                ins: Instruction::EX,
+                op1,
+                op2,
+                mcycles: 1,
+                tstates: vec![4],
+            });
         }
         0xC6 => {
             // ADD a, n
