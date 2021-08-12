@@ -422,6 +422,12 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
                 }
             }
         }
+        disas::Instruction::RLCA => {
+            s.r.A = s.r.A.rotate_left(1);
+            s.r.set_flag(Flag::C, s.r.A & 0x1 != 0);
+            s.r.set_flag(Flag::H, false);
+            s.r.set_flag(Flag::N, false);
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     s.r.PC += op.length as u16;
