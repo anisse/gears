@@ -453,6 +453,14 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
         }
+        disas::Instruction::EX => {
+            let op1 = op.op1.ok_or("EX op1 missing")?;
+            let op2 = op.op2.ok_or("EX op2 missing")?;
+            let a = get_op16(s, op1);
+            let b = get_op16(s, op2);
+            set_op16(s, op1, b);
+            set_op16(s, op2, a);
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     s.r.PC += op.length as u16;
