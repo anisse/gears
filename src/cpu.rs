@@ -5,7 +5,9 @@ use std::fmt;
 enum Flag {
     S,
     Z,
+    F5,
     H,
+    F3,
     PV,
     N,
     C,
@@ -145,7 +147,9 @@ impl Regs {
         let shift = match f {
             Flag::S => 7,
             Flag::Z => 6,
+            Flag::F5 => 5,
             Flag::H => 4,
+            Flag::F3 => 3,
             Flag::PV => 2,
             Flag::N => 1,
             Flag::C => 0,
