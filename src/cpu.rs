@@ -317,31 +317,32 @@ fn set_op16(s: &mut State, op: disas::Operand, val: u16) {
 }
 
 fn set_conditions_add_8(r: &mut Regs, a: i8, b: i8) -> u8 {
+    r.set_flag(Flag::C, (a as u8).overflowing_add(b as u8).1);
+
+    set_conditions_add8_base(r, a, b)
+}
+fn set_conditions_inc8_dec8(r: &mut Regs, a: i8, b: i8) -> u8 {
+    let res = set_conditions_add8_base(r, a, b);
+    if b < 0 {
+        // invert H to mean borrow
+        r.set_flag(Flag::H, (r.F & 0x10) ^ 0x10 != 0)
+    }
+    r.set_flag(Flag::N, b < 0);
+    res
+}
+fn set_conditions_add8_base(r: &mut Regs, a: i8, b: i8) -> u8 {
     let real_res = a as i16 + b as i16; // easier for overflows, etc
     let res = (real_res & 0xFF) as i8;
     r.set_flag(Flag::S, res < 0);
     r.set_flag(Flag::Z, res == 0);
-    r.set_flag(Flag::H, ((a & 0xF) + (b & 0xF)) != res & 0xF);
-    //dbg!(((a & 0xF) + (b & 0xF)) != res & 0xF);
-    //s.r.set_flag(Flag::PV, real_res < i8::MIN as i16 || real_res > i8::MAX as i16);
+    r.set_flag(Flag::H, (a ^ b ^ res) & 0x10 != 0);
     r.set_flag(
         Flag::PV,
         a.signum() == b.signum() && a.signum() != res.signum(),
     );
     r.set_flag(Flag::N, false);
-    r.set_flag(Flag::C, (a as u8).overflowing_add(b as u8).1);
-
-    res as u8
-}
-fn set_conditions_inc_8(r: &mut Regs, a: i8) -> u8 {
-    let b = 1_i8;
-    let real_res = a as i16 + b as i16; // easier for overflows, etc
-    let res = (real_res & 0xFF) as i8;
-    r.set_flag(Flag::S, res < 0);
-    r.set_flag(Flag::Z, res == 0);
-    r.set_flag(Flag::H, ((a & 0xF) + (b & 0xF)) != res & 0xF);
-    r.set_flag(Flag::PV, a == 0x7F);
-    r.set_flag(Flag::N, false);
+    r.set_flag(Flag::F5, res & (1 << 5) != 0);
+    r.set_flag(Flag::F3, res & (1 << 3) != 0);
 
     res as u8
 }
@@ -398,19 +399,25 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
                 }
             }
         }
-        disas::Instruction::INC => {
+        disas::Instruction::INC | disas::Instruction::DEC => {
             let op1 = op.op1.ok_or("INC op1 missing")?;
+            let inc = if op.ins == disas::Instruction::INC {
+                1
+            } else {
+                -1
+            };
             match op1.size().ok_or("unsupported INC source size")? {
                 disas::OpSize::S1 => {
                     // Sets conditions
                     let val = get_op8(s, op1) as i8;
-                    let res = set_conditions_inc_8(&mut s.r, val);
+                    let res = set_conditions_inc8_dec8(&mut s.r, val, inc);
                     set_op8(s, op1, res);
                 }
                 disas::OpSize::S2 => {
                     // Does not set conditions
                     let val = get_op16(s, op1);
-                    set_op16(s, op1, val + 1);
+                    let (res, _) = val.overflowing_add(inc as u16);
+                    set_op16(s, op1, res);
                 }
             }
         }
@@ -479,7 +486,7 @@ mod tests {
             s.r,
             Regs {
                 A: -2_i8 as u8,
-                F: 0x91,
+                F: 0xb9,
                 PC: 1,
                 R: 1,
                 ..default
