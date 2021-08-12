@@ -288,22 +288,40 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         0xDD => {}
         _ => {}
     }
-    if (ins[0] & 0xCF) == 0x01 {
-        // LD dd, nn
-        let arg = (ins[2] as u16) << 8 | ins[1] as u16;
-        let reg = decode_operand_reg_ddss((ins[0] >> 4) & 0x3);
-        let opcode = OpCode {
-            data: vec![ins[0], ins[1], ins[2]],
-            length: 3,
-            ins: Instruction::LD,
-            op1: Some(Operand::Reg16(reg)),
-            op2: Some(Operand::Imm16(arg)),
-            mcycles: 3, // error in datasheet page 99 ?
-            tstates: vec![4, 3, 3],
-        };
-        return Some(opcode);
+    match ins[0] & 0xCF {
+        0x01 => {
+            // LD dd, nn
+            let arg = (ins[2] as u16) << 8 | ins[1] as u16;
+            let reg = decode_operand_reg_ddss((ins[0] >> 4) & 0x3);
+            let opcode = OpCode {
+                data: vec![ins[0], ins[1], ins[2]],
+                length: 3,
+                ins: Instruction::LD,
+                op1: Some(Operand::Reg16(reg)),
+                op2: Some(Operand::Imm16(arg)),
+                mcycles: 3, // error in datasheet page 99 ?
+                tstates: vec![4, 3, 3],
+            };
+            return Some(opcode);
+        }
+        0x03 => {
+            // INC ss
+            let reg = decode_operand_reg_ddss((ins[0] >> 4) & 0x3);
+            let opcode = OpCode {
+                data: vec![ins[0]],
+                length: 1,
+                ins: Instruction::INC,
+                op1: Some(Operand::Reg16(reg)),
+                op2: None,
+                mcycles: 1,
+                tstates: vec![6],
+            };
+            return Some(opcode);
+        }
+        _ => {}
     }
-    if (ins[0] & 0xC7) == 0x06 {
+    match ins[0] & 0xC7 {
+    0x06 => {
         // LD r, n
         // LD (HL), n
         let op;
@@ -328,24 +346,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         };
         return Some(opcode);
     }
-    if (ins[0] & 0xCF) == 0x03 {
-        // INC ss
-        let reg = decode_operand_reg_ddss((ins[0] >> 4) & 0x3);
-        let opcode = OpCode {
-            data: vec![ins[0]],
-            length: 1,
-            ins: Instruction::INC,
-            op1: Some(Operand::Reg16(reg)),
-            op2: None,
-            mcycles: 1,
-            tstates: vec![6],
-        };
-        return Some(opcode);
-    }
-    if (ins[0] & 0xC7) == 0x04 || //INC
-       (ins[0] & 0xC7) == 0x05
-    //DEC
-    {
+    0x04 | 0x05 /* INC | DEC */ => {
         // INC r
         // INC (HL)
         // DEC r
@@ -376,6 +377,8 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             tstates,
         };
         return Some(opcode);
+    }
+        _ => {}
     }
 
     None
