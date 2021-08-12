@@ -8,14 +8,6 @@ pub enum Reg8 {
     E,
     H,
     L,
-    Ap,
-    Fp,
-    Bp,
-    Cp,
-    Dp,
-    Ep,
-    Hp,
-    Lp,
 }
 /*
 #[derive(Debug, PartialEq, Clone, Copy)]
