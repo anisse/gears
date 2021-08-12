@@ -279,6 +279,7 @@ fn set_op8(s: &mut State, op: disas::Operand, val: u8) {
             disas::Reg16::DE => s.mem.set_u8(s.r.get_regpair(RegPair::DE), val),
             disas::Reg16::HL => s.mem.set_u8(s.r.get_regpair(RegPair::HL), val),
             disas::Reg16::SP => s.mem.set_u8(s.r.SP, val),
+            disas::Reg16::AFp => s.mem.set_u8(s.r.get_regpair(RegPair::AFp), val),
         },
         _ => panic!(
             "Unknown operand {:?} or size not 8, or writing unsupported",
@@ -295,6 +296,7 @@ fn get_op16(s: &State, op: disas::Operand) -> u16 {
             disas::Reg16::BC => s.r.get_regpair(RegPair::BC),
             disas::Reg16::DE => s.r.get_regpair(RegPair::DE),
             disas::Reg16::HL => s.r.get_regpair(RegPair::HL),
+            disas::Reg16::AFp => s.r.get_regpair(RegPair::AFp),
             disas::Reg16::SP => s.r.SP,
         },
         _ => panic!("Unknown operand {:?} or size not 16", op),
@@ -308,6 +310,7 @@ fn set_op16(s: &mut State, op: disas::Operand, val: u16) {
             disas::Reg16::BC => s.r.set_regpair(RegPair::BC, val),
             disas::Reg16::DE => s.r.set_regpair(RegPair::DE, val),
             disas::Reg16::HL => s.r.set_regpair(RegPair::HL, val),
+            disas::Reg16::AFp => s.r.set_regpair(RegPair::AFp, val),
             disas::Reg16::SP => s.r.SP = val,
         },
         _ => panic!(

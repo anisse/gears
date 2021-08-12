@@ -33,6 +33,7 @@ pub enum Reg16 {
     DE,
     HL,
     SP,
+    AFp,
 }
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RegI {
