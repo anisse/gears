@@ -270,7 +270,9 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         return Some(opcode);
     }
     if (ins[0] & 0xC7) == 0x04 || //INC
-       (ins[0] & 0xC7) == 0x05 { // DEC
+       (ins[0] & 0xC7) == 0x05
+    //DEC
+    {
         // INC r
         // INC (HL)
         // DEC r
