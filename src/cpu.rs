@@ -25,7 +25,7 @@ pub enum RegPair {
     HLp,
 }
 
-#[derive(Default, Debug, PartialEq, Clone, Copy)]
+#[derive(Default, PartialEq, Clone, Copy)]
 #[allow(non_snake_case)]
 pub struct Regs {
     pub A: u8,
@@ -167,54 +167,63 @@ fn flag(s: &str, f: u8) -> &str {
     if f != 0 {
         return s;
     }
-    ""
+    "-"
 }
 
 impl fmt::Display for Regs {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "AF: {:X} ({}) F: {} {} {} {} {} {} \n\
-             BC: {:X} ({}) \n\
-             DE: {:X} ({}) \n\
+            "A: {:02X} ({}) F: {}{}{}{}{}{}{}{} \
+             BC: {:X} ({}) \
+             DE: {:X} ({}) \
              HL: {:X} ({}) \n\
-             AF': {:X} ({}) F: {} {} {} {} {} {} \n\
-             BC': {:X} ({}) \n\
-             DE': {:X} ({}) \n\
+             AF': {:X} ({}) F: {}{}{}{}{}{}{}{} \
+             BC': {:X} ({}) \
+             DE': {:X} ({}) \
              HL': {:X} ({}) \n\
-             SP: {:X}\n\
+             SP: {:X} \
              PC: {:X}",
-            self.get_regpair(RegPair::AF),
-            self.get_regpair(RegPair::AF) as i8,
+            self.A,
+            self.A as i8,
             flag("S", self.F & 0x80),
             flag("Z", self.F & 0x40),
+            flag("Y", self.F & 0x20),
             flag("H", self.F & 0x10),
+            flag("X", self.F & 0x08),
             flag("PV", self.F & 0x04),
             flag("N", self.F & 0x02),
             flag("C", self.F & 0x01),
             self.get_regpair(RegPair::BC),
-            self.get_regpair(RegPair::BC) as i8,
+            self.get_regpair(RegPair::BC) as i16,
             self.get_regpair(RegPair::DE),
-            self.get_regpair(RegPair::DE) as i8,
+            self.get_regpair(RegPair::DE) as i16,
             self.get_regpair(RegPair::HL),
-            self.get_regpair(RegPair::HL) as i8,
+            self.get_regpair(RegPair::HL) as i16,
             self.get_regpair(RegPair::AFp),
-            self.get_regpair(RegPair::AFp) as i8,
+            self.get_regpair(RegPair::AFp) as i16,
             flag("S", self.Fp & 0x80),
             flag("Z", self.Fp & 0x40),
+            flag("Y", self.Fp & 0x20),
             flag("H", self.Fp & 0x10),
+            flag("X", self.Fp & 0x80),
             flag("PV", self.Fp & 0x04),
             flag("N", self.Fp & 0x02),
             flag("C", self.Fp & 0x01),
             self.get_regpair(RegPair::BCp),
-            self.get_regpair(RegPair::BCp) as i8,
+            self.get_regpair(RegPair::BCp) as i16,
             self.get_regpair(RegPair::DEp),
-            self.get_regpair(RegPair::DEp) as i8,
+            self.get_regpair(RegPair::DEp) as i16,
             self.get_regpair(RegPair::HLp),
-            self.get_regpair(RegPair::HLp) as i8,
+            self.get_regpair(RegPair::HLp) as i16,
             self.SP,
             self.PC
         )
+    }
+}
+impl fmt::Debug for Regs {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self)
     }
 }
 fn get_op8(s: &State, op: disas::Operand) -> u8 {
