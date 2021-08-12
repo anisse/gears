@@ -307,7 +307,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         0x03 => {
             // INC ss
             let reg = decode_operand_reg_ddss((ins[0] >> 4) & 0x3);
-            let opcode = OpCode {
+            return Some(OpCode {
                 data: vec![ins[0]],
                 length: 1,
                 ins: Instruction::INC,
@@ -315,8 +315,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 op2: None,
                 mcycles: 1,
                 tstates: vec![6],
-            };
-            return Some(opcode);
+            })
         }
         _ => {}
     }
