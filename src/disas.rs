@@ -315,7 +315,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 op2: None,
                 mcycles: 1,
                 tstates: vec![6],
-            })
+            });
         }
         0x09 => {
             // ADD HL, ss
@@ -328,7 +328,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 op2: Some(Operand::Reg16(reg)),
                 mcycles: 3,
                 tstates: vec![4, 4, 3],
-            })
+            });
         }
         _ => {}
     }

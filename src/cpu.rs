@@ -309,6 +309,7 @@ fn set_conditions_add_8(r: &mut Regs, a: i8, b: i8) -> u8 {
 
     set_conditions_add8_base(r, a, b)
 }
+
 fn set_conditions_inc8_dec8(r: &mut Regs, a: i8, b: i8) -> u8 {
     let res = set_conditions_add8_base(r, a, b);
     if b < 0 {
@@ -318,6 +319,7 @@ fn set_conditions_inc8_dec8(r: &mut Regs, a: i8, b: i8) -> u8 {
     r.set_flag(Flag::N, b < 0);
     res
 }
+
 fn set_conditions_add8_base(r: &mut Regs, a: i8, b: i8) -> u8 {
     let real_res = a as i16 + b as i16; // easier for overflows, etc
     let res = (real_res & 0xFF) as i8;
