@@ -257,6 +257,7 @@ fn get_op8(s: &State, op: disas::Operand) -> u8 {
             disas::Reg8::H => s.r.H,
             disas::Reg8::L => s.r.L,
         },
+        disas::Operand::RegAddr(reg) => s.mem.fetch_u8(s.r.get_regpair(RegPair::from(reg))),
         disas::Operand::Imm8(imm) => imm,
         _ => panic!("Unknown operand {:?} or size not 8", op),
     }
@@ -379,7 +380,12 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
         disas::Instruction::LD => {
             let op1 = op.op1.ok_or("LD op1 missing")?;
             let op2 = op.op2.ok_or("LD op2 missing")?;
-            match op2.size().ok_or("unsupported ld source size")? {
+            // transfer size == min(op1, op1)
+            let size = op2
+                .size()
+                .or_else(|| op1.size())
+                .ok_or("unsupported ld size")?;
+            match size {
                 disas::OpSize::S1 => {
                     let val = get_op8(s, op2);
                     set_op8(s, op1, val);
@@ -409,6 +415,12 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
                         panic!("Unknown MEMPTR LD update op1 {:?}", op1)
                     }
                 }
+            } else if let disas::Operand::RegAddr(reg) = op2 {
+                s.r.MEMPTR = s.r.get_regpair(RegPair::from(reg)) + 1
+            } else if let disas::Operand::Address(addr) = op1 {
+                s.r.MEMPTR = addr + 1
+            } else if let disas::Operand::Address(addr) = op2 {
+                s.r.MEMPTR = addr + 1
             }
         }
         disas::Instruction::INC | disas::Instruction::DEC => {
