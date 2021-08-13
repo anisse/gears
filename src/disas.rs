@@ -285,7 +285,6 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             };
             return Some(opcode);
         }
-        0xDD => {}
         _ => {}
     }
     match ins[0] & 0xCF {
