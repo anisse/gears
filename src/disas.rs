@@ -257,6 +257,24 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 tstates: vec![4],
             });
         }
+        0x0A | 0x1A => {
+            // LD A, (BC)
+            // LD A, (DE)
+            let op2 = if ins[0] == 0x0A {
+                Some(Operand::RegAddr(Reg16::BC))
+            } else {
+                Some(Operand::RegAddr(Reg16::DE))
+            };
+            return Some(OpCode {
+                data: vec![ins[0]],
+                length: 1,
+                ins: Instruction::LD,
+                op1: Some(Operand::Reg8(Reg8::A)),
+                op2,
+                mcycles: 2,
+                tstates: vec![4, 3],
+            });
+        }
         0xC6 => {
             // ADD a, n
             let arg = ins[1];
@@ -567,6 +585,19 @@ mod tests {
                 op2: None,
                 mcycles: 1,
                 tstates: vec!(4),
+            })
+        );
+        // LD A, (DE)
+        assert_eq!(
+            disas(&[0x1A]),
+            Some(OpCode {
+                data: vec!(0x1A),
+                length: 1,
+                ins: Instruction::LD,
+                op1: Some(Operand::Reg8(Reg8::A)),
+                op2: Some(Operand::RegAddr(Reg16::DE)),
+                mcycles: 2,
+                tstates: vec!(4, 3),
             })
         );
     }
