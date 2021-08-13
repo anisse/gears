@@ -182,8 +182,7 @@ impl fmt::Display for Regs {
              BC': {:X} ({}) \
              DE': {:X} ({}) \
              HL': {:X} ({}) \n\
-             SP: {:X} \
-             PC: {:X}",
+             SP: {:X} PC: {:X} MEMPTR: {:X}",
             self.A,
             self.A as i8,
             flag("S", self.F & 0x80),
@@ -217,7 +216,8 @@ impl fmt::Display for Regs {
             self.get_regpair(RegPair::HLp),
             self.get_regpair(RegPair::HLp) as i16,
             self.SP,
-            self.PC
+            self.PC,
+            self.MEMPTR
         )
     }
 }
