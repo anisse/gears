@@ -337,6 +337,20 @@ fn set_conditions_add8_base(r: &mut Regs, a: i8, b: i8) -> u8 {
     res as u8
 }
 
+fn set_conditions_add_16(r: &mut Regs, a: i16, b: i16) -> u16 {
+    let real_res = a as i32 + b as i32; // easier for overflows, etc
+    let res = (real_res & 0xFFFF) as i16;
+    println!("a = {:04X}, b = {:04X}, res = {:04X}, a ^ b = {:04X}, a ^ b ^ res = {:04X}, & 0x1000 = {:04X}", a, b, res, a ^b, a ^ b ^ res, (a ^ b ^res) & 0x1000);
+    r.set_flag(Flag::H, (a ^ b ^ res) & 0x1000 != 0);
+    r.set_flag(Flag::N, false);
+    r.set_flag(Flag::F5, res & (1 << 5) != 0);
+    r.set_flag(Flag::F3, res & (1 << 3) != 0);
+
+    r.set_flag(Flag::C, (a as u16).overflowing_add(b as u16).1);
+
+    res as u16
+}
+
 pub fn init() -> State {
     State::default()
 }
@@ -346,10 +360,21 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
         disas::Instruction::ADD => {
             let op1 = op.op1.ok_or("add op1 missing")?;
             let op2 = op.op2.ok_or("add op2 missing")?;
-            let a = get_op8(s, op1) as i8;
-            let b = get_op8(s, op2) as i8;
-            let res = set_conditions_add_8(&mut s.r, a, b);
-            set_op8(s, op1, res);
+            match op1.size().ok_or("unsupported add size")? {
+                disas::OpSize::S1 => {
+                    let a = get_op8(s, op1) as i8;
+                    let b = get_op8(s, op2) as i8;
+                    let res = set_conditions_add_8(&mut s.r, a, b);
+                    set_op8(s, op1, res);
+                }
+                disas::OpSize::S2 => {
+                    let a = get_op16(s, op1) as i16;
+                    let b = get_op16(s, op2) as i16;
+                    let res = set_conditions_add_16(&mut s.r, a, b);
+                    s.r.MEMPTR = a.overflowing_add(1).0 as u16;
+                    set_op16(s, op1, res);
+                }
+            }
         }
         disas::Instruction::NOP => {
             // nothing to do
