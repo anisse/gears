@@ -334,6 +334,19 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 tstates: vec![6],
             });
         }
+        0x0B => {
+            // DEC ss
+            let reg = decode_operand_reg_ddss((ins[0] >> 4) & 0x3);
+            return Some(OpCode {
+                data: vec![ins[0]],
+                length: 1,
+                ins: Instruction::DEC,
+                op1: Some(Operand::Reg16(reg)),
+                op2: None,
+                mcycles: 1,
+                tstates: vec![6],
+            });
+        }
         0x09 => {
             // ADD HL, ss
             let reg = decode_operand_reg_ddss((ins[0] >> 4) & 0x3);
