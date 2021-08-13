@@ -23,6 +23,20 @@ pub enum RegPair {
     BCp,
     DEp,
     HLp,
+    SP, // for convenience
+}
+
+impl From<disas::Reg16> for RegPair {
+    fn from(r: disas::Reg16) -> Self {
+        match r {
+            disas::Reg16::AF => RegPair::AF,
+            disas::Reg16::BC => RegPair::BC,
+            disas::Reg16::DE => RegPair::DE,
+            disas::Reg16::HL => RegPair::HL,
+            disas::Reg16::AFp => RegPair::AFp,
+            disas::Reg16::SP => RegPair::SP,
+        }
+    }
 }
 
 #[derive(Default, PartialEq, Clone, Copy)]
@@ -102,6 +116,9 @@ impl Regs {
                 self.Hp = r1;
                 self.Lp = r2
             }
+            RegPair::SP => {
+                self.SP = val;
+            }
         }
     }
     pub fn get_regpair(&self, reg: RegPair) -> u16 {
@@ -140,6 +157,7 @@ impl Regs {
                 r1 = self.Hp;
                 r2 = self.Lp
             }
+            RegPair::SP => return self.SP,
         }
         (r1 as u16) << 8 | r2 as u16
     }
@@ -257,14 +275,7 @@ fn set_op8(s: &mut State, op: disas::Operand, val: u8) {
             disas::Reg8::H => s.r.H = val,
             disas::Reg8::L => s.r.L = val,
         },
-        disas::Operand::RegAddr(reg) => match reg {
-            disas::Reg16::AF => s.mem.set_u8(s.r.get_regpair(RegPair::AF), val),
-            disas::Reg16::BC => s.mem.set_u8(s.r.get_regpair(RegPair::BC), val),
-            disas::Reg16::DE => s.mem.set_u8(s.r.get_regpair(RegPair::DE), val),
-            disas::Reg16::HL => s.mem.set_u8(s.r.get_regpair(RegPair::HL), val),
-            disas::Reg16::SP => s.mem.set_u8(s.r.SP, val),
-            disas::Reg16::AFp => s.mem.set_u8(s.r.get_regpair(RegPair::AFp), val),
-        },
+        disas::Operand::RegAddr(reg) => s.mem.set_u8(s.r.get_regpair(RegPair::from(reg)), val),
         _ => panic!(
             "Unknown operand {:?} or size not 8, or writing unsupported",
             op
@@ -275,28 +286,14 @@ fn set_op8(s: &mut State, op: disas::Operand, val: u8) {
 fn get_op16(s: &State, op: disas::Operand) -> u16 {
     match op {
         disas::Operand::Imm16(x) => x,
-        disas::Operand::Reg16(reg) => match reg {
-            disas::Reg16::AF => s.r.get_regpair(RegPair::AF),
-            disas::Reg16::BC => s.r.get_regpair(RegPair::BC),
-            disas::Reg16::DE => s.r.get_regpair(RegPair::DE),
-            disas::Reg16::HL => s.r.get_regpair(RegPair::HL),
-            disas::Reg16::AFp => s.r.get_regpair(RegPair::AFp),
-            disas::Reg16::SP => s.r.SP,
-        },
+        disas::Operand::Reg16(reg) => s.r.get_regpair(RegPair::from(reg)),
         _ => panic!("Unknown operand {:?} or size not 16", op),
     }
 }
 
 fn set_op16(s: &mut State, op: disas::Operand, val: u16) {
     match op {
-        disas::Operand::Reg16(reg) => match reg {
-            disas::Reg16::AF => s.r.set_regpair(RegPair::AF, val),
-            disas::Reg16::BC => s.r.set_regpair(RegPair::BC, val),
-            disas::Reg16::DE => s.r.set_regpair(RegPair::DE, val),
-            disas::Reg16::HL => s.r.set_regpair(RegPair::HL, val),
-            disas::Reg16::AFp => s.r.set_regpair(RegPair::AFp, val),
-            disas::Reg16::SP => s.r.SP = val,
-        },
+        disas::Operand::Reg16(reg) => s.r.set_regpair(RegPair::from(reg), val),
         _ => panic!(
             "Unknown operand {:?} or size not 16, or writing unsupported",
             op
