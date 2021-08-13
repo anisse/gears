@@ -450,6 +450,8 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
             s.r.set_flag(Flag::C, s.r.A & 0x1 != 0);
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
+            s.r.set_flag(Flag::F5, s.r.A & (1 << 5) != 0);
+            s.r.set_flag(Flag::F3, s.r.A & (1 << 3) != 0);
         }
         disas::Instruction::RLA => {
             let a = s.r.A;
@@ -458,12 +460,16 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
             s.r.set_flag(Flag::C, s.r.A & 0x80 != 0);
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
+            s.r.set_flag(Flag::F5, s.r.A & (1 << 5) != 0);
+            s.r.set_flag(Flag::F3, s.r.A & (1 << 3) != 0);
         }
         disas::Instruction::RRCA => {
             s.r.A = s.r.A.rotate_right(1);
             s.r.set_flag(Flag::C, s.r.A & 0x80 != 0);
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
+            s.r.set_flag(Flag::F5, s.r.A & (1 << 5) != 0);
+            s.r.set_flag(Flag::F3, s.r.A & (1 << 3) != 0);
         }
         disas::Instruction::RRA => {
             let a = s.r.A;
@@ -472,6 +478,8 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
             s.r.set_flag(Flag::C, s.r.A & 0x1 != 0);
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
+            s.r.set_flag(Flag::F5, s.r.A & (1 << 5) != 0);
+            s.r.set_flag(Flag::F3, s.r.A & (1 << 3) != 0);
         }
         disas::Instruction::EX => {
             let op1 = op.op1.ok_or("EX op1 missing")?;
