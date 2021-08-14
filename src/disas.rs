@@ -36,6 +36,18 @@ pub enum RegI {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
+pub enum FlagCondition {
+    NZ,
+    Z,
+    NC,
+    C,
+    PO,
+    PE,
+    P,
+    M
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Operand {
     Imm8(u8),     // immediate addressing
     Imm16(u16),   // immediate extended adressing
@@ -45,6 +57,7 @@ pub enum Operand {
     Reg8(Reg8),   // 8 bit register
     Reg16(Reg16), // 16 bit register
     RegAddr(Reg16), //register indirect addressing
+    FlagCondition(FlagCondition),
 
                   //RegSpe(RegSpe), // special register ? XXX ?
 }
@@ -66,6 +79,7 @@ impl Operand {
             Operand::Reg8(_) => Some(OpSize::S1),
             Operand::Reg16(_) => Some(OpSize::S2),
             Operand::RegAddr(_) => None,
+            Operand::FlagCondition(_) => None,
         }
     }
 }
@@ -81,6 +95,7 @@ impl fmt::Display for Operand {
             Operand::Reg8(x) => write!(f, "{:?}", x),
             Operand::Reg16(x) => write!(f, "{:?}", x),
             Operand::RegAddr(x) => write!(f, "({:?})", x),
+            Operand::FlagCondition(x) => write!(f, "({:?})", x),
         }
     }
 }
