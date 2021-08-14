@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Reg8 {
     A,
@@ -68,6 +70,21 @@ impl Operand {
     }
 }
 
+impl fmt::Display for Operand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Operand::Imm8(x) => write!(f, "{:02X}", x),
+            Operand::Imm16(x) => write!(f, "{:04X}", x),
+            Operand::RelAddr(x) => write!(f, "{:+}", x),
+            Operand::Address(x) => write!(f, "({:04X})", x),
+            Operand::RegI(x) => write!(f, "{:?}", x),
+            Operand::Reg8(x) => write!(f, "{:?}", x),
+            Operand::Reg16(x) => write!(f, "{:?}", x),
+            Operand::RegAddr(x) => write!(f, "({:?})", x),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Instruction {
     ADD,
@@ -83,7 +100,7 @@ pub enum Instruction {
     EX,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct OpCode {
     pub data: Vec<u8>,
     pub length: u8,
@@ -92,6 +109,31 @@ pub struct OpCode {
     pub op2: Option<Operand>,
     pub mcycles: u8,
     pub tstates: Vec<u8>,
+}
+
+impl fmt::Display for OpCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let op1 = if let Some(x) = self.op1 {
+            format!("{}", x)
+        } else {
+            "".to_string()
+        };
+        let op2 = if let Some(x) = self.op2 {
+            format!(", {}", x)
+        } else {
+            "".to_string()
+        };
+        write!(f, "{:?}\t{}{}", self.ins, op1, op2)
+    }
+}
+
+impl fmt::Debug for OpCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for i in self.data.iter() {
+            write!(f, "{:02X} ", i)?
+        }
+        write!(f, "\t\t{}", self)
+    }
 }
 
 fn add_reg_operand(arg: u8) -> Option<Operand> {
