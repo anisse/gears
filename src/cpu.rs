@@ -342,8 +342,8 @@ fn set_conditions_add_16(r: &mut Regs, a: i16, b: i16) -> u16 {
     //println!("a = {:04X}, b = {:04X}, res = {:04X}, a ^ b = {:04X}, a ^ b ^ res = {:04X}, & 0x1000 = {:04X}", a, b, res, a ^b, a ^ b ^ res, (a ^ b ^res) & 0x1000);
     r.set_flag(Flag::H, (a ^ b ^ res) & 0x1000 != 0);
     r.set_flag(Flag::N, false);
-    r.set_flag(Flag::F5, res & (1 << 5) != 0);
-    r.set_flag(Flag::F3, res & (1 << 3) != 0);
+    r.set_flag(Flag::F5, res & (1 << 13) != 0);
+    r.set_flag(Flag::F3, res & (1 << 11) != 0);
 
     r.set_flag(Flag::C, (a as u16).overflowing_add(b as u16).1);
 
