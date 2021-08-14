@@ -363,63 +363,63 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         _ => {}
     }
     match ins[0] & 0xC7 {
-    0x06 => {
-        // LD r, n
-        // LD (HL), n
-        let op;
-        let tstates;
-        let opraw = (ins[0] >> 3) & 0x7;
-        if opraw == 0x6 {
-            op = Operand::RegAddr(Reg16::HL);
-            tstates = vec![4, 3, 3];
-        } else {
-            let reg = decode_operand_reg_r(opraw);
-            op = Operand::Reg8(reg);
-            tstates = vec![4, 3];
+        0x06 => {
+            // LD r, n
+            // LD (HL), n
+            let op;
+            let tstates;
+            let opraw = (ins[0] >> 3) & 0x7;
+            if opraw == 0x6 {
+                op = Operand::RegAddr(Reg16::HL);
+                tstates = vec![4, 3, 3];
+            } else {
+                let reg = decode_operand_reg_r(opraw);
+                op = Operand::Reg8(reg);
+                tstates = vec![4, 3];
+            }
+            let opcode = OpCode {
+                data: vec![ins[0], ins[1]],
+                length: 2,
+                ins: Instruction::LD,
+                op1: Some(op),
+                op2: Some(Operand::Imm8(ins[1])),
+                mcycles: tstates.len() as u8,
+                tstates,
+            };
+            return Some(opcode);
         }
-        let opcode = OpCode {
-            data: vec![ins[0], ins[1]],
-            length: 2,
-            ins: Instruction::LD,
-            op1: Some(op),
-            op2: Some(Operand::Imm8(ins[1])),
-            mcycles: tstates.len() as u8,
-            tstates,
-        };
-        return Some(opcode);
-    }
-    0x04 | 0x05 /* INC | DEC */ => {
-        // INC r
-        // INC (HL)
-        // DEC r
-        // DEC (HL)
-        let typ = if (ins[0] & 0xC7) == 0x04 {
-            Instruction::INC
-        } else {
-            Instruction::DEC
-        };
-        let op;
-        let tstates;
-        let opraw = (ins[0] >> 3) & 0x7;
-        if opraw == 0x6 {
-            op = Operand::RegAddr(Reg16::HL);
-            tstates = vec![4, 4, 3];
-        } else {
-            let reg = decode_operand_reg_r(opraw);
-            op = Operand::Reg8(reg);
-            tstates = vec![4];
+        0x04 | 0x05 /* INC | DEC */ => {
+            // INC r
+            // INC (HL)
+            // DEC r
+            // DEC (HL)
+            let typ = if (ins[0] & 0xC7) == 0x04 {
+                Instruction::INC
+            } else {
+                Instruction::DEC
+            };
+            let op;
+            let tstates;
+            let opraw = (ins[0] >> 3) & 0x7;
+            if opraw == 0x6 {
+                op = Operand::RegAddr(Reg16::HL);
+                tstates = vec![4, 4, 3];
+            } else {
+                let reg = decode_operand_reg_r(opraw);
+                op = Operand::Reg8(reg);
+                tstates = vec![4];
+            }
+            let opcode = OpCode {
+                data: vec![ins[0]],
+                length: 1,
+                ins: typ,
+                op1: Some(op),
+                op2: None,
+                mcycles: tstates.len() as u8,
+                tstates,
+            };
+            return Some(opcode);
         }
-        let opcode = OpCode {
-            data: vec![ins[0]],
-            length: 1,
-            ins: typ,
-            op1: Some(op),
-            op2: None,
-            mcycles: tstates.len() as u8,
-            tstates,
-        };
-        return Some(opcode);
-    }
         _ => {}
     }
 
