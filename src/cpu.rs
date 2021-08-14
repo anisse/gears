@@ -527,7 +527,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 update_pc = false;
                 s.r.MEMPTR = s.r.PC;
             } else {
-                let op2 = op.op1.ok_or("No second rel addr operand for JR")?;
+                let op2 = op.op2.ok_or("No second rel addr operand for JR")?;
                 if let disas::Operand::FlagCondition(cond) = op1 {
                     if let disas::Operand::RelAddr(j) = op2 {
                         if cond_valid(&s.r, cond) {
