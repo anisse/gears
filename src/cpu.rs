@@ -338,7 +338,7 @@ fn set_conditions_add8_base(r: &mut Regs, a: i8, b: i8) -> u8 {
 fn set_conditions_add_16(r: &mut Regs, a: i16, b: i16) -> u16 {
     let real_res = a as i32 + b as i32; // easier for overflows, etc
     let res = (real_res & 0xFFFF) as i16;
-    println!("a = {:04X}, b = {:04X}, res = {:04X}, a ^ b = {:04X}, a ^ b ^ res = {:04X}, & 0x1000 = {:04X}", a, b, res, a ^b, a ^ b ^ res, (a ^ b ^res) & 0x1000);
+    //println!("a = {:04X}, b = {:04X}, res = {:04X}, a ^ b = {:04X}, a ^ b ^ res = {:04X}, & 0x1000 = {:04X}", a, b, res, a ^b, a ^ b ^ res, (a ^ b ^res) & 0x1000);
     r.set_flag(Flag::H, (a ^ b ^ res) & 0x1000 != 0);
     r.set_flag(Flag::N, false);
     r.set_flag(Flag::F5, res & (1 << 5) != 0);
