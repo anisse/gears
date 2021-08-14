@@ -224,7 +224,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         data: vec![ins[0]],
         length: 1,
         ins: Instruction::RLCA,
-        op1: Some(Operand::Reg8(Reg8::A)),
+        op1: None,
         op2: None,
         mcycles: 1,
         tstates: vec![4],
