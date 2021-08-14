@@ -472,8 +472,8 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         disas::Instruction::RLA => {
             let a = s.r.A;
             let c = s.r.F & 0x1;
-            s.r.A = a << 1 | c;
             s.r.set_flag(Flag::C, s.r.A & 0x80 != 0);
+            s.r.A = a << 1 | c;
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
             s.r.set_flag(Flag::F5, s.r.A & (1 << 5) != 0);
@@ -490,8 +490,8 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         disas::Instruction::RRA => {
             let a = s.r.A;
             let c = s.r.F & 0x1;
-            s.r.A = a >> 1 | (c << 7);
             s.r.set_flag(Flag::C, s.r.A & 0x1 != 0);
+            s.r.A = a >> 1 | (c << 7);
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
             s.r.set_flag(Flag::F5, s.r.A & (1 << 5) != 0);
