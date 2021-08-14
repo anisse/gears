@@ -39,7 +39,7 @@ pub enum RegI {
 pub enum Operand {
     Imm8(u8),     // immediate addressing
     Imm16(u16),   // immediate extended adressing
-    RelAddr(i8),  // Relative addressing
+    RelAddr(i16),  // Relative addressing
     Address(u16), // extended addressing
     RegI(u8),     // indexed addressing
     Reg8(Reg8),   // 8 bit register
@@ -98,6 +98,7 @@ pub enum Instruction {
     RRCA,
     RRA,
     EX,
+    DJNZ,
 }
 
 #[derive(PartialEq, Clone)]
@@ -315,6 +316,17 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 op2,
                 mcycles: 2,
                 tstates: vec![4, 3],
+            });
+        }
+        0x10 => {
+            return Some(OpCode {
+                data: vec![ins[0], ins[1]],
+                length: 2,
+                ins: Instruction::DJNZ,
+                op1: Some(Operand::RelAddr((ins[1] as i8) as i16 + 2)),
+                op2: None,
+                mcycles: 3,
+                tstates: vec![5, 3, 5], // Warning: varies
             });
         }
         0xC6 => {
