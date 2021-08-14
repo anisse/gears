@@ -94,7 +94,7 @@ impl fmt::Display for Operand {
             Operand::Reg8(x) => write!(f, "{:?}", x),
             Operand::Reg16(x) => write!(f, "{:?}", x),
             Operand::RegAddr(x) => write!(f, "({:?})", x),
-            Operand::FlagCondition(x) => write!(f, "({:?})", x),
+            Operand::FlagCondition(x) => write!(f, "{:?}", x),
         }
     }
 }
