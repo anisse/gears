@@ -350,6 +350,19 @@ fn set_conditions_add_16(r: &mut Regs, a: i16, b: i16) -> u16 {
     res as u16
 }
 
+fn cond_valid(r: &Regs, fc: disas::FlagCondition) -> bool {
+    match fc {
+        NZ => r.F & 0x40 == 0,
+        Z => r.F & 0x40 != 0,
+        NC => r.F & 0x1 == 0,
+        C => r.F & 0x1 != 0,
+        PO => r.F & 0x4 == 0,
+        PE => r.F & 0x4 != 0,
+        P => r.F & 0x80 == 0,
+        M => r.F & 0x80 != 0,
+    }
+}
+
 pub fn init() -> State {
     State::default()
 }
@@ -505,6 +518,31 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 update_pc = false;
             } else {
                 op_len = 8 // [5, 3]
+            }
+        }
+        disas::Instruction::JR => {
+            let op1 = op.op1.ok_or("No immediate arg for DJNZ")?;
+            if let disas::Operand::RelAddr(j) = op1 {
+                s.r.PC = (s.r.PC as i32 + j as i32) as u16;
+                update_pc = false;
+                s.r.MEMPTR = s.r.PC;
+            } else {
+                let op2 = op.op1.ok_or("No second rel addr operand for JR")?;
+                if let disas::Operand::FlagCondition(cond) = op1 {
+                    if let disas::Operand::RelAddr(j) = op2 {
+                        if cond_valid(&s.r, cond) {
+                            s.r.PC = (s.r.PC as i32 + j as i32) as u16;
+                            update_pc = false;
+                            s.r.MEMPTR = s.r.PC;
+                        } else {
+                            op_len = 7 // [4, 3]
+                        }
+                    } else {
+                        return Err(format!("op2 {:?} should be rel addr for JR", op2));
+                    }
+                } else {
+                    return Err(format!("op1 {:?} should be cond for JR", op1));
+                }
             }
         }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
