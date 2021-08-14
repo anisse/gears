@@ -354,7 +354,9 @@ pub fn init() -> State {
     State::default()
 }
 
-pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
+pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
+    let mut update_pc = true;
+    let mut op_len: usize = op.tstates.iter().fold(0, |sum, x| sum + (*x as usize));
     match op.ins {
         disas::Instruction::ADD => {
             let op1 = op.op1.ok_or("add op1 missing")?;
@@ -490,12 +492,29 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<(), String> {
             set_op16(s, op1, b);
             set_op16(s, op2, a);
         }
+        disas::Instruction::DJNZ => {
+            let op1 = op.op1.ok_or("No immediate arg for DJNZ")?;
+            let jump = if let disas::Operand::RelAddr(j) = op1 {
+                j
+            } else {
+                return Err(format!("Arg {} not rel addr for DJNZ", op1))
+            };
+            s.r.B = s.r.B.overflowing_sub(1).0;
+            if s.r.B != 0 {
+                s.r.PC = (s.r.PC as i32 + jump as i32) as u16;
+                update_pc = false;
+            } else {
+                op_len = 8 // [5, 3]
+            }
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
-    s.r.PC += op.length as u16;
+    if update_pc {
+        s.r.PC += op.length as u16;
+    }
     s.r.R = (s.r.R + 1) & 0x7F;
 
-    Ok(())
+    Ok(op_len)
 }
 
 pub fn run(s: &mut State, tstates_len: usize) -> Result<(), String> {
@@ -505,8 +524,7 @@ pub fn run(s: &mut State, tstates_len: usize) -> Result<(), String> {
         let disas_target = s.mem.fetch_range_safe(s.r.PC, 4);
         if let Some(op) = disas::disas(disas_target) {
             println!("{:04X}: {:?}", s.r.PC, op);
-            run_op(s, &op)?;
-            let op_len: usize = op.tstates.iter().fold(0, |sum, x| sum + (*x as usize));
+            let op_len = run_op(s, &op)?;
             tstates_len = usize::saturating_sub(tstates_len, op_len);
         } else {
             return Err(format!("Unknown instruction {:#X}", disas_target[0]));
