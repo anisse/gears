@@ -497,7 +497,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             let jump = if let disas::Operand::RelAddr(j) = op1 {
                 j
             } else {
-                return Err(format!("Arg {} not rel addr for DJNZ", op1))
+                return Err(format!("Arg {} not rel addr for DJNZ", op1));
             };
             s.r.B = s.r.B.overflowing_sub(1).0;
             if s.r.B != 0 {
