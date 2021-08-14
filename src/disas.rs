@@ -44,22 +44,21 @@ pub enum FlagCondition {
     PO,
     PE,
     P,
-    M
+    M,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Operand {
-    Imm8(u8),     // immediate addressing
-    Imm16(u16),   // immediate extended adressing
-    RelAddr(i16),  // Relative addressing
-    Address(u16), // extended addressing
-    RegI(u8),     // indexed addressing
-    Reg8(Reg8),   // 8 bit register
-    Reg16(Reg16), // 16 bit register
+    Imm8(u8),       // immediate addressing
+    Imm16(u16),     // immediate extended adressing
+    RelAddr(i16),   // Relative addressing
+    Address(u16),   // extended addressing
+    RegI(u8),       // indexed addressing
+    Reg8(Reg8),     // 8 bit register
+    Reg16(Reg16),   // 16 bit register
     RegAddr(Reg16), //register indirect addressing
     FlagCondition(FlagCondition),
-
-                  //RegSpe(RegSpe), // special register ? XXX ?
+    //RegSpe(RegSpe), // special register ? XXX ?
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
