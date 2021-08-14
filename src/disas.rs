@@ -345,7 +345,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             });
         }
         0x18 => {
-            let jr = Some(OpCode {
+            return Some(OpCode {
                 data: vec![ins[0], ins[1]],
                 length: 2,
                 ins: Instruction::JR,
@@ -354,7 +354,24 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 mcycles: 3,
                 tstates: vec![4, 3, 5], // Warning: varies
             });
-            return jr
+        }
+        0x38 | 0x30 | 0x28 | 0x20 => {
+            let cond = match ins[0] {
+                0x38 => FlagCondition::C,
+                0x30 => FlagCondition::NC,
+                0x28 => FlagCondition::Z,
+                0x20 => FlagCondition::NZ,
+                _ => unreachable!(),
+            };
+            return Some(OpCode {
+                data: vec![ins[0], ins[1]],
+                length: 2,
+                ins: Instruction::JR,
+                op1: Some(Operand::FlagCondition(cond)),
+                op2: Some(Operand::RelAddr((ins[1] as i8) as i16 + 2)),
+                mcycles: 3,
+                tstates: vec![4, 3, 5], // Warning: varies
+            });
         }
         0xC6 => {
             // ADD a, n
