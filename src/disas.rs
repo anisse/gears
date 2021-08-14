@@ -172,7 +172,7 @@ fn decode_operand_reg_ddss(arg: u8) -> Reg16 {
         1 => Reg16::DE,
         2 => Reg16::HL,
         3 => Reg16::SP,
-        _ => panic!("unreachable"),
+        _ => unreachable!(),
     }
 }
 
