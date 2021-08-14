@@ -247,6 +247,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
     };
     match ins[0] {
         0x00 => {
+            // NOP
             return Some(OpCode {
                 data: vec![ins[0]],
                 length: 1,
@@ -274,20 +275,23 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 tstates: vec![4, 3],
             });
         }
-        0x07 => return Some(rlca),
+        0x07 => return Some(rlca), // RLCA
         0x17 => {
+            // RLA
             return Some(OpCode {
                 ins: Instruction::RLA,
                 ..rlca
             })
         }
         0x0F => {
+            // RRCA
             return Some(OpCode {
                 ins: Instruction::RRCA,
                 ..rlca
             })
         }
         0x1F => {
+            // RRA
             return Some(OpCode {
                 ins: Instruction::RRA,
                 ..rlca
@@ -334,6 +338,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             });
         }
         0x10 => {
+            // DJNZ, e
             return Some(OpCode {
                 data: vec![ins[0], ins[1]],
                 length: 2,
@@ -345,6 +350,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             });
         }
         0x18 => {
+            // JR e
             return Some(OpCode {
                 data: vec![ins[0], ins[1]],
                 length: 2,
@@ -356,6 +362,10 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             });
         }
         0x38 | 0x30 | 0x28 | 0x20 => {
+            // JR C, e
+            // JR NC, e
+            // JR Z, e
+            // JR NZ, e
             let cond = match ins[0] {
                 0x38 => FlagCondition::C,
                 0x30 => FlagCondition::NC,
