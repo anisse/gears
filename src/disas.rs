@@ -113,6 +113,7 @@ pub enum Instruction {
     RRA,
     EX,
     DJNZ,
+    JP,
     JR,
 }
 
@@ -186,6 +187,20 @@ fn decode_operand_reg_r(arg: u8) -> Reg8 {
         5 => Reg8::L,
         7 => Reg8::A,
         _ => panic!("unknown reg arg {}", arg),
+    }
+}
+
+fn decode_operand_cond_cc(arg: u8) -> FlagCondition {
+    match arg & 0x7 {
+        0 => FlagCondition::NZ,
+        1 => FlagCondition::Z,
+        2 => FlagCondition::NC,
+        3 => FlagCondition::C,
+        4 => FlagCondition::PO,
+        5 => FlagCondition::PE,
+        6 => FlagCondition::P,
+        7 => FlagCondition::M,
+        _ => unreachable!(),
     }
 }
 
@@ -383,6 +398,18 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 tstates: vec![4, 3, 5], // Warning: varies
             });
         }
+        0xC3 => {
+            // JP nn
+            return Some(OpCode {
+                data: vec![ins[0], ins[1], ins[2]],
+                length: 3,
+                ins: Instruction::JP,
+                op1: Some(Operand::Address(ins[1] as u16 | ((ins[2] as u16) << 8))),
+                op2: None,
+                mcycles: 3,
+                tstates: vec![4, 3, 3], // Warning: varies
+            });
+        }
         0xC6 => {
             // ADD a, n
             let arg = ins[1];
@@ -527,6 +554,19 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 tstates,
             };
             return Some(opcode);
+        }
+        0xC2 => {
+            // JP cc, nn
+            let cond = decode_operand_cond_cc(ins[0] >> 3 & 0x7);
+            return Some(OpCode {
+                data: vec![ins[0], ins[1], ins[2]],
+                length: 3,
+                ins: Instruction::JP,
+                op1: Some(Operand::FlagCondition(cond)),
+                op2: Some(Operand::Address(ins[1] as u16 | ((ins[2] as u16) << 8))),
+                mcycles: 3,
+                tstates: vec![4, 3, 3], // Warning: varies
+            });
         }
         _ => {}
     }
