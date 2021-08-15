@@ -353,14 +353,14 @@ fn set_conditions_add_16(r: &mut Regs, a: i16, b: i16) -> u16 {
 
 fn cond_valid(r: &Regs, fc: disas::FlagCondition) -> bool {
     match fc {
-        NZ => r.F & 0x40 == 0,
-        Z => r.F & 0x40 != 0,
-        NC => r.F & 0x1 == 0,
-        C => r.F & 0x1 != 0,
-        PO => r.F & 0x4 == 0,
-        PE => r.F & 0x4 != 0,
-        P => r.F & 0x80 == 0,
-        M => r.F & 0x80 != 0,
+        disas::FlagCondition::NZ => r.F & 0x40 == 0,
+        disas::FlagCondition::Z => r.F & 0x40 != 0,
+        disas::FlagCondition::NC => r.F & 0x1 == 0,
+        disas::FlagCondition::C => r.F & 0x1 != 0,
+        disas::FlagCondition::PO => r.F & 0x4 == 0,
+        disas::FlagCondition::PE => r.F & 0x4 != 0,
+        disas::FlagCondition::P => r.F & 0x80 == 0,
+        disas::FlagCondition::M => r.F & 0x80 != 0,
     }
 }
 
