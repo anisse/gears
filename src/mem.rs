@@ -23,6 +23,10 @@ impl Memory {
     pub fn set_u8(&mut self, addr: u16, val: u8) {
         self.mem[addr as usize] = val
     }
+    pub fn set_u16(&mut self, addr: u16, val: u16) {
+        self.mem[addr as usize] = (val & 0xFF) as u8;
+        self.mem[(addr+1) as usize] = ((val >>8) & 0xFF) as u8;
+    }
     pub fn len(&self) -> usize {
         self.mem.len()
     }

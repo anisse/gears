@@ -296,6 +296,7 @@ fn get_op16(s: &State, op: disas::Operand) -> u16 {
 fn set_op16(s: &mut State, op: disas::Operand, val: u16) {
     match op {
         disas::Operand::Reg16(reg) => s.r.set_regpair(RegPair::from(reg), val),
+        disas::Operand::Address(addr) => s.mem.set_u16(addr, val),
         _ => panic!(
             "Unknown operand {:?} or size not 16, or writing unsupported",
             op
