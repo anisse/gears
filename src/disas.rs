@@ -115,6 +115,7 @@ pub enum Instruction {
     DJNZ,
     JP,
     JR,
+    DAA,
 }
 
 #[derive(PartialEq, Clone)]
@@ -408,6 +409,18 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 op2: Some(Operand::Reg16(Reg16::HL)),
                 mcycles: 5,
                 tstates: vec![4, 3, 3, 3, 3],
+            });
+        }
+        0x27 => {
+            // DAA
+            return Some(OpCode {
+                data: vec![ins[0]],
+                length: 1,
+                ins: Instruction::DAA,
+                op1: None,
+                op2: None,
+                mcycles: 1,
+                tstates: vec![4],
             });
         }
         0xC3 => {
