@@ -372,6 +372,231 @@ fn cond_valid(r: &Regs, fc: disas::FlagCondition) -> bool {
     }
 }
 
+fn daa_diff(c: u8, h: u8, lo: u8, hi: u8) -> Option<u8> {
+    // Tables from Stefano Donati via Sean Young's Z80 Undocumented
+    let diff_table = [
+        vec![
+            // CF = 0
+            (
+                // high nibble
+                0..=9,
+                [
+                    // HF = 0
+                    (
+                        // low nibble
+                        0..=9,
+                        0_u8, // diff
+                    ),
+                    // HF = 1
+                    (
+                        // low nibble
+                        0..=9,
+                        6_u8, // diff
+                    ),
+                ],
+            ),
+            (
+                0..=8,
+                [
+                    // HF = 0
+                    (
+                        // low nibble
+                        0xa..=0xf,
+                        6_u8, // diff
+                    ),
+                    // HF = 1
+                    (
+                        // low nibble
+                        0xa..=0xf,
+                        6_u8, // diff
+                    ),
+                ],
+            ),
+            (
+                0xa..=0xf,
+                [
+                    // HF = 0
+                    (
+                        // low nibble
+                        0..=9,
+                        0x60_u8, // diff
+                    ),
+                    // HF = 1
+                    (
+                        // low nibble
+                        0..=9,
+                        0x66_u8, // diff
+                    ),
+                ],
+            ),
+            (
+                0x9..=0xf,
+                [
+                    // HF = 0
+                    (
+                        // low nibble
+                        0xa..=0xf,
+                        0x66_u8, // diff
+                    ),
+                    // HF = 1
+                    (
+                        // low nibble
+                        0xa..=0xf,
+                        0x66_u8, // diff
+                    ),
+                ],
+            ),
+        ],
+        vec![
+            // CF = 1
+            (
+                // high nibble
+                0..=0xf,
+                [
+                    // HF = 0
+                    (
+                        // low nibble
+                        0..=9,
+                        0x60_u8, // diff
+                    ),
+                    // HF = 1
+                    (
+                        // low nibble
+                        0..=9,
+                        0x66_u8, // diff
+                    ),
+                ],
+            ),
+            (
+                0..=0xf,
+                [
+                    // HF = 0
+                    (
+                        // low nibble
+                        0xa..=0xf,
+                        0x66_u8, // diff
+                    ),
+                    // HF = 1
+                    (
+                        // low nibble
+                        0xa..=0xf,
+                        0x66_u8, // diff
+                    ),
+                ],
+            ),
+        ],
+    ];
+    for i in diff_table[c as usize].iter() {
+        // c
+        if (*i).0.contains(&hi) {
+            // high nibble
+            // h
+            let arr = &i.1[h as usize];
+            if arr.0.contains(&lo) {
+                // low nibble
+                return Some(arr.1);
+            }
+        }
+    }
+    None
+}
+fn daa_cf(c: u8, hi: u8, lo: u8) -> Option<bool> {
+    if c != 0 {
+        return Some(true);
+    }
+    let table = [
+        (0..=9, 0..=9, false),
+        (0..=8, 0xa..=0xf, false),
+        (9..=0xf, 0xa..=0xf, true),
+        (0xa..=0xf, 0..=9, true),
+    ];
+    for i in table.iter() {
+        if i.0.contains(&hi) && i.1.contains(&lo) {
+            return Some(i.2);
+        }
+    }
+    None
+}
+
+fn daa_hf(n: u8, h: u8, lo: u8) -> Option<bool> {
+    struct HTable {
+        n: u8,
+        h: u8,
+        lo: std::ops::RangeInclusive<u8>,
+        hp: bool,
+    }
+    let table = [
+        HTable {
+            n: 0,
+            h: 0,
+            lo: 0..=9,
+            hp: false,
+        },
+        HTable {
+            n: 0,
+            h: 1,
+            lo: 0..=9,
+            hp: false,
+        },
+        HTable {
+            n: 0,
+            h: 0,
+            lo: 0xa..=0xf,
+            hp: true,
+        },
+        HTable {
+            n: 0,
+            h: 1,
+            lo: 0xa..=0xf,
+            hp: true,
+        },
+        HTable {
+            n: 1,
+            h: 0,
+            lo: 0..=0xf,
+            hp: false,
+        },
+        HTable {
+            n: 1,
+            h: 1,
+            lo: 6..=0xf,
+            hp: false,
+        },
+        HTable {
+            n: 1,
+            h: 1,
+            lo: 0..=5,
+            hp: true,
+        },
+    ];
+    for l in table.iter() {
+        if n == l.n && h == l.h && l.lo.contains(&lo) {
+            return Some(l.hp);
+        }
+    }
+    None
+}
+fn daa(r: &mut Regs) {
+    let c = r.F & C;
+    let h = (r.F & H) >> 4;
+    let lo = r.A & 0xF;
+    let hi = (r.A >> 4) & 0xF;
+    let n = (r.F & N) >> 1;
+    let diff = daa_diff(c, h, lo, hi).expect("DAA diff not found, should never happen");
+    let cp = daa_cf(c, hi, lo).expect("DAA C' not found, should never happen");
+    let hp = daa_hf(n, h, lo).expect("DAA H' not found, should never happen");
+    if n == 0 {
+        r.A += diff;
+    } else {
+        r.A -= diff;
+    }
+    r.set_flag(Flag::C, cp);
+    r.set_flag(Flag::H, hp);
+    r.set_flag(Flag::S, (r.A & 0x80) != 0);
+    r.set_flag(Flag::F5, (r.A & 0x20) != 0);
+    r.set_flag(Flag::F3, (r.A & 0x08) != 0);
+}
+
 pub fn init() -> State {
     State::default()
 }
@@ -554,6 +779,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 }
             }
         }
+        disas::Instruction::DAA => daa(&mut s.r),
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     if update_pc {
