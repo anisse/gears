@@ -31,8 +31,8 @@ pub enum Reg16 {
 }
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RegI {
-    IX,
-    IY,
+    IX(i8),
+    IY(i8),
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -53,7 +53,7 @@ pub enum Operand {
     Imm16(u16),     // immediate extended adressing
     RelAddr(i16),   // Relative addressing
     Address(u16),   // extended addressing
-    RegI(u8),       // indexed addressing
+    RegI(RegI),       // indexed addressing
     Reg8(Reg8),     // 8 bit register
     Reg16(Reg16),   // 16 bit register
     RegAddr(Reg16), //register indirect addressing
