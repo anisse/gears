@@ -466,6 +466,21 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 tstates: vec![4],
             });
         }
+        0x32 => {
+            // LD (nn), A
+            if ins.len() < 3 {
+                return None
+            }
+            return Some(OpCode {
+                data: vec![ins[0], ins[1], ins[2]],
+                length: 3,
+                ins: Instruction::LD,
+                op1: Some(Operand::Address(ins[1] as u16 | (ins[2] as u16) << 8)),
+                op2: Some(Operand::Reg8(Reg8::A)),
+                mcycles: 4,
+                tstates: vec![4, 3, 3, 3],
+            });
+        }
         0xC3 => {
             // JP nn
             if ins.len() < 3 {
