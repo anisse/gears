@@ -297,21 +297,21 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             return Some(OpCode {
                 ins: Instruction::RLA,
                 ..rlca
-            })
+            });
         }
         0x0F => {
             // RRCA
             return Some(OpCode {
                 ins: Instruction::RRCA,
                 ..rlca
-            })
+            });
         }
         0x1F => {
             // RRA
             return Some(OpCode {
                 ins: Instruction::RRA,
                 ..rlca
-            })
+            });
         }
         0x08 | 0xEB => {
             // EX AF, AF'

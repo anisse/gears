@@ -3,15 +3,23 @@ use crate::mem;
 use std::fmt;
 
 enum Flag {
-    S,
-    Z,
-    F5,
-    H,
-    F3,
-    PV,
-    N,
-    C,
+    S = 1 << 7,
+    Z = 1 << 6,
+    F5 = 1 << 5,
+    H = 1 << 4,
+    F3 = 1 << 3,
+    PV = 1 << 2,
+    N = 1 << 1,
+    C = 1 << 0,
 }
+const S: u8 = Flag::S as u8;
+const Z: u8 = Flag::Z as u8;
+const F5: u8 = Flag::F5 as u8;
+const H: u8 = Flag::H as u8;
+const F3: u8 = Flag::F3 as u8;
+const PV: u8 = Flag::PV as u8;
+const N: u8 = Flag::N as u8;
+const C: u8 = Flag::C as u8;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RegPair {
@@ -203,14 +211,14 @@ impl fmt::Display for Regs {
              SP: {:X} PC: {:X} R: {:X} MEMPTR: {:X}",
             self.A,
             self.A as i8,
-            flag("S", self.F & 0x80),
-            flag("Z", self.F & 0x40),
-            flag("Y", self.F & 0x20),
-            flag("H", self.F & 0x10),
-            flag("X", self.F & 0x08),
-            flag("PV", self.F & 0x04),
-            flag("N", self.F & 0x02),
-            flag("C", self.F & 0x01),
+            flag("S", self.F & S),
+            flag("Z", self.F & Z),
+            flag("Y", self.F & F5),
+            flag("H", self.F & H),
+            flag("X", self.F & F3),
+            flag("PV", self.F & PV),
+            flag("N", self.F & N),
+            flag("C", self.F & C),
             self.get_regpair(RegPair::BC),
             self.get_regpair(RegPair::BC) as i16,
             self.get_regpair(RegPair::DE),
@@ -219,14 +227,14 @@ impl fmt::Display for Regs {
             self.get_regpair(RegPair::HL) as i16,
             self.get_regpair(RegPair::AFp),
             self.get_regpair(RegPair::AFp) as i16,
-            flag("S", self.Fp & 0x80),
-            flag("Z", self.Fp & 0x40),
-            flag("Y", self.Fp & 0x20),
-            flag("H", self.Fp & 0x10),
-            flag("X", self.Fp & 0x80),
-            flag("PV", self.Fp & 0x04),
-            flag("N", self.Fp & 0x02),
-            flag("C", self.Fp & 0x01),
+            flag("S", self.Fp & S),
+            flag("Z", self.Fp & Z),
+            flag("Y", self.Fp & F5),
+            flag("H", self.Fp & H),
+            flag("X", self.Fp & F3),
+            flag("PV", self.Fp & PV),
+            flag("N", self.Fp & N),
+            flag("C", self.Fp & C),
             self.get_regpair(RegPair::BCp),
             self.get_regpair(RegPair::BCp) as i16,
             self.get_regpair(RegPair::DEp),
@@ -314,7 +322,7 @@ fn set_conditions_inc8_dec8(r: &mut Regs, a: i8, b: i8) -> u8 {
     let res = set_conditions_add8_base(r, a, b);
     if b < 0 {
         // invert H to mean borrow
-        r.set_flag(Flag::H, (r.F & 0x10) ^ 0x10 != 0)
+        r.set_flag(Flag::H, (r.F & H) ^ H != 0)
     }
     r.set_flag(Flag::N, b < 0);
     res
@@ -353,14 +361,14 @@ fn set_conditions_add_16(r: &mut Regs, a: i16, b: i16) -> u16 {
 
 fn cond_valid(r: &Regs, fc: disas::FlagCondition) -> bool {
     match fc {
-        disas::FlagCondition::NZ => r.F & 0x40 == 0,
-        disas::FlagCondition::Z => r.F & 0x40 != 0,
-        disas::FlagCondition::NC => r.F & 0x1 == 0,
-        disas::FlagCondition::C => r.F & 0x1 != 0,
-        disas::FlagCondition::PO => r.F & 0x4 == 0,
-        disas::FlagCondition::PE => r.F & 0x4 != 0,
-        disas::FlagCondition::P => r.F & 0x80 == 0,
-        disas::FlagCondition::M => r.F & 0x80 != 0,
+        disas::FlagCondition::NZ => r.F & Z == 0,
+        disas::FlagCondition::Z => r.F & Z != 0,
+        disas::FlagCondition::NC => r.F & C == 0,
+        disas::FlagCondition::C => r.F & C != 0,
+        disas::FlagCondition::PO => r.F & PV == 0,
+        disas::FlagCondition::PE => r.F & PV != 0,
+        disas::FlagCondition::P => r.F & S == 0,
+        disas::FlagCondition::M => r.F & S != 0,
     }
 }
 
@@ -472,7 +480,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         }
         disas::Instruction::RLA => {
             let a = s.r.A;
-            let c = s.r.F & 0x1;
+            let c = s.r.F & C;
             s.r.set_flag(Flag::C, s.r.A & 0x80 != 0);
             s.r.A = a << 1 | c;
             s.r.set_flag(Flag::H, false);
@@ -490,7 +498,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         }
         disas::Instruction::RRA => {
             let a = s.r.A;
-            let c = s.r.F & 0x1;
+            let c = s.r.F & C;
             s.r.set_flag(Flag::C, s.r.A & 0x1 != 0);
             s.r.A = a >> 1 | (c << 7);
             s.r.set_flag(Flag::H, false);
