@@ -236,7 +236,7 @@ fn parse_tests(input: &str, expected: &str) -> Option<Vec<Test>> {
             .filter(|l| !l.starts_with("  "))
             .skip(2)
             .collect();
-        parse_memory_values(memval, &mut t.memory_values)
+        parse_memory_values(memval, &mut t.changed_mem_values)
             .unwrap_or_else(|e| panic!("test res {} ({}): {}", t.desc, i, e));
         tests.push(t)
     }
