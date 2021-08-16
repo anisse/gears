@@ -297,6 +297,7 @@ fn get_op16(s: &State, op: disas::Operand) -> u16 {
     match op {
         disas::Operand::Imm16(x) => x,
         disas::Operand::Reg16(reg) => s.r.get_regpair(RegPair::from(reg)),
+        disas::Operand::Address(addr) => s.mem.fetch_u16(addr),
         _ => panic!("Unknown operand {:?} or size not 16", op),
     }
 }
