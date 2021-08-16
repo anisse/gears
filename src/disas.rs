@@ -423,6 +423,18 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 tstates: vec![4],
             });
         }
+        0x2A => {
+            // LD HL, (nn)
+            return Some(OpCode {
+                data: vec![ins[0], ins[1], ins[2]],
+                length: 3,
+                ins: Instruction::LD,
+                op1: Some(Operand::Reg16(Reg16::HL)),
+                op2: Some(Operand::Address(ins[1] as u16 | (ins[2] as u16) << 8)),
+                mcycles: 5,
+                tstates: vec![4, 3, 3, 3, 3],
+            });
+        }
         0xC3 => {
             // JP nn
             return Some(OpCode {
