@@ -116,6 +116,7 @@ pub enum Instruction {
     JP,
     JR,
     DAA,
+    CPL,
 }
 
 #[derive(PartialEq, Clone)]
@@ -433,6 +434,18 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 op2: Some(Operand::Address(ins[1] as u16 | (ins[2] as u16) << 8)),
                 mcycles: 5,
                 tstates: vec![4, 3, 3, 3, 3],
+            });
+        }
+        0x2F => {
+            // CPL
+            return Some(OpCode {
+                data: vec![ins[0]],
+                length: 1,
+                ins: Instruction::CPL,
+                op1: None,
+                op2: None,
+                mcycles: 1,
+                tstates: vec![4],
             });
         }
         0xC3 => {
