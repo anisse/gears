@@ -208,6 +208,9 @@ fn decode_operand_cond_cc(arg: u8) -> FlagCondition {
 
 // An instruction can be one to four bytes
 pub fn disas(ins: &[u8]) -> Option<OpCode> {
+    if ins.is_empty() {
+        return None
+    }
     match ins[0] >> 3 {
         0x10 => {
             // ADD a, r
@@ -356,6 +359,9 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         }
         0x10 => {
             // DJNZ, e
+            if ins.len() < 2 {
+                return None
+            }
             return Some(OpCode {
                 data: vec![ins[0], ins[1]],
                 length: 2,
@@ -368,6 +374,9 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         }
         0x18 => {
             // JR e
+            if ins.len() < 2 {
+                return None
+            }
             return Some(OpCode {
                 data: vec![ins[0], ins[1]],
                 length: 2,
@@ -383,6 +392,9 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             // JR NC, e
             // JR Z, e
             // JR NZ, e
+            if ins.len() < 2 {
+                return None
+            }
             let cond = match ins[0] {
                 0x38 => FlagCondition::C,
                 0x30 => FlagCondition::NC,
@@ -402,6 +414,9 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         }
         0x22 => {
             // LD (nn), HL
+            if ins.len() < 3 {
+                return None
+            }
             return Some(OpCode {
                 data: vec![ins[0], ins[1], ins[2]],
                 length: 3,
@@ -426,6 +441,9 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         }
         0x2A => {
             // LD HL, (nn)
+            if ins.len() < 3 {
+                return None
+            }
             return Some(OpCode {
                 data: vec![ins[0], ins[1], ins[2]],
                 length: 3,
@@ -450,6 +468,9 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         }
         0xC3 => {
             // JP nn
+            if ins.len() < 3 {
+                return None
+            }
             return Some(OpCode {
                 data: vec![ins[0], ins[1], ins[2]],
                 length: 3,
@@ -462,6 +483,9 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         }
         0xC6 => {
             // ADD a, n
+            if ins.len() < 2 {
+                return None
+            }
             let arg = ins[1];
             let opcode = OpCode {
                 data: vec![ins[0], ins[1]],
@@ -476,6 +500,9 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         }
         0xCE => {
             // ADC a, n
+            if ins.len() < 2 {
+                return None
+            }
             let arg = ins[1];
             let opcode = OpCode {
                 data: vec![ins[0], ins[1]],
@@ -493,6 +520,9 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
     match ins[0] & 0xCF {
         0x01 => {
             // LD dd, nn
+            if ins.len() < 3 {
+                return None
+            }
             let arg = (ins[2] as u16) << 8 | ins[1] as u16;
             let reg = decode_operand_reg_ddss((ins[0] >> 4) & 0x3);
             let opcode = OpCode {
@@ -551,6 +581,9 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         0x06 => {
             // LD r, n
             // LD (HL), n
+            if ins.len() < 2 {
+                return None
+            }
             let op;
             let tstates;
             let opraw = (ins[0] >> 3) & 0x7;
@@ -607,6 +640,9 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         }
         0xC2 => {
             // JP cc, nn
+            if ins.len() < 3 {
+                return None
+            }
             let cond = decode_operand_cond_cc(ins[0] >> 3 & 0x7);
             return Some(OpCode {
                 data: vec![ins[0], ins[1], ins[2]],
