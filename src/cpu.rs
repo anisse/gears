@@ -781,6 +781,13 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             }
         }
         disas::Instruction::DAA => daa(&mut s.r),
+        disas::Instruction::CPL => {
+            s.r.A = !s.r.A;
+            s.r.set_flag(Flag::H, true);
+            s.r.set_flag(Flag::N, true);
+            s.r.set_flag(Flag::F5, s.r.A & (1 << 5) != 0);
+            s.r.set_flag(Flag::F3, s.r.A & (1 << 3) != 0);
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     if update_pc {
