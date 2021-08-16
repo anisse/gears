@@ -682,7 +682,12 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             } else {
                 -1
             };
-            match op1.size().ok_or("unsupported INC source size")? {
+            let size = match op1 {
+                disas::Operand::RegAddr(_) => disas::OpSize::S1,
+                disas::Operand::RegI(_) => disas::OpSize::S1,
+                _ => op1.size().ok_or("unsupported INC source size")?,
+            };
+            match size {
                 disas::OpSize::S1 => {
                     // Sets conditions
                     let val = get_op8(s, op1) as i8;
