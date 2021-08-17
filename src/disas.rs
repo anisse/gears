@@ -688,6 +688,23 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         }
         _ => {}
     }
+    if ins[0] >> 6 == 0x1 {
+        // LD r, r'
+        // warning: decoding nust be ater HALT, otherwise we'll have the non-existing instruction
+        // LD (HL), (HL)
+        let op1 = Some(decode_operand_reg_r_hladdr((ins[0] >> 3) & 0x7));
+        let op2 = Some(decode_operand_reg_r_hladdr(ins[0] & 0x7));
+        assert!(
+            !(op1 == Some(Operand::RegAddr(Reg16::HL)) && op1 == op2),
+            "Halt detected"
+        ); //HALT
+        return Some(OpCode {
+            ins: Instruction::LD,
+            op1,
+            op2,
+            ..nop
+        });
+    }
 
     None
 }
