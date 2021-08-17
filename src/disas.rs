@@ -157,20 +157,6 @@ impl fmt::Debug for OpCode {
     }
 }
 
-fn add_reg_operand(arg: u8) -> Option<Operand> {
-    match arg {
-        0x7 => Some(Operand::Reg8(Reg8::A)),
-        0x0 => Some(Operand::Reg8(Reg8::B)),
-        0x1 => Some(Operand::Reg8(Reg8::C)),
-        0x2 => Some(Operand::Reg8(Reg8::D)),
-        0x3 => Some(Operand::Reg8(Reg8::E)),
-        0x4 => Some(Operand::Reg8(Reg8::H)),
-        0x5 => Some(Operand::Reg8(Reg8::L)),
-        0x6 => Some(Operand::RegAddr(Reg16::HL)),
-        _ => None,
-    }
-}
-
 fn decode_operand_reg_ddss(arg: u8) -> Reg16 {
     match arg & 0x3 {
         0 => Reg16::BC,
@@ -230,7 +216,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 length: 1,
                 ins: Instruction::ADD,
                 op1: Some(Operand::Reg8(Reg8::A)),
-                op2: add_reg_operand(arg),
+                op2: Some(decode_operand_reg_r_hladdr(arg)),
                 mcycles: match arg {
                     0x6 => 2,
                     _ => 1,
@@ -251,7 +237,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 length: 1,
                 ins: Instruction::ADC,
                 op1: Some(Operand::Reg8(Reg8::A)),
-                op2: add_reg_operand(arg),
+                op2: Some(decode_operand_reg_r_hladdr(arg)),
                 mcycles: match arg {
                     0x6 => 2,
                     _ => 1,
