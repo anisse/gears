@@ -600,7 +600,6 @@ fn copy_f53_res(res: u8, r: &mut Regs) {
     r.set_flag(Flag::F3, res & (1 << 3) != 0);
 }
 
-
 pub fn init() -> State {
     State::default()
 }
@@ -789,6 +788,18 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.A = !s.r.A;
             s.r.set_flag(Flag::H, true);
             s.r.set_flag(Flag::N, true);
+            copy_f53_res(s.r.A, &mut s.r);
+        }
+        disas::Instruction::SCF => {
+            s.r.set_flag(Flag::C, true);
+            s.r.set_flag(Flag::H, false);
+            s.r.set_flag(Flag::N, false);
+            copy_f53_res(s.r.A, &mut s.r);
+        }
+        disas::Instruction::CCF => {
+            s.r.set_flag(Flag::H, s.r.F & C != 0);
+            s.r.set_flag(Flag::C, s.r.F & C == 0);
+            s.r.set_flag(Flag::N, false);
             copy_f53_res(s.r.A, &mut s.r);
         }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
