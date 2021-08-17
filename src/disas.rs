@@ -102,6 +102,8 @@ impl fmt::Display for Operand {
 pub enum Instruction {
     ADD,
     ADC,
+    SUB,
+    SBC,
     NOP,
     LD,
     INC,
@@ -233,6 +235,24 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             //ADC a, (HL)
             let opcode = OpCode {
                 ins: Instruction::ADC,
+                ..add8
+            };
+            return Some(opcode);
+        }
+        0x12 => {
+            // SUB A, r
+            // SUB A, (HL)
+            let opcode = OpCode {
+                ins: Instruction::SUB,
+                ..add8
+            };
+            return Some(opcode);
+        }
+        0x13 => {
+            // SBC A, r
+            // SBC A, (HL)
+            let opcode = OpCode {
+                ins: Instruction::SUB,
                 ..add8
             };
             return Some(opcode);
