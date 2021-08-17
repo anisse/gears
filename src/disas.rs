@@ -119,6 +119,7 @@ pub enum Instruction {
     CPL,
     SCF,
     CCF,
+    HALT,
 }
 
 #[derive(PartialEq, Clone)]
@@ -504,6 +505,13 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             // CCF
             return Some(OpCode {
                 ins: Instruction::CCF,
+                ..nop
+            });
+        }
+        0x76 => {
+            // HALT
+            return Some(OpCode {
+                ins: Instruction::HALT,
                 ..nop
             });
         }

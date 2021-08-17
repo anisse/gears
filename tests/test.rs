@@ -274,6 +274,7 @@ fn run_instructions() {
 
         dbg!(t);
         cpu::run(&mut state, t.tstate_to_run as usize).unwrap();
+        state.halted = false; // not supported by testsuite, maybe move out of structure ?
         assert_eq!(state, end_state);
         //assert_eq!(state.mem, mem_result);
     }

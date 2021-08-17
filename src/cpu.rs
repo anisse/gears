@@ -808,6 +808,10 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.set_flag(Flag::N, false);
             copy_f53_res(s.r.A, &mut s.r);
         }
+        Instruction::HALT => {
+            s.halted = true;
+            update_pc = false;
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     if update_pc {
