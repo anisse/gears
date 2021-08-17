@@ -117,6 +117,8 @@ pub enum Instruction {
     JR,
     DAA,
     CPL,
+    SCF,
+    CCF,
 }
 
 #[derive(PartialEq, Clone)]
@@ -467,6 +469,20 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 op2: Some(Operand::Reg8(Reg8::A)),
                 mcycles: 4,
                 tstates: vec![4, 3, 3, 3],
+            });
+        }
+        0x37 => {
+            // SCF
+            return Some(OpCode {
+                ins: Instruction::SCF,
+                ..nop
+            });
+        }
+        0x3F => {
+            // CCF
+            return Some(OpCode {
+                ins: Instruction::CCF,
+                ..nop
             });
         }
         0xC3 => {
