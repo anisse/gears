@@ -3,7 +3,6 @@ use std::fmt;
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Reg8 {
     A,
-    F,
     B,
     C,
     D,

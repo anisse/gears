@@ -263,7 +263,6 @@ fn get_op8(s: &State, op: Operand) -> u8 {
     match op {
         Operand::Reg8(reg) => match reg {
             disas::Reg8::A => s.r.A,
-            disas::Reg8::F => s.r.F,
             disas::Reg8::B => s.r.B,
             disas::Reg8::C => s.r.C,
             disas::Reg8::D => s.r.D,
@@ -283,7 +282,6 @@ fn set_op8(s: &mut State, op: Operand, val: u8) {
     match op {
         Operand::Reg8(reg) => match reg {
             disas::Reg8::A => s.r.A = val,
-            disas::Reg8::F => s.r.F = val,
             disas::Reg8::B => s.r.B = val,
             disas::Reg8::C => s.r.C = val,
             disas::Reg8::D => s.r.D = val,
