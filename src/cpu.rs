@@ -1,9 +1,5 @@
 use crate::disas;
-use crate::disas::{
-    Operand,
-    OpSize,
-    Instruction,
-};
+use crate::disas::{Instruction, OpSize, Operand};
 use crate::mem;
 use std::fmt;
 
@@ -682,11 +678,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         }
         Instruction::INC | Instruction::DEC => {
             let op1 = op.op1.ok_or("INC op1 missing")?;
-            let inc = if op.ins == Instruction::INC {
-                1
-            } else {
-                -1
-            };
+            let inc = if op.ins == Instruction::INC { 1 } else { -1 };
             let size = match op1 {
                 Operand::RegAddr(_) => OpSize::S1,
                 Operand::RegI(_) => OpSize::S1,
