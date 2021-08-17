@@ -1,4 +1,9 @@
 use crate::disas;
+use crate::disas::{
+    Operand,
+    OpSize,
+    Instruction,
+};
 use crate::mem;
 use std::fmt;
 
@@ -253,10 +258,10 @@ impl fmt::Debug for Regs {
         write!(f, "{}", self)
     }
 }
-fn get_op8(s: &State, op: disas::Operand) -> u8 {
+fn get_op8(s: &State, op: Operand) -> u8 {
     // TODO: size
     match op {
-        disas::Operand::Reg8(reg) => match reg {
+        Operand::Reg8(reg) => match reg {
             disas::Reg8::A => s.r.A,
             disas::Reg8::F => s.r.F,
             disas::Reg8::B => s.r.B,
@@ -266,17 +271,17 @@ fn get_op8(s: &State, op: disas::Operand) -> u8 {
             disas::Reg8::H => s.r.H,
             disas::Reg8::L => s.r.L,
         },
-        disas::Operand::RegAddr(reg) => s.mem.fetch_u8(s.r.get_regpair(RegPair::from(reg))),
-        disas::Operand::Address(addr) => s.mem.fetch_u8(addr),
-        disas::Operand::Imm8(imm) => imm,
+        Operand::RegAddr(reg) => s.mem.fetch_u8(s.r.get_regpair(RegPair::from(reg))),
+        Operand::Address(addr) => s.mem.fetch_u8(addr),
+        Operand::Imm8(imm) => imm,
         _ => panic!("Unknown operand {:?} or size not 8", op),
     }
 }
 
-fn set_op8(s: &mut State, op: disas::Operand, val: u8) {
+fn set_op8(s: &mut State, op: Operand, val: u8) {
     // TODO: size
     match op {
-        disas::Operand::Reg8(reg) => match reg {
+        Operand::Reg8(reg) => match reg {
             disas::Reg8::A => s.r.A = val,
             disas::Reg8::F => s.r.F = val,
             disas::Reg8::B => s.r.B = val,
@@ -286,8 +291,8 @@ fn set_op8(s: &mut State, op: disas::Operand, val: u8) {
             disas::Reg8::H => s.r.H = val,
             disas::Reg8::L => s.r.L = val,
         },
-        disas::Operand::RegAddr(reg) => s.mem.set_u8(s.r.get_regpair(RegPair::from(reg)), val),
-        disas::Operand::Address(addr) => s.mem.set_u8(addr, val),
+        Operand::RegAddr(reg) => s.mem.set_u8(s.r.get_regpair(RegPair::from(reg)), val),
+        Operand::Address(addr) => s.mem.set_u8(addr, val),
         _ => panic!(
             "Unknown operand {:?} or size not 8, or writing unsupported",
             op
@@ -295,19 +300,19 @@ fn set_op8(s: &mut State, op: disas::Operand, val: u8) {
     }
 }
 
-fn get_op16(s: &State, op: disas::Operand) -> u16 {
+fn get_op16(s: &State, op: Operand) -> u16 {
     match op {
-        disas::Operand::Imm16(x) => x,
-        disas::Operand::Reg16(reg) => s.r.get_regpair(RegPair::from(reg)),
-        disas::Operand::Address(addr) => s.mem.fetch_u16(addr),
+        Operand::Imm16(x) => x,
+        Operand::Reg16(reg) => s.r.get_regpair(RegPair::from(reg)),
+        Operand::Address(addr) => s.mem.fetch_u16(addr),
         _ => panic!("Unknown operand {:?} or size not 16", op),
     }
 }
 
-fn set_op16(s: &mut State, op: disas::Operand, val: u16) {
+fn set_op16(s: &mut State, op: Operand, val: u16) {
     match op {
-        disas::Operand::Reg16(reg) => s.r.set_regpair(RegPair::from(reg), val),
-        disas::Operand::Address(addr) => s.mem.set_u16(addr, val),
+        Operand::Reg16(reg) => s.r.set_regpair(RegPair::from(reg), val),
+        Operand::Address(addr) => s.mem.set_u16(addr, val),
         _ => panic!(
             "Unknown operand {:?} or size not 16, or writing unsupported",
             op
@@ -609,17 +614,17 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
     let mut update_pc = true;
     let mut op_len: usize = op.tstates.iter().fold(0, |sum, x| sum + (*x as usize));
     match op.ins {
-        disas::Instruction::ADD => {
+        Instruction::ADD => {
             let op1 = op.op1.ok_or("add op1 missing")?;
             let op2 = op.op2.ok_or("add op2 missing")?;
             match op1.size().ok_or("unsupported add size")? {
-                disas::OpSize::S1 => {
+                OpSize::S1 => {
                     let a = get_op8(s, op1) as i8;
                     let b = get_op8(s, op2) as i8;
                     let res = set_conditions_add_8(&mut s.r, a, b);
                     set_op8(s, op1, res);
                 }
-                disas::OpSize::S2 => {
+                OpSize::S2 => {
                     let a = get_op16(s, op1) as i16;
                     let b = get_op16(s, op2) as i16;
                     let res = set_conditions_add_16(&mut s.r, a, b);
@@ -628,10 +633,10 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 }
             }
         }
-        disas::Instruction::NOP => {
+        Instruction::NOP => {
             // nothing to do
         }
-        disas::Instruction::LD => {
+        Instruction::LD => {
             let op1 = op.op1.ok_or("LD op1 missing")?;
             let op2 = op.op2.ok_or("LD op2 missing")?;
             // transfer size == min(op1, op1)
@@ -640,23 +645,23 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 .or_else(|| op1.size())
                 .ok_or("unsupported ld size")?;
             match size {
-                disas::OpSize::S1 => {
+                OpSize::S1 => {
                     let val = get_op8(s, op2);
                     set_op8(s, op1, val);
                 }
-                disas::OpSize::S2 => {
+                OpSize::S2 => {
                     let val = get_op16(s, op2);
                     set_op16(s, op1, val);
                 }
             }
             // MEMPTR
-            if op2 == disas::Operand::Reg8(disas::Reg8::A) {
+            if op2 == Operand::Reg8(disas::Reg8::A) {
                 match op1 {
-                    disas::Operand::Address(addr) => {
+                    Operand::Address(addr) => {
                         // MEMPTR_low = (addr + 1) & #FF,  MEMPTR_hi = A
                         s.r.MEMPTR = (addr + 1) & 0xFF | ((s.r.A as u16) << 8);
                     }
-                    disas::Operand::RegAddr(x) => {
+                    Operand::RegAddr(x) => {
                         let r = match x {
                             disas::Reg16::BC => s.r.get_regpair(RegPair::BC),
                             disas::Reg16::DE => s.r.get_regpair(RegPair::DE),
@@ -667,36 +672,36 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                     }
                     _ => {}
                 }
-            } else if op1 == disas::Operand::Reg8(disas::Reg8::A) || size == disas::OpSize::S2 {
-                if let disas::Operand::RegAddr(reg) = op2 {
+            } else if op1 == Operand::Reg8(disas::Reg8::A) || size == OpSize::S2 {
+                if let Operand::RegAddr(reg) = op2 {
                     s.r.MEMPTR = s.r.get_regpair(RegPair::from(reg)) + 1
-                } else if let disas::Operand::Address(addr) = op1 {
+                } else if let Operand::Address(addr) = op1 {
                     s.r.MEMPTR = addr + 1
-                } else if let disas::Operand::Address(addr) = op2 {
+                } else if let Operand::Address(addr) = op2 {
                     s.r.MEMPTR = addr + 1
                 }
             }
         }
-        disas::Instruction::INC | disas::Instruction::DEC => {
+        Instruction::INC | Instruction::DEC => {
             let op1 = op.op1.ok_or("INC op1 missing")?;
-            let inc = if op.ins == disas::Instruction::INC {
+            let inc = if op.ins == Instruction::INC {
                 1
             } else {
                 -1
             };
             let size = match op1 {
-                disas::Operand::RegAddr(_) => disas::OpSize::S1,
-                disas::Operand::RegI(_) => disas::OpSize::S1,
+                Operand::RegAddr(_) => OpSize::S1,
+                Operand::RegI(_) => OpSize::S1,
                 _ => op1.size().ok_or("unsupported INC source size")?,
             };
             match size {
-                disas::OpSize::S1 => {
+                OpSize::S1 => {
                     // Sets conditions
                     let val = get_op8(s, op1) as i8;
                     let res = set_conditions_inc8_dec8(&mut s.r, val, inc);
                     set_op8(s, op1, res);
                 }
-                disas::OpSize::S2 => {
+                OpSize::S2 => {
                     // Does not set conditions
                     let val = get_op16(s, op1);
                     let (res, _) = val.overflowing_add(inc as u16);
@@ -704,14 +709,14 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 }
             }
         }
-        disas::Instruction::RLCA => {
+        Instruction::RLCA => {
             s.r.A = s.r.A.rotate_left(1);
             s.r.set_flag(Flag::C, s.r.A & 0x1 != 0);
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
             copy_f53_res(s.r.A, &mut s.r);
         }
-        disas::Instruction::RLA => {
+        Instruction::RLA => {
             let a = s.r.A;
             let c = s.r.F & C;
             s.r.set_flag(Flag::C, s.r.A & 0x80 != 0);
@@ -720,14 +725,14 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.set_flag(Flag::N, false);
             copy_f53_res(s.r.A, &mut s.r);
         }
-        disas::Instruction::RRCA => {
+        Instruction::RRCA => {
             s.r.A = s.r.A.rotate_right(1);
             s.r.set_flag(Flag::C, s.r.A & 0x80 != 0);
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
             copy_f53_res(s.r.A, &mut s.r);
         }
-        disas::Instruction::RRA => {
+        Instruction::RRA => {
             let a = s.r.A;
             let c = s.r.F & C;
             s.r.set_flag(Flag::C, s.r.A & 0x1 != 0);
@@ -736,7 +741,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.set_flag(Flag::N, false);
             copy_f53_res(s.r.A, &mut s.r);
         }
-        disas::Instruction::EX => {
+        Instruction::EX => {
             let op1 = op.op1.ok_or("EX op1 missing")?;
             let op2 = op.op2.ok_or("EX op2 missing")?;
             let a = get_op16(s, op1);
@@ -744,9 +749,9 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             set_op16(s, op1, b);
             set_op16(s, op2, a);
         }
-        disas::Instruction::DJNZ => {
+        Instruction::DJNZ => {
             let op1 = op.op1.ok_or("No immediate arg for DJNZ")?;
-            let jump = if let disas::Operand::RelAddr(j) = op1 {
+            let jump = if let Operand::RelAddr(j) = op1 {
                 j
             } else {
                 return Err(format!("Arg {} not rel addr for DJNZ", op1));
@@ -759,16 +764,16 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 op_len = 8 // [5, 3]
             }
         }
-        disas::Instruction::JR => {
+        Instruction::JR => {
             let op1 = op.op1.ok_or("No immediate arg for DJNZ")?;
-            if let disas::Operand::RelAddr(j) = op1 {
+            if let Operand::RelAddr(j) = op1 {
                 s.r.PC = (s.r.PC as i32 + j as i32) as u16;
                 update_pc = false;
                 s.r.MEMPTR = s.r.PC;
             } else {
                 let op2 = op.op2.ok_or("No second rel addr operand for JR")?;
-                if let disas::Operand::FlagCondition(cond) = op1 {
-                    if let disas::Operand::RelAddr(j) = op2 {
+                if let Operand::FlagCondition(cond) = op1 {
+                    if let Operand::RelAddr(j) = op2 {
                         if cond_valid(&s.r, cond) {
                             s.r.PC = (s.r.PC as i32 + j as i32) as u16;
                             update_pc = false;
@@ -784,20 +789,20 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 }
             }
         }
-        disas::Instruction::DAA => daa(&mut s.r),
-        disas::Instruction::CPL => {
+        Instruction::DAA => daa(&mut s.r),
+        Instruction::CPL => {
             s.r.A = !s.r.A;
             s.r.set_flag(Flag::H, true);
             s.r.set_flag(Flag::N, true);
             copy_f53_res(s.r.A, &mut s.r);
         }
-        disas::Instruction::SCF => {
+        Instruction::SCF => {
             s.r.set_flag(Flag::C, true);
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
             copy_f53_res(s.r.A, &mut s.r);
         }
-        disas::Instruction::CCF => {
+        Instruction::CCF => {
             s.r.set_flag(Flag::H, s.r.F & C != 0);
             s.r.set_flag(Flag::C, s.r.F & C == 0);
             s.r.set_flag(Flag::N, false);
