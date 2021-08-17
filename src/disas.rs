@@ -194,6 +194,13 @@ fn decode_operand_reg_r(arg: u8) -> Reg8 {
     }
 }
 
+fn decode_operand_reg_r_hladdr(arg: u8) -> Operand {
+    if arg & 0x7 == 6 {
+        return Operand::RegAddr(Reg16::HL);
+    }
+    Operand::Reg8(decode_operand_reg_r(arg))
+}
+
 fn decode_operand_cond_cc(arg: u8) -> FlagCondition {
     match arg & 0x7 {
         0 => FlagCondition::NZ,
@@ -615,15 +622,12 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             if ins.len() < 2 {
                 return None
             }
-            let op;
             let tstates;
             let opraw = (ins[0] >> 3) & 0x7;
+            let op = decode_operand_reg_r_hladdr(opraw);
             if opraw == 0x6 {
-                op = Operand::RegAddr(Reg16::HL);
                 tstates = vec![4, 3, 3];
             } else {
-                let reg = decode_operand_reg_r(opraw);
-                op = Operand::Reg8(reg);
                 tstates = vec![4, 3];
             }
             let opcode = OpCode {
@@ -647,15 +651,12 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             } else {
                 Instruction::DEC
             };
-            let op;
             let tstates;
             let opraw = (ins[0] >> 3) & 0x7;
+            let op = decode_operand_reg_r_hladdr(opraw);
             if opraw == 0x6 {
-                op = Operand::RegAddr(Reg16::HL);
                 tstates = vec![4, 4, 3];
             } else {
-                let reg = decode_operand_reg_r(opraw);
-                op = Operand::Reg8(reg);
                 tstates = vec![4];
             }
             let opcode = OpCode {
