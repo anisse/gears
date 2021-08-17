@@ -341,8 +341,7 @@ fn set_conditions_add8_base(r: &mut Regs, a: i8, b: i8) -> u8 {
         a.signum() == b.signum() && a.signum() != res.signum(),
     );
     r.set_flag(Flag::N, false);
-    r.set_flag(Flag::F5, res & (1 << 5) != 0);
-    r.set_flag(Flag::F3, res & (1 << 3) != 0);
+    copy_f53_res(res as u8, r);
 
     res as u8
 }
@@ -353,8 +352,7 @@ fn set_conditions_add_16(r: &mut Regs, a: i16, b: i16) -> u16 {
     //println!("a = {:04X}, b = {:04X}, res = {:04X}, a ^ b = {:04X}, a ^ b ^ res = {:04X}, & 0x1000 = {:04X}", a, b, res, a ^b, a ^ b ^ res, (a ^ b ^res) & 0x1000);
     r.set_flag(Flag::H, (a ^ b ^ res) & 0x1000 != 0);
     r.set_flag(Flag::N, false);
-    r.set_flag(Flag::F5, res & (1 << 13) != 0);
-    r.set_flag(Flag::F3, res & (1 << 11) != 0);
+    copy_f53_res((res >> 8) as u8, r);
 
     r.set_flag(Flag::C, (a as u16).overflowing_add(b as u16).1);
 
@@ -595,9 +593,13 @@ fn daa(r: &mut Regs) {
     r.set_flag(Flag::C, cp);
     r.set_flag(Flag::H, hp);
     r.set_flag(Flag::S, (r.A & 0x80) != 0);
-    r.set_flag(Flag::F5, (r.A & 0x20) != 0);
-    r.set_flag(Flag::F3, (r.A & 0x08) != 0);
+    copy_f53_res(r.A, r);
 }
+fn copy_f53_res(res: u8, r: &mut Regs) {
+    r.set_flag(Flag::F5, res & (1 << 5) != 0);
+    r.set_flag(Flag::F3, res & (1 << 3) != 0);
+}
+
 
 pub fn init() -> State {
     State::default()
@@ -707,8 +709,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.set_flag(Flag::C, s.r.A & 0x1 != 0);
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
-            s.r.set_flag(Flag::F5, s.r.A & (1 << 5) != 0);
-            s.r.set_flag(Flag::F3, s.r.A & (1 << 3) != 0);
+            copy_f53_res(s.r.A, &mut s.r);
         }
         disas::Instruction::RLA => {
             let a = s.r.A;
@@ -717,16 +718,14 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.A = a << 1 | c;
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
-            s.r.set_flag(Flag::F5, s.r.A & (1 << 5) != 0);
-            s.r.set_flag(Flag::F3, s.r.A & (1 << 3) != 0);
+            copy_f53_res(s.r.A, &mut s.r);
         }
         disas::Instruction::RRCA => {
             s.r.A = s.r.A.rotate_right(1);
             s.r.set_flag(Flag::C, s.r.A & 0x80 != 0);
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
-            s.r.set_flag(Flag::F5, s.r.A & (1 << 5) != 0);
-            s.r.set_flag(Flag::F3, s.r.A & (1 << 3) != 0);
+            copy_f53_res(s.r.A, &mut s.r);
         }
         disas::Instruction::RRA => {
             let a = s.r.A;
@@ -735,8 +734,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.A = a >> 1 | (c << 7);
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
-            s.r.set_flag(Flag::F5, s.r.A & (1 << 5) != 0);
-            s.r.set_flag(Flag::F3, s.r.A & (1 << 3) != 0);
+            copy_f53_res(s.r.A, &mut s.r);
         }
         disas::Instruction::EX => {
             let op1 = op.op1.ok_or("EX op1 missing")?;
@@ -791,8 +789,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.A = !s.r.A;
             s.r.set_flag(Flag::H, true);
             s.r.set_flag(Flag::N, true);
-            s.r.set_flag(Flag::F5, s.r.A & (1 << 5) != 0);
-            s.r.set_flag(Flag::F3, s.r.A & (1 << 3) != 0);
+            copy_f53_res(s.r.A, &mut s.r);
         }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
