@@ -206,46 +206,34 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
     if ins.is_empty() {
         return None;
     }
+    let arg = ins[0] & 0x7;
+    let add8 = OpCode {
+        data: vec![ins[0]],
+        length: 1,
+        ins: Instruction::ADD,
+        op1: Some(Operand::Reg8(Reg8::A)),
+        op2: Some(decode_operand_reg_r_hladdr(arg)),
+        mcycles: match arg {
+            0x6 => 2,
+            _ => 1,
+        },
+        tstates: match arg {
+            0x6 => vec![4, 3],
+            _ => vec![4],
+        },
+    };
     match ins[0] >> 3 {
         0x10 => {
             // ADD a, r
             // ADD a, (HL)
-            let arg = ins[0] & 0x7;
-            let opcode = OpCode {
-                data: vec![ins[0]],
-                length: 1,
-                ins: Instruction::ADD,
-                op1: Some(Operand::Reg8(Reg8::A)),
-                op2: Some(decode_operand_reg_r_hladdr(arg)),
-                mcycles: match arg {
-                    0x6 => 2,
-                    _ => 1,
-                },
-                tstates: match arg {
-                    0x6 => vec![4, 3],
-                    _ => vec![4],
-                },
-            };
-            return Some(opcode);
+            return Some(add8);
         }
         0x11 => {
             //ADC a, r
             //ADC a, (HL)
-            let arg = ins[0] & 0x7;
             let opcode = OpCode {
-                data: vec![ins[0]],
-                length: 1,
                 ins: Instruction::ADC,
-                op1: Some(Operand::Reg8(Reg8::A)),
-                op2: Some(decode_operand_reg_r_hladdr(arg)),
-                mcycles: match arg {
-                    0x6 => 2,
-                    _ => 1,
-                },
-                tstates: match arg {
-                    0x6 => vec![4, 3],
-                    _ => vec![4],
-                },
+                ..add8
             };
             return Some(opcode);
         }
