@@ -665,16 +665,16 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                         // MEMPTR_low = (rp + 1) & #FF,  MEMPTR_hi = A
                         s.r.MEMPTR = (r + 1) & 0xFF | ((s.r.A as u16) << 8);
                     }
-                    _ => {
-                        panic!("Unknown MEMPTR LD update op1 {:?}", op1)
-                    }
+                    _ => {}
                 }
-            } else if let disas::Operand::RegAddr(reg) = op2 {
-                s.r.MEMPTR = s.r.get_regpair(RegPair::from(reg)) + 1
-            } else if let disas::Operand::Address(addr) = op1 {
-                s.r.MEMPTR = addr + 1
-            } else if let disas::Operand::Address(addr) = op2 {
-                s.r.MEMPTR = addr + 1
+            } else if op1 == disas::Operand::Reg8(disas::Reg8::A) || size == disas::OpSize::S2 {
+                if let disas::Operand::RegAddr(reg) = op2 {
+                    s.r.MEMPTR = s.r.get_regpair(RegPair::from(reg)) + 1
+                } else if let disas::Operand::Address(addr) = op1 {
+                    s.r.MEMPTR = addr + 1
+                } else if let disas::Operand::Address(addr) = op2 {
+                    s.r.MEMPTR = addr + 1
+                }
             }
         }
         disas::Instruction::INC | disas::Instruction::DEC => {
