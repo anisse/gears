@@ -267,6 +267,7 @@ fn get_op8(s: &State, op: disas::Operand) -> u8 {
             disas::Reg8::L => s.r.L,
         },
         disas::Operand::RegAddr(reg) => s.mem.fetch_u8(s.r.get_regpair(RegPair::from(reg))),
+        disas::Operand::Address(addr) => s.mem.fetch_u8(addr),
         disas::Operand::Imm8(imm) => imm,
         _ => panic!("Unknown operand {:?} or size not 8", op),
     }
