@@ -256,10 +256,10 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         }
         _ => {}
     }
-    let rlca = OpCode {
+    let nop = OpCode {
         data: vec![ins[0]],
         length: 1,
-        ins: Instruction::RLCA,
+        ins: Instruction::NOP,
         op1: None,
         op2: None,
         mcycles: 1,
@@ -268,15 +268,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
     match ins[0] {
         0x00 => {
             // NOP
-            return Some(OpCode {
-                data: vec![ins[0]],
-                length: 1,
-                ins: Instruction::NOP,
-                op1: None,
-                op2: None,
-                mcycles: 1,
-                tstates: vec![4],
-            });
+            return Some(nop);
         }
         0x02 | 0x12 => {
             // LD (BC), A
@@ -295,26 +287,32 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 tstates: vec![4, 3],
             });
         }
-        0x07 => return Some(rlca), // RLCA
+        0x07 => {
+            // RLCA
+            return Some(OpCode {
+                ins: Instruction::RLCA,
+                ..nop
+            });
+        }
         0x17 => {
             // RLA
             return Some(OpCode {
                 ins: Instruction::RLA,
-                ..rlca
+                ..nop
             });
         }
         0x0F => {
             // RRCA
             return Some(OpCode {
                 ins: Instruction::RRCA,
-                ..rlca
+                ..nop
             });
         }
         0x1F => {
             // RRA
             return Some(OpCode {
                 ins: Instruction::RRA,
-                ..rlca
+                ..nop
             });
         }
         0x08 | 0xEB => {
@@ -430,13 +428,8 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         0x27 => {
             // DAA
             return Some(OpCode {
-                data: vec![ins[0]],
-                length: 1,
                 ins: Instruction::DAA,
-                op1: None,
-                op2: None,
-                mcycles: 1,
-                tstates: vec![4],
+                ..nop
             });
         }
         0x2A => {
@@ -457,13 +450,8 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         0x2F => {
             // CPL
             return Some(OpCode {
-                data: vec![ins[0]],
-                length: 1,
                 ins: Instruction::CPL,
-                op1: None,
-                op2: None,
-                mcycles: 1,
-                tstates: vec![4],
+                ..nop
             });
         }
         0x32 => {
@@ -568,13 +556,10 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             // DEC ss
             let reg = decode_operand_reg_ddss((ins[0] >> 4) & 0x3);
             return Some(OpCode {
-                data: vec![ins[0]],
-                length: 1,
                 ins: Instruction::DEC,
                 op1: Some(Operand::Reg16(reg)),
-                op2: None,
-                mcycles: 1,
                 tstates: vec![6],
+                ..nop
             });
         }
         0x09 => {
