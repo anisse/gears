@@ -648,27 +648,31 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                     set_op16(s, op1, val);
                 }
             }
+            let a_reg = Operand::Reg8(disas::Reg8::A);
             // MEMPTR
-            if op2 == Operand::Reg8(disas::Reg8::A) {
+            if op2 == a_reg {
                 match op1 {
                     Operand::Address(addr) => {
                         // MEMPTR_low = (addr + 1) & #FF,  MEMPTR_hi = A
                         s.r.MEMPTR = (addr + 1) & 0xFF | ((s.r.A as u16) << 8);
                     }
                     Operand::RegAddr(x) => {
-                        let r = match x {
-                            disas::Reg16::BC => s.r.get_regpair(RegPair::BC),
-                            disas::Reg16::DE => s.r.get_regpair(RegPair::DE),
-                            _ => panic!("Unsupported MEMPTR LD {:?}", x),
-                        };
-                        // MEMPTR_low = (rp + 1) & #FF,  MEMPTR_hi = A
-                        s.r.MEMPTR = (r + 1) & 0xFF | ((s.r.A as u16) << 8);
+                        if x == disas::Reg16::BC || x == disas::Reg16::DE {
+                            let r = s.r.get_regpair(RegPair::from(x));
+                            // MEMPTR_low = (rp + 1) & #FF,  MEMPTR_hi = A
+                            s.r.MEMPTR = (r + 1) & 0xFF | ((s.r.A as u16) << 8);
+                        }
                     }
                     _ => {}
                 }
-            } else if op1 == Operand::Reg8(disas::Reg8::A) || size == OpSize::S2 {
+            } else if op1 == a_reg || size == OpSize::S2 {
                 if let Operand::RegAddr(reg) = op2 {
-                    s.r.MEMPTR = s.r.get_regpair(RegPair::from(reg)) + 1
+                    if op1 != a_reg
+                        || op2 == Operand::RegAddr(disas::Reg16::BC)
+                        || op2 == Operand::RegAddr(disas::Reg16::DE)
+                    {
+                        s.r.MEMPTR = s.r.get_regpair(RegPair::from(reg)) + 1
+                    }
                 } else if let Operand::Address(addr) = op1 {
                     s.r.MEMPTR = addr + 1
                 } else if let Operand::Address(addr) = op2 {
