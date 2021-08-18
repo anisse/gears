@@ -252,7 +252,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             // SBC A, r
             // SBC A, (HL)
             let opcode = OpCode {
-                ins: Instruction::SUB,
+                ins: Instruction::SBC,
                 ..add8
             };
             return Some(opcode);
