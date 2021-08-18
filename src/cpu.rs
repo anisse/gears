@@ -339,6 +339,14 @@ fn set_conditions_sub8_base(r: &mut Regs, a: i8, b: i8, c: i8) -> u8 {
 
     res as u8
 }
+fn set_conditions_sbc_8(r: &mut Regs, a: i8, b: i8) -> u8 {
+    let c = r.F & C;
+    let (tmp, ov1) = (a as u8).overflowing_sub(b as u8);
+    let (_, ov2) = (tmp as u8).overflowing_sub(c as u8);
+    r.set_flag(Flag::C, ov1 || ov2);
+
+    set_conditions_sub8_base(r, a, b, c as i8)
+}
 
 fn set_conditions_adc_8(r: &mut Regs, a: i8, b: i8) -> u8 {
     let c = r.F & C;
@@ -397,6 +405,26 @@ fn set_conditions_add_16(r: &mut Regs, a: i16, b: i16, c: i16) -> u16 {
     res as u16
 }
 
+fn set_conditions_sbc_16(r: &mut Regs, a: i16, b: i16) -> u16 {
+    let c = (r.F & C) as i16;
+    let real_res = a as i32 + b as i32 + c as i32; // easier for overflows, etc
+    let res = (real_res & 0xFFFF) as i16;
+    r.set_flag(Flag::S, res < 0);
+    r.set_flag(Flag::Z, res == 0);
+    r.set_flag(Flag::H, (a ^ b ^ res) & 0x1000 == 0);
+    r.set_flag(
+        Flag::PV,
+        (a != 0 || b == i16::MIN) && a.signum() != b.signum() && a.signum() != res.signum(),
+    );
+    r.set_flag(Flag::N, true);
+    copy_f53_res((res >> 8) as u8, r);
+
+    let (tmp, ov1) = (a as u8).overflowing_sub(b as u8);
+    let (_, ov2) = (tmp as u8).overflowing_sub(c as u8);
+    r.set_flag(Flag::C, ov1 || ov2);
+
+    res as u16
+}
 
 fn cond_valid(r: &Regs, fc: disas::FlagCondition) -> bool {
     match fc {
@@ -697,6 +725,25 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 }
                 OpSize::S2 => {
                     return Err("No such thing as sub16".to_string())
+                }
+            }
+        }
+        Instruction::SBC => {
+            let op1 = op.op1.ok_or("sub op1 missing")?;
+            let op2 = op.op2.ok_or("sub op2 missing")?;
+            match op1.size().ok_or("unsupported add size")? {
+                OpSize::S1 => {
+                    let a = get_op8(s, op1) as i8;
+                    let b = get_op8(s, op2) as i8;
+                    let res = set_conditions_sbc_8(&mut s.r, a, b);
+                    set_op8(s, op1, res);
+                }
+                OpSize::S2 => {
+                    let a = get_op16(s, op1) as i16;
+                    let b = get_op16(s, op2) as i16;
+                    let res = set_conditions_sbc_16(&mut s.r, a, b);
+                    s.r.MEMPTR = a.overflowing_add(1).0 as u16;
+                    set_op16(s, op1, res);
                 }
             }
         }
