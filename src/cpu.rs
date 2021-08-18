@@ -697,13 +697,6 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 }
                 OpSize::S2 => {
                     return Err("No such thing as sub16".to_string())
-                        /*
-                    let a = get_op16(s, op1) as i16;
-                    let b = get_op16(s, op2) as i16;
-                    let res = set_conditions_sub_16(&mut s.r, a, b);
-                    s.r.MEMPTR = a.overflowing_add(1).0 as u16;
-                    set_op16(s, op1, res);
-                    */
                 }
             }
         }
