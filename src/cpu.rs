@@ -350,13 +350,11 @@ fn set_conditions_adc_8(r: &mut Regs, a: i8, b: i8) -> u8 {
 }
 
 fn set_conditions_inc8_dec8(r: &mut Regs, a: i8, b: i8) -> u8 {
-    let res = set_conditions_add8_base(r, a, b, 0);
     if b < 0 {
-        // invert H to mean borrow
-        r.set_flag(Flag::H, (r.F & H) ^ H != 0)
+        set_conditions_sub8_base(r, a, 1, 0)
+    } else {
+        set_conditions_add8_base(r, a, 1, 0)
     }
-    r.set_flag(Flag::N, b < 0);
-    res
 }
 
 fn set_conditions_add8_base(r: &mut Regs, a: i8, b: i8, c: i8) -> u8 {
