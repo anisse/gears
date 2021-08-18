@@ -121,6 +121,10 @@ pub enum Instruction {
     SCF,
     CCF,
     HALT,
+    AND,
+    OR,
+    XOR,
+    CP,
 }
 
 #[derive(PartialEq, Clone)]
@@ -253,6 +257,42 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             // SBC A, (HL)
             let opcode = OpCode {
                 ins: Instruction::SBC,
+                ..add8
+            };
+            return Some(opcode);
+        }
+        0x14 => {
+            // AND A, r
+            // AND A, (HL)
+            let opcode = OpCode {
+                ins: Instruction::AND,
+                ..add8
+            };
+            return Some(opcode);
+        }
+        0x16 => {
+            // OR A, r
+            // OR A, (HL)
+            let opcode = OpCode {
+                ins: Instruction::OR,
+                ..add8
+            };
+            return Some(opcode);
+        }
+        0x15 => {
+            // XOR A, r
+            // XOR A, (HL)
+            let opcode = OpCode {
+                ins: Instruction::XOR,
+                ..add8
+            };
+            return Some(opcode);
+        }
+        0x17 => {
+            // XOR A, r
+            // XOR A, (HL)
+            let opcode = OpCode {
+                ins: Instruction::CP,
                 ..add8
             };
             return Some(opcode);
