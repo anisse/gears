@@ -638,8 +638,8 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             }
         }
         Instruction::ADC => {
-            let op1 = op.op1.ok_or("add op1 missing")?;
-            let op2 = op.op2.ok_or("add op2 missing")?;
+            let op1 = op.op1.ok_or("adc op1 missing")?;
+            let op2 = op.op2.ok_or("adc op2 missing")?;
             match op1.size().ok_or("unsupported add size")? {
                 OpSize::S1 => {
                     let a = get_op8(s, op1) as i8;
