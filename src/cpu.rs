@@ -321,7 +321,9 @@ fn set_conditions_add_8(r: &mut Regs, a: i8, b: i8) -> u8 {
 }
 fn set_conditions_adc_8(r: &mut Regs, a: i8, b: i8) -> u8 {
     let c = r.F & C;
-    r.set_flag(Flag::C, (a as u8).overflowing_add(b as u8).1);
+    let (tmp, ov1) = (a as u8).overflowing_add(b as u8);
+    let (_, ov2) = (tmp as u8).overflowing_add(c as u8);
+    r.set_flag(Flag::C, ov1 || ov2);
 
     set_conditions_add8_base(r, a, b, c as i8)
 }
@@ -354,7 +356,12 @@ fn set_conditions_add8_base(r: &mut Regs, a: i8, b: i8, c: i8) -> u8 {
 
 fn set_conditions_adc_16(r: &mut Regs, a: i16, b: i16) -> u16 {
     let c = r.F & C;
-    set_conditions_add_16(r, a, b, c as i16)
+    let res = set_conditions_add_16(r, a, b, c as i16) as i16;
+    r.set_flag(
+        Flag::PV,
+        a.signum() == b.signum() && a.signum() != res.signum(),
+    );
+    res as u16
 }
 fn set_conditions_add_16(r: &mut Regs, a: i16, b: i16, c: i16) -> u16 {
     let real_res = a as i32 + b as i32 + c as i32; // easier for overflows, etc
@@ -364,10 +371,13 @@ fn set_conditions_add_16(r: &mut Regs, a: i16, b: i16, c: i16) -> u16 {
     r.set_flag(Flag::N, false);
     copy_f53_res((res >> 8) as u8, r);
 
-    r.set_flag(Flag::C, (a as u16).overflowing_add(b as u16).1);
+    let (tmp, ov1) = (a as u16).overflowing_add(b as u16);
+    let (_, ov2) = (tmp as u16).overflowing_add(c as u16);
+    r.set_flag(Flag::C, ov1 || ov2);
 
     res as u16
 }
+
 
 fn cond_valid(r: &Regs, fc: disas::FlagCondition) -> bool {
     match fc {
