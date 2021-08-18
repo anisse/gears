@@ -715,23 +715,15 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         }
         Instruction::SUB => {
             let op1 = op.op1.ok_or("sub op1 missing")?;
-            let op2 = op.op2.ok_or("sub op2 missing")?;
-            match op1.size().ok_or("unsupported add size")? {
-                OpSize::S1 => {
-                    let a = get_op8(s, op1) as i8;
-                    let b = get_op8(s, op2) as i8;
-                    let res = set_conditions_sub_8(&mut s.r, a, b);
-                    set_op8(s, op1, res);
-                }
-                OpSize::S2 => {
-                    return Err("No such thing as sub16".to_string())
-                }
-            }
+            let a = s.r.A as i8;
+            let b = get_op8(s, op1) as i8;
+            let res = set_conditions_sub_8(&mut s.r, a, b);
+            s.r.A = res;
         }
         Instruction::SBC => {
-            let op1 = op.op1.ok_or("sub op1 missing")?;
-            let op2 = op.op2.ok_or("sub op2 missing")?;
-            match op1.size().ok_or("unsupported add size")? {
+            let op1 = op.op1.ok_or("sbc op1 missing")?;
+            let op2 = op.op2.ok_or("sbc op2 missing")?;
+            match op1.size().ok_or("unsupported sbc size")? {
                 OpSize::S1 => {
                     let a = get_op8(s, op1) as i8;
                     let b = get_op8(s, op2) as i8;

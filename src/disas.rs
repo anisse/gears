@@ -228,6 +228,12 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             _ => vec![4],
         },
     };
+    let sub8 = OpCode{
+        op1: add8.op2,
+        op2: None,
+        ins: Instruction::SUB,
+        ..add8.clone()
+    };
     match ins[0] >> 3 {
         0x10 => {
             // ADD a, r
@@ -246,11 +252,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         0x12 => {
             // SUB A, r
             // SUB A, (HL)
-            let opcode = OpCode {
-                ins: Instruction::SUB,
-                ..add8
-            };
-            return Some(opcode);
+            return Some(sub8);
         }
         0x13 => {
             // SBC A, r
@@ -266,7 +268,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             // AND A, (HL)
             let opcode = OpCode {
                 ins: Instruction::AND,
-                ..add8
+                ..sub8
             };
             return Some(opcode);
         }
@@ -275,7 +277,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             // OR A, (HL)
             let opcode = OpCode {
                 ins: Instruction::OR,
-                ..add8
+                ..sub8
             };
             return Some(opcode);
         }
@@ -284,7 +286,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             // XOR A, (HL)
             let opcode = OpCode {
                 ins: Instruction::XOR,
-                ..add8
+                ..sub8
             };
             return Some(opcode);
         }
@@ -293,7 +295,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             // XOR A, (HL)
             let opcode = OpCode {
                 ins: Instruction::CP,
-                ..add8
+                ..sub8
             };
             return Some(opcode);
         }
