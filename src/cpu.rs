@@ -918,6 +918,17 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.halted = true;
             update_pc = false;
         }
+        Instruction::AND => {
+            let op1 = op.op1.ok_or("AND op1 missing")?;
+            s.r.A &= get_op8(s, op1);
+            s.r.set_flag(Flag::S, (s.r.A as i8) < 0);
+            s.r.set_flag(Flag::Z, s.r.A == 0);
+            s.r.set_flag(Flag::H, true);
+            s.r.set_flag(Flag::PV, s.r.A.count_ones() & 1 == 0);
+            s.r.set_flag(Flag::N, false);
+            s.r.set_flag(Flag::C, false);
+            copy_f53_res(s.r.A, &mut s.r);
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     if update_pc {
