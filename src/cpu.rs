@@ -319,6 +319,27 @@ fn set_conditions_add_8(r: &mut Regs, a: i8, b: i8) -> u8 {
 
     set_conditions_add8_base(r, a, b, 0)
 }
+
+fn set_conditions_sub_8(r: &mut Regs, a: i8, b: i8) -> u8 {
+    r.set_flag(Flag::C, (a as u8).overflowing_sub(b as u8).1);
+    set_conditions_sub8_base(r, a, b, 0)
+}
+fn set_conditions_sub8_base(r: &mut Regs, a: i8, b: i8, c: i8) -> u8 {
+    let real_res = a as i16 - b as i16 - c as i16; // easier for overflows, etc
+    let res = (real_res & 0xFF) as i8;
+    r.set_flag(Flag::S, res < 0);
+    r.set_flag(Flag::Z, res == 0);
+    r.set_flag(Flag::H, (a ^ b ^ res) & 0x10 != 0);
+    r.set_flag(
+        Flag::PV,
+        (a != 0 || b == i8::MIN) && a.signum() != b.signum() && a.signum() != res.signum(),
+    );
+    r.set_flag(Flag::N, true);
+    copy_f53_res(res as u8, r);
+
+    res as u8
+}
+
 fn set_conditions_adc_8(r: &mut Regs, a: i8, b: i8) -> u8 {
     let c = r.F & C;
     let (tmp, ov1) = (a as u8).overflowing_add(b as u8);
@@ -663,6 +684,28 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                     let res = set_conditions_adc_16(&mut s.r, a, b);
                     s.r.MEMPTR = a.overflowing_add(1).0 as u16;
                     set_op16(s, op1, res);
+                }
+            }
+        }
+        Instruction::SUB => {
+            let op1 = op.op1.ok_or("sub op1 missing")?;
+            let op2 = op.op2.ok_or("sub op2 missing")?;
+            match op1.size().ok_or("unsupported add size")? {
+                OpSize::S1 => {
+                    let a = get_op8(s, op1) as i8;
+                    let b = get_op8(s, op2) as i8;
+                    let res = set_conditions_sub_8(&mut s.r, a, b);
+                    set_op8(s, op1, res);
+                }
+                OpSize::S2 => {
+                    return Err("No such thing as sub16".to_string())
+                        /*
+                    let a = get_op16(s, op1) as i16;
+                    let b = get_op16(s, op2) as i16;
+                    let res = set_conditions_sub_16(&mut s.r, a, b);
+                    s.r.MEMPTR = a.overflowing_add(1).0 as u16;
+                    set_op16(s, op1, res);
+                    */
                 }
             }
         }
