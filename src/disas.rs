@@ -189,7 +189,6 @@ fn decode_operand_reg_qq(arg: u8) -> Reg16 {
     }
 }
 
-
 fn decode_operand_reg_r(arg: u8) -> Reg8 {
     match arg & 0x7 {
         0 => Reg8::B,
@@ -611,7 +610,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         0xCD => {
             // CALL nn
             if ins.len() < 3 {
-                return None
+                return None;
             }
             return Some(OpCode {
                 data: vec![ins[0], ins[1], ins[2]],
@@ -850,7 +849,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         });
     }
     if ins.len() < 2 {
-        return None
+        return None;
     }
     // two bytes opcodes
     let ins2 = (ins[0] as u16) << 8 | ins[1] as u16;

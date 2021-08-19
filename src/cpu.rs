@@ -1026,7 +1026,8 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             }
             if jump {
                 s.r.SP = s.r.SP.overflowing_sub(2).0;
-                s.mem.set_u16(s.r.SP, s.r.PC.overflowing_add(op.length as u16).0);
+                s.mem
+                    .set_u16(s.r.SP, s.r.PC.overflowing_add(op.length as u16).0);
                 s.r.PC = addr;
                 update_pc = false;
             }
@@ -1035,7 +1036,8 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         Instruction::RST => {
             let op1 = op.op1.ok_or("RST op1 missing")?;
             s.r.SP = s.r.SP.overflowing_sub(2).0;
-            s.mem.set_u16(s.r.SP, s.r.PC.overflowing_add(op.length as u16).0);
+            s.mem
+                .set_u16(s.r.SP, s.r.PC.overflowing_add(op.length as u16).0);
             let addr = get_op8(s, op1) as u16;
             s.r.PC = addr;
             s.r.MEMPTR = addr;
