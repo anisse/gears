@@ -977,7 +977,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             let op1 = op.op1.ok_or("PUSH op1 missing")?;
             let arg = get_op16(s, op1);
             s.r.SP = s.r.SP.overflowing_sub(2).0;
-            s.mem.set_u16(s.r.PC, arg);
+            s.mem.set_u16(s.r.SP, arg);
         }
         Instruction::JP => {
             if let Some(Operand::FlagCondition(cond)) = op.op1 {
