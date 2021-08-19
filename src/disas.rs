@@ -130,6 +130,7 @@ pub enum Instruction {
     POP,
     CALL,
     RST,
+    RLC,
 }
 
 #[derive(PartialEq, Clone)]
@@ -848,7 +849,37 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             ..nop
         });
     }
-
+    if ins.len() < 2 {
+        return None
+    }
+    // two bytes opcodes
+    let ins2 = (ins[0] as u16) << 8 | ins[1] as u16;
+    /*
+    match ins2 {
+        _ => {}
+    }
+    */
+    /*
+    match ins2 & 0xFFF8 {
+        0xCB00 => {
+        */
+    if ins2 & 0xFFF8 == 0xCB00 {
+            //RLC r
+            let op1 = Some(decode_operand_reg_r_hladdr(ins[1] & 0x7));
+            return Some(OpCode {
+                data: vec![ins[0], ins[1]],
+                length: 2,
+                ins: Instruction::RLC,
+                op1,
+                op2: None,
+                mcycles: 2,
+                tstates: vec![4, 4],
+            });
+        }
+    /*
+        _ => {}
+    }
+    */
     None
 }
 
