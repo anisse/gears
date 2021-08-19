@@ -573,7 +573,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 data: vec![ins[0], ins[1], ins[2]],
                 length: 3,
                 ins: Instruction::JP,
-                op1: Some(Operand::Address(ins[1] as u16 | ((ins[2] as u16) << 8))),
+                op1: Some(Operand::Imm16(ins[1] as u16 | ((ins[2] as u16) << 8))),
                 op2: None,
                 mcycles: 3,
                 tstates: vec![4, 3, 3], // Warning: varies
@@ -780,7 +780,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 length: 3,
                 ins: Instruction::JP,
                 op1: Some(Operand::FlagCondition(cond)),
-                op2: Some(Operand::Address(ins[1] as u16 | ((ins[2] as u16) << 8))),
+                op2: Some(Operand::Imm16(ins[1] as u16 | ((ins[2] as u16) << 8))),
                 mcycles: 3,
                 tstates: vec![4, 3, 3], // Warning: varies
             });
