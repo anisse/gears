@@ -998,6 +998,26 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 }
             }
         }
+        Instruction::CALL => {
+            let mut jump = true;
+            let addr;
+            if let Some(Operand::FlagCondition(cond)) = op.op1 {
+                addr = get_op16(s, op.op2.ok_or("CALL missing op2")?);
+                if !cond_valid(&s.r, cond) {
+                    op_len = 5;
+                    jump = false;
+                }
+            } else {
+                addr = get_op16(s, op.op1.ok_or("CALL missing op1")?);
+            }
+            if jump {
+                s.r.SP = s.r.SP.overflowing_sub(2).0;
+                s.mem.set_u16(s.r.SP, s.r.PC.overflowing_add(op.length as u16).0);
+                s.r.PC = addr;
+                update_pc = false;
+            }
+            s.r.MEMPTR = addr;
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     if update_pc {
