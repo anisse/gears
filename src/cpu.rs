@@ -667,6 +667,15 @@ fn copy_f53_res(res: u8, r: &mut Regs) {
     r.set_flag(Flag::F3, res & (1 << 3) != 0);
 }
 
+fn set_bitops_flags(r: &mut Regs) {
+    r.set_flag(Flag::S, (r.A as i8) < 0);
+    r.set_flag(Flag::Z, r.A == 0);
+    r.set_flag(Flag::PV, r.A.count_ones() & 1 == 0);
+    r.set_flag(Flag::N, false);
+    r.set_flag(Flag::C, false);
+    copy_f53_res(r.A, r);
+}
+
 pub fn init() -> State {
     State::default()
 }
@@ -921,13 +930,20 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         Instruction::AND => {
             let op1 = op.op1.ok_or("AND op1 missing")?;
             s.r.A &= get_op8(s, op1);
-            s.r.set_flag(Flag::S, (s.r.A as i8) < 0);
-            s.r.set_flag(Flag::Z, s.r.A == 0);
             s.r.set_flag(Flag::H, true);
-            s.r.set_flag(Flag::PV, s.r.A.count_ones() & 1 == 0);
-            s.r.set_flag(Flag::N, false);
-            s.r.set_flag(Flag::C, false);
-            copy_f53_res(s.r.A, &mut s.r);
+            set_bitops_flags(&mut s.r);
+        }
+        Instruction::OR => {
+            let op1 = op.op1.ok_or("AND op1 missing")?;
+            s.r.A |= get_op8(s, op1);
+            s.r.set_flag(Flag::H, false);
+            set_bitops_flags(&mut s.r);
+        }
+        Instruction::XOR => {
+            let op1 = op.op1.ok_or("AND op1 missing")?;
+            s.r.A ^= get_op8(s, op1);
+            s.r.set_flag(Flag::H, false);
+            set_bitops_flags(&mut s.r);
         }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
