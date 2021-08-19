@@ -952,6 +952,21 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             set_conditions_sub_8(&mut s.r, a, b);
             copy_f53_res(b as u8, &mut s.r);
         }
+        Instruction::RET => {
+            let mut jump = true;
+            if let Some(Operand::FlagCondition(cond)) = op.op1 {
+                if !cond_valid(&s.r, cond) {
+                    op_len = 5;
+                    jump = false;
+                }
+            }
+            if jump {
+                s.r.PC = s.mem.fetch_u16(s.r.SP);
+                s.r.SP = s.r.SP.overflowing_add(2).0;
+                s.r.MEMPTR = s.r.PC;
+                update_pc = false;
+            }
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     if update_pc {
