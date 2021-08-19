@@ -854,6 +854,15 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.set_flag(Flag::N, false);
             copy_f53_res(s.r.A, &mut s.r);
         }
+        Instruction::RRC => {
+            let op1 = op.op1.ok_or("RRC missing op1")?;
+            let val = get_op8(s, op1);
+            let val = val.rotate_right(1);
+            set_op8(s, op1, val);
+            set_bitops_flags(val, &mut s.r);
+            s.r.set_flag(Flag::C, val & 0x80 != 0);
+            s.r.set_flag(Flag::H, false);
+        }
         Instruction::RRCA => {
             s.r.A = s.r.A.rotate_right(1);
             s.r.set_flag(Flag::C, s.r.A & 0x80 != 0);
