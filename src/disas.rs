@@ -125,6 +125,7 @@ pub enum Instruction {
     OR,
     XOR,
     CP,
+    RET,
 }
 
 #[derive(PartialEq, Clone)]
@@ -582,6 +583,15 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             };
             return Some(opcode);
         }
+        0xC9 => {
+            //RET
+            return Some(OpCode {
+                ins: Instruction::RET,
+                mcycles: 3,
+                tstates: vec![4, 3, 3],
+                ..nop
+            });
+        }
         0xCE => {
             // ADC a, n
             if ins.len() < 2 {
@@ -712,6 +722,17 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 tstates,
             };
             return Some(opcode);
+        }
+        0xC0 => {
+            // RET cc
+            let cond = decode_operand_cond_cc(ins[0] >> 3 & 0x7);
+            return Some(OpCode {
+                ins: Instruction::RET,
+                op1: Some(Operand::FlagCondition(cond)),
+                mcycles: 3,
+                tstates: vec![5, 3, 3], // warning: varies
+                ..nop
+            });
         }
         0xC2 => {
             // JP cc, nn
