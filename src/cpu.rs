@@ -845,6 +845,17 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.set_flag(Flag::N, false);
             copy_f53_res(s.r.A, &mut s.r);
         }
+        Instruction::RL => {
+            let op1 = op.op1.ok_or("RL missing op1")?;
+            let c = s.r.F & C;
+            let val = get_op8(s, op1);
+            let cp = val & 0x80 != 0;
+            let val = val << 1 | c;
+            set_op8(s, op1, val);
+            set_bitops_flags(val, &mut s.r);
+            s.r.set_flag(Flag::C, cp);
+            s.r.set_flag(Flag::H, false);
+        }
         Instruction::RLA => {
             let a = s.r.A;
             let c = s.r.F & C;
@@ -869,6 +880,17 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
             copy_f53_res(s.r.A, &mut s.r);
+        }
+        Instruction::RR => {
+            let op1 = op.op1.ok_or("RR missing op1")?;
+            let c = s.r.F & C;
+            let val = get_op8(s, op1);
+            let cp = val & 0x1 != 0;
+            let val = val >> 1 | (c << 7);
+            set_op8(s, op1, val);
+            set_bitops_flags(val, &mut s.r);
+            s.r.set_flag(Flag::C, cp);
+            s.r.set_flag(Flag::H, false);
         }
         Instruction::RRA => {
             let a = s.r.A;
