@@ -967,6 +967,18 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 update_pc = false;
             }
         }
+        Instruction::POP => {
+            let op1 = op.op1.ok_or("POP op1 missing")?;
+            let val = s.mem.fetch_u16(s.r.SP);
+            set_op16(s, op1, val);
+            s.r.SP = s.r.SP.overflowing_add(2).0;
+        }
+        Instruction::PUSH => {
+            let op1 = op.op1.ok_or("PUSH op1 missing")?;
+            let arg = get_op16(s, op1);
+            s.r.SP = s.r.SP.overflowing_sub(2).0;
+            s.mem.set_u16(s.r.PC, arg);
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     if update_pc {
