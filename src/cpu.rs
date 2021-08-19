@@ -945,6 +945,13 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.set_flag(Flag::H, false);
             set_bitops_flags(&mut s.r);
         }
+        Instruction::CP => {
+            let op1 = op.op1.ok_or("CP op1 missing")?;
+            let a = s.r.A as i8;
+            let b = get_op8(s, op1) as i8;
+            set_conditions_sub_8(&mut s.r, a, b);
+            copy_f53_res(b as u8, &mut s.r);
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     if update_pc {
