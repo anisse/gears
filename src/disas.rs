@@ -126,6 +126,8 @@ pub enum Instruction {
     XOR,
     CP,
     RET,
+    PUSH,
+    POP,
 }
 
 #[derive(PartialEq, Clone)]
@@ -173,6 +175,17 @@ fn decode_operand_reg_ddss(arg: u8) -> Reg16 {
         _ => unreachable!(),
     }
 }
+
+fn decode_operand_reg_qq(arg: u8) -> Reg16 {
+    match arg & 0x3 {
+        0 => Reg16::BC,
+        1 => Reg16::DE,
+        2 => Reg16::HL,
+        3 => Reg16::AF,
+        _ => unreachable!(),
+    }
+}
+
 
 fn decode_operand_reg_r(arg: u8) -> Reg8 {
     match arg & 0x7 {
@@ -664,6 +677,28 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 op2: Some(Operand::Reg16(reg)),
                 mcycles: 3,
                 tstates: vec![4, 4, 3],
+            });
+        }
+        0xC1 => {
+            // POP qq
+            let reg = decode_operand_reg_qq((ins[0] >> 4) & 0x3);
+            return Some(OpCode {
+                ins: Instruction::POP,
+                op1: Some(Operand::Reg16(reg)),
+                mcycles: 3,
+                tstates: vec![4, 3, 3],
+                ..nop
+            });
+        }
+        0xC5 => {
+            // POP qq
+            let reg = decode_operand_reg_qq((ins[0] >> 4) & 0x3);
+            return Some(OpCode {
+                ins: Instruction::PUSH,
+                op1: Some(Operand::Reg16(reg)),
+                mcycles: 3,
+                tstates: vec![5, 3, 3],
+                ..nop
             });
         }
         _ => {}
