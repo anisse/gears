@@ -1060,7 +1060,7 @@ pub fn run(s: &mut State, tstates_len: usize) -> Result<(), String> {
             let op_len = run_op(s, &op)?;
             tstates_len = usize::saturating_sub(tstates_len, op_len);
         } else {
-            return Err(format!("Unknown instruction {:#X}", disas_target[0]));
+            return Err(format!("Unknown instruction(s)) {:02X?}", disas_target));
         }
     }
     Ok(())
