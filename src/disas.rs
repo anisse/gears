@@ -229,7 +229,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
             _ => vec![4],
         },
     };
-    let sub8 = OpCode{
+    let sub8 = OpCode {
         op1: add8.op2,
         op2: None,
         ins: Instruction::SUB,
