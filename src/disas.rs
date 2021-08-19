@@ -128,6 +128,7 @@ pub enum Instruction {
     RET,
     PUSH,
     POP,
+    CALL,
 }
 
 #[derive(PartialEq, Clone)]
@@ -605,6 +606,21 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 ..nop
             });
         }
+        0xCD => {
+            // CALL nn
+            if ins.len() < 3 {
+                return None
+            }
+            return Some(OpCode {
+                data: vec![ins[0], ins[1], ins[2]],
+                length: 3,
+                ins: Instruction::CALL,
+                op1: Some(Operand::Imm16(ins[1] as u16 | ((ins[2] as u16) << 8))),
+                op2: None,
+                mcycles: 5,
+                tstates: vec![4, 3, 4, 3, 3], // Warning: varies
+            });
+        }
         0xCE => {
             // ADC a, n
             if ins.len() < 2 {
@@ -783,6 +799,22 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 op2: Some(Operand::Imm16(ins[1] as u16 | ((ins[2] as u16) << 8))),
                 mcycles: 3,
                 tstates: vec![4, 3, 3], // Warning: varies
+            });
+        }
+        0xC4 => {
+            // CALL cc, nn
+            if ins.len() < 3 {
+                return None
+            }
+            let cond = decode_operand_cond_cc(ins[0] >> 3 & 0x7);
+            return Some(OpCode {
+                data: vec![ins[0], ins[1], ins[2]],
+                length: 3,
+                ins: Instruction::CALL,
+                op1: Some(Operand::FlagCondition(cond)),
+                op2: Some(Operand::Imm16(ins[1] as u16 | ((ins[2] as u16) << 8))),
+                mcycles: 5,
+                tstates: vec![4, 3, 4, 3, 3], // Warning: varies
             });
         }
         _ => {}
