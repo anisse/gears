@@ -1004,7 +1004,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             if let Some(Operand::FlagCondition(cond)) = op.op1 {
                 addr = get_op16(s, op.op2.ok_or("CALL missing op2")?);
                 if !cond_valid(&s.r, cond) {
-                    op_len = 5;
+                    op_len = 10; // [4, 3, 3]
                     jump = false;
                 }
             } else {
