@@ -131,6 +131,7 @@ pub enum Instruction {
     CALL,
     RST,
     RLC,
+    RRC,
 }
 
 #[derive(PartialEq, Clone)]
@@ -866,27 +867,28 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         _ => {}
     }
     */
-    /*
     match ins2 & 0xFFF8 {
-        0xCB00 => {
-        */
-    if ins2 & 0xFFF8 == 0xCB00 {
+        0xCB00 | 0xCB08 => {
             //RLC r
+            //RRC r
             let op1 = Some(decode_operand_reg_r_hladdr(ins[1] & 0x7));
+            let tstates = if op1 == Some(Operand::RegAddr(Reg16::HL)) {
+                vec![4, 4, 4, 3]
+            } else {
+                vec![4, 4]
+            };
             return Some(OpCode {
                 data: vec![ins[0], ins[1]],
                 length: 2,
-                ins: Instruction::RLC,
+                ins: if ins2 & 0xFFF8 == 0xCB00 { Instruction::RLC } else { Instruction::RRC },
                 op1,
                 op2: None,
-                mcycles: 2,
-                tstates: vec![4, 4],
+                mcycles: tstates.len() as u8,
+                tstates,
             });
         }
-    /*
         _ => {}
     }
-    */
     None
 }
 
