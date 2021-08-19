@@ -839,12 +839,20 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         let op2 = Some(decode_operand_reg_r_hladdr(ins[0] & 0x7));
         assert!(
             !(op1 == Some(Operand::RegAddr(Reg16::HL)) && op1 == op2),
-            "Halt detected"
-        ); //HALT
+            "HALT detected"
+        );
+        let tstates;
+        if op1 == Some(Operand::RegAddr(Reg16::HL)) || op2 == Some(Operand::RegAddr(Reg16::HL)) {
+            tstates = vec![4, 3];
+        } else {
+            tstates = vec![4];
+        }
         return Some(OpCode {
             ins: Instruction::LD,
             op1,
             op2,
+            mcycles: tstates.len() as u8,
+            tstates,
             ..nop
         });
     }
