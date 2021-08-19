@@ -129,6 +129,7 @@ pub enum Instruction {
     PUSH,
     POP,
     CALL,
+    RST,
 }
 
 #[derive(PartialEq, Clone)]
@@ -815,6 +816,17 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 op2: Some(Operand::Imm16(ins[1] as u16 | ((ins[2] as u16) << 8))),
                 mcycles: 5,
                 tstates: vec![4, 3, 4, 3, 3], // Warning: varies
+            });
+        }
+        0xC7 => {
+            // RST p
+            let p =  ((ins[0] >> 3) & 0x7) << 3;
+            return Some(OpCode {
+                ins: Instruction::RST,
+                op1: Some(Operand::Imm8(p)),
+                mcycles: 3,
+                tstates: vec![5, 3, 3],
+                ..nop
             });
         }
         _ => {}

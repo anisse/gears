@@ -1018,6 +1018,15 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             }
             s.r.MEMPTR = addr;
         }
+        Instruction::RST => {
+            let op1 = op.op1.ok_or("RST op1 missing")?;
+            s.r.SP = s.r.SP.overflowing_sub(2).0;
+            s.mem.set_u16(s.r.SP, s.r.PC.overflowing_add(op.length as u16).0);
+            let addr = get_op8(s, op1) as u16;
+            s.r.PC = addr;
+            s.r.MEMPTR = addr;
+            update_pc = false;
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     if update_pc {
