@@ -888,7 +888,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                     0xCB00 => Instruction::RLC,
                     0xCB08 => Instruction::RRC,
                     0xCB10 => Instruction::RL,
-                    0xCB18 => Instruction::RR,
+                    0xCB18 => Instruction::RR, // error in manual page 228 (pd 242)
                     _ => unreachable!()
                 },
                 op1,
