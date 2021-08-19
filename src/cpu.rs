@@ -979,6 +979,25 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.SP = s.r.SP.overflowing_sub(2).0;
             s.mem.set_u16(s.r.PC, arg);
         }
+        Instruction::JP => {
+            if let Some(Operand::FlagCondition(cond)) = op.op1 {
+                let op2 = op.op2.ok_or("JP op2 missing")?;
+                let addr = get_op16(s, op2);
+                if cond_valid(&s.r, cond) {
+                    s.r.PC = addr;
+                    update_pc = false;
+                }
+                s.r.MEMPTR = addr;
+            } else {
+                let op1 = op.op1.ok_or("JP op1 missing")?;
+                let addr = get_op16(s, op1);
+                s.r.PC = addr;
+                update_pc = false;
+                if let Operand::Imm16(_) = op1 {
+                    s.r.MEMPTR = addr;
+                }
+            }
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     if update_pc {
