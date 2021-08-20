@@ -1118,6 +1118,30 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.set_flag(Flag::C, cp);
             s.r.set_flag(Flag::H, false);
         }
+        Instruction::BIT => {
+            let op1 = op.op1.ok_or("BIT missing op1")?;
+            let op2 = op.op2.ok_or("BIT missing op2")?;
+            let shift = get_op8(s, op1);
+            let val = get_op8(s, op2);
+
+            s.r.set_flag(Flag::H, true);
+            set_bitops_flags(val & (1 << shift), &mut s.r);
+            /* According to the FUSE test suite, real hardware uses all bits for F5 and F3,
+             * opposite to what Sean Young's Z80 undocumented says; we'll need to verify this
+             * later, but trust the more recent FUSE interpretation for now */
+            copy_f53_res(val, &mut s.r);
+            if let Operand::RegI(i) = op2 {
+                let val = match i {
+                    disas::RegI::IX(d) => (s.r.IX as i32 + d as i32) as u16,
+                    disas::RegI::IY(d) => (s.r.IY as i32 + d as i32) as u16,
+                };
+                copy_f53_res(((val >> 8) & 0xFF) as u8, &mut s.r);
+                todo!(); // to check
+            } else if op2 == Operand::RegAddr(disas::Reg16::HL) {
+                // infamous MEMPTR leaking
+                copy_f53_res(((s.r.MEMPTR >> 8) & 0xFF) as u8, &mut s.r);
+            }
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     if update_pc {
