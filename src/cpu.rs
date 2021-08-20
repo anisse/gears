@@ -672,8 +672,11 @@ fn set_bitops_flags(res: u8, r: &mut Regs) {
     r.set_flag(Flag::Z, res == 0);
     r.set_flag(Flag::PV, res.count_ones() & 1 == 0);
     r.set_flag(Flag::N, false);
-    r.set_flag(Flag::C, false);
     copy_f53_res(res, r);
+}
+fn set_bitops_flags_c(res: u8, r: &mut Regs) {
+    set_bitops_flags(res, r);
+    r.set_flag(Flag::C, false);
 }
 
 pub fn init() -> State {
@@ -976,19 +979,19 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             let op1 = op.op1.ok_or("AND op1 missing")?;
             s.r.A &= get_op8(s, op1);
             s.r.set_flag(Flag::H, true);
-            set_bitops_flags(s.r.A, &mut s.r);
+            set_bitops_flags_c(s.r.A, &mut s.r);
         }
         Instruction::OR => {
             let op1 = op.op1.ok_or("AND op1 missing")?;
             s.r.A |= get_op8(s, op1);
             s.r.set_flag(Flag::H, false);
-            set_bitops_flags(s.r.A, &mut s.r);
+            set_bitops_flags_c(s.r.A, &mut s.r);
         }
         Instruction::XOR => {
             let op1 = op.op1.ok_or("AND op1 missing")?;
             s.r.A ^= get_op8(s, op1);
             s.r.set_flag(Flag::H, false);
-            set_bitops_flags(s.r.A, &mut s.r);
+            set_bitops_flags_c(s.r.A, &mut s.r);
         }
         Instruction::CP => {
             let op1 = op.op1.ok_or("CP op1 missing")?;
