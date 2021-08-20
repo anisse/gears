@@ -138,6 +138,9 @@ pub enum Instruction {
     SRA,
     SRL,
     SLL,
+    BIT,
+    SET,
+    RES,
 }
 
 #[derive(PartialEq, Clone)]
@@ -904,6 +907,39 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 },
                 op1,
                 op2: None,
+                mcycles: tstates.len() as u8,
+                tstates,
+            });
+        }
+        _ => {}
+    }
+    match ins2 & 0xFFC0 {
+        0xCB40 | 0xCBC0 | 0xCB80 => {
+            // BIT b, r
+            // SET b, r
+            // RES b, r
+            let op1 = Some(Operand::Imm8((ins[1] >> 3) & 0x7));
+            let op2 = Some(decode_operand_reg_r_hladdr(ins[1] & 0x7));
+            let tstates = if op1 == Some(Operand::RegAddr(Reg16::HL)) {
+                if ins2 & 0xFFC0 == 0xCB40 {
+                    vec![4, 4, 4]
+                } else {
+                    vec![4, 4, 4, 3]
+                }
+            } else {
+                vec![4, 4]
+            };
+            return Some(OpCode {
+                data: vec![ins[0], ins[1]],
+                length: 2,
+                ins: match ins2 & 0xFFC0 {
+                    0xCB40 => Instruction::BIT,
+                    0xCBC0 => Instruction::SET,
+                    0xCB80 => Instruction::RES,
+                    _ => unreachable!(),
+                },
+                op1,
+                op2,
                 mcycles: tstates.len() as u8,
                 tstates,
             });
