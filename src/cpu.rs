@@ -1074,6 +1074,37 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.MEMPTR = addr;
             update_pc = false;
         }
+        Instruction::SLA => {
+            let op1 = op.op1.ok_or("SLA missing op1")?;
+            let val = get_op8(s, op1);
+            let cp = val & 0x80 != 0;
+            let val = val << 1;
+            set_op8(s, op1, val);
+            set_bitops_flags(val, &mut s.r);
+            s.r.set_flag(Flag::C, cp);
+            s.r.set_flag(Flag::H, false);
+        }
+        Instruction::SRA => {
+            let op1 = op.op1.ok_or("SRA missing op1")?;
+            let val = get_op8(s, op1);
+            let cp = val & 0x1 != 0;
+            let hi = val & 0x80;
+            let val = (val >> 1) | hi;
+            set_op8(s, op1, val);
+            set_bitops_flags(val, &mut s.r);
+            s.r.set_flag(Flag::C, cp);
+            s.r.set_flag(Flag::H, false);
+        }
+        Instruction::SRL => {
+            let op1 = op.op1.ok_or("SRL missing op1")?;
+            let val = get_op8(s, op1);
+            let cp = val & 0x1 != 0;
+            let val = val >> 1;
+            set_op8(s, op1, val);
+            set_bitops_flags(val, &mut s.r);
+            s.r.set_flag(Flag::C, cp);
+            s.r.set_flag(Flag::H, false);
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     if update_pc {
