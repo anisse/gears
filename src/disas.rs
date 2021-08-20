@@ -137,6 +137,7 @@ pub enum Instruction {
     SLA,
     SRA,
     SRL,
+    SLL,
 }
 
 #[derive(PartialEq, Clone)]
@@ -873,7 +874,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
     }
     */
     match ins2 & 0xFFF8 {
-        0xCB00 | 0xCB08 | 0xCB10 | 0xCB18 | 0xCB20 | 0xCB28 | 0xCB38 => {
+        0xCB00 | 0xCB08 | 0xCB10 | 0xCB18 | 0xCB20 | 0xCB28 | 0xCB30 | 0xCB38 => {
             //RLC r
             //RRC r
             //RL r
@@ -897,6 +898,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                     0xCB18 => Instruction::RR, // error in manual page 228 (pd 242)
                     0xCB20 => Instruction::SLA,
                     0xCB28 => Instruction::SRA,
+                    0xCB30 => Instruction::SLL,
                     0xCB38 => Instruction::SRL,
                     _ => unreachable!(),
                 },
