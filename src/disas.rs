@@ -134,6 +134,9 @@ pub enum Instruction {
     RRC,
     RL,
     RR,
+    SLA,
+    SRA,
+    SRL,
 }
 
 #[derive(PartialEq, Clone)]
@@ -870,11 +873,14 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
     }
     */
     match ins2 & 0xFFF8 {
-        0xCB00 | 0xCB08 | 0xCB10 | 0xCB18 => {
+        0xCB00 | 0xCB08 | 0xCB10 | 0xCB18 | 0xCB20 | 0xCB28 | 0xCB38 => {
             //RLC r
             //RRC r
             //RL r
             //RR r
+            //SLA r
+            //SRA r
+            //SRL r
             let op1 = Some(decode_operand_reg_r_hladdr(ins[1] & 0x7));
             let tstates = if op1 == Some(Operand::RegAddr(Reg16::HL)) {
                 vec![4, 4, 4, 3]
@@ -889,7 +895,10 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                     0xCB08 => Instruction::RRC,
                     0xCB10 => Instruction::RL,
                     0xCB18 => Instruction::RR, // error in manual page 228 (pd 242)
-                    _ => unreachable!()
+                    0xCB20 => Instruction::SLA,
+                    0xCB28 => Instruction::SRA,
+                    0xCB38 => Instruction::SRL,
+                    _ => unreachable!(),
                 },
                 op1,
                 op2: None,
