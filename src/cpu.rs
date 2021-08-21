@@ -1142,6 +1142,20 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 copy_f53_res(((s.r.MEMPTR >> 8) & 0xFF) as u8, &mut s.r);
             }
         }
+        Instruction::RES => {
+            let op1 = op.op1.ok_or("RES missing op1")?;
+            let op2 = op.op2.ok_or("RES missing op2")?;
+            let shift = get_op8(s, op1);
+            let val = get_op8(s, op2) & (!(1 << shift));
+            set_op8(s, op2, val);
+        }
+        Instruction::SET => {
+            let op1 = op.op1.ok_or("RES missing op1")?;
+            let op2 = op.op2.ok_or("RES missing op2")?;
+            let shift = get_op8(s, op1);
+            let val = get_op8(s, op2) | (1 << shift);
+            set_op8(s, op2, val);
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     if update_pc {
