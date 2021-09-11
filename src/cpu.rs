@@ -1158,6 +1158,21 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             let val = get_op8(s, op2) | (1 << shift);
             set_op8(s, op2, val);
         }
+        Instruction::OUT => {
+            let op1 = op.op1.ok_or("OUT missing op1")?;
+            let op2 = op.op2.ok_or("OUT missing op2")?;
+            if op2 != Operand::Reg8(disas::Reg8::A) {
+                return Err("Op2 should be A".to_string());
+            }
+            if let Operand::IOAddress(addr) = op1 {
+                let val = s.r.A;
+                // TODO: stop ignoring errors
+                s.io.out(addr, val).ok();
+                // MEMPTR_low = (port + 1) & #FF,  MEMPTR_hi = A
+                let low = addr.overflowing_add(1).0 as u16;
+                s.r.MEMPTR = low & 0xFF | ((val as u16) << 8);
+            }
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     if update_pc {
