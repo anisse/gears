@@ -52,6 +52,7 @@ pub enum Operand {
     Imm16(u16),     // immediate extended adressing
     RelAddr(i16),   // Relative addressing
     Address(u16),   // extended addressing
+    IOAddress(u8),  // extended addressing
     RegI(RegI),     // indexed addressing
     Reg8(Reg8),     // 8 bit register
     Reg16(Reg16),   // 16 bit register
@@ -73,6 +74,7 @@ impl Operand {
             Operand::Imm16(_) => Some(OpSize::S2),
             Operand::RelAddr(_) => None,
             Operand::Address(_) => None,
+            Operand::IOAddress(_) => None,
             Operand::RegI(_) => None,
             Operand::Reg8(_) => Some(OpSize::S1),
             Operand::Reg16(_) => Some(OpSize::S2),
@@ -89,6 +91,7 @@ impl fmt::Display for Operand {
             Operand::Imm16(x) => write!(f, "{:04X}", x),
             Operand::RelAddr(x) => write!(f, "{:+}", x),
             Operand::Address(x) => write!(f, "({:04X})", x),
+            Operand::IOAddress(x) => write!(f, "({:02X})", x),
             Operand::RegI(x) => write!(f, "{:?}", x),
             Operand::Reg8(x) => write!(f, "{:?}", x),
             Operand::Reg16(x) => write!(f, "{:?}", x),
@@ -141,6 +144,7 @@ pub enum Instruction {
     BIT,
     SET,
     RES,
+    OUT,
 }
 
 #[derive(PartialEq, Clone)]
@@ -648,6 +652,21 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 tstates: vec![4, 3],
             };
             return Some(opcode);
+        }
+        0xD3 => {
+            // OUT (n), A
+            if ins.len() < 2 {
+                return None;
+            }
+            return Some(OpCode {
+                data: vec![ins[0], ins[1]],
+                length: 2,
+                ins: Instruction::OUT,
+                op1: Some(Operand::IOAddress(ins[1])),
+                op2: Some(Operand::Reg8(Reg8::A)),
+                mcycles: 3,
+                tstates: vec![4, 3, 4],
+            });
         }
         _ => {}
     }
