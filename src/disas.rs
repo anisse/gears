@@ -669,6 +669,20 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
                 tstates: vec![4, 3, 4],
             });
         }
+        0xD6 => {
+            // SUB n
+            if ins.len() < 2 {
+                return None;
+            }
+            return Some(OpCode {
+                data: vec![ins[0], ins[1]],
+                op1: Some(Operand::Imm8(ins[1])),
+                length: 2,
+                mcycles: 2,
+                tstates: vec![4, 3],
+                ..sub8
+            });
+        }
         _ => {}
     }
     match ins[0] & 0xCF {
