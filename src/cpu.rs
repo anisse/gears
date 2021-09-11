@@ -1,5 +1,6 @@
 use crate::disas;
 use crate::disas::{Instruction, OpSize, Operand};
+use crate::io;
 use crate::mem;
 use std::fmt;
 
@@ -82,10 +83,11 @@ pub struct Regs {
 
 #[derive(Default, Debug, PartialEq, Clone)]
 #[allow(non_snake_case)]
-pub struct State {
+pub struct State<'a> {
     pub r: Regs,
     pub halted: bool,
     pub mem: mem::Memory,
+    pub io: io::IO<'a>,
 }
 
 impl Regs {
@@ -679,7 +681,7 @@ fn set_bitops_flags_c(res: u8, r: &mut Regs) {
     r.set_flag(Flag::C, false);
 }
 
-pub fn init() -> State {
+pub fn init() -> State<'static> {
     State::default()
 }
 

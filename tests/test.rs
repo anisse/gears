@@ -1,5 +1,5 @@
 use gears::cpu::RegPair;
-use gears::{cpu, mem};
+use gears::{cpu, io, mem};
 
 #[derive(Debug, Clone, Copy)]
 enum EventType {
@@ -28,11 +28,11 @@ struct MemValues {
 struct Test {
     //tests.in
     desc: String,
-    start_state: cpu::State,
+    start_state: cpu::State<'static>,
     tstate_to_run: u16,
     memory_values: Vec<MemValues>,
     //tests.expected
-    end_state: cpu::State,
+    end_state: cpu::State<'static>,
     events: Vec<Event>,
     tstate_ran: u16,
     changed_mem_values: Vec<MemValues>,
@@ -271,6 +271,8 @@ fn run_instructions() {
         end_state.mem = data.clone();
         setup_memory(&t.changed_mem_values, &mut end_state.mem);
         state.mem = data;
+        state.io = io::IO::default();
+        end_state.io = io::IO::default();
 
         dbg!(t);
         cpu::run(&mut state, t.tstate_to_run as usize).unwrap();
