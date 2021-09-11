@@ -58,7 +58,7 @@ impl Default for Memory {
 impl fmt::Debug for Memory {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut i = 0;
-        let mut star = false;
+        let mut star = false; // line repeat marker
         while i < self.mem.len() {
             let v = self.mem[i];
             if i % 16 == 0 {
