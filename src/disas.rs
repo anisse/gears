@@ -102,6 +102,7 @@ impl fmt::Display for Operand {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Instruction {
     ADD,
     ADC,
