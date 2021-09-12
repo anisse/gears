@@ -1173,6 +1173,21 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 s.r.MEMPTR = low & 0xFF | ((val as u16) << 8);
             }
         }
+        Instruction::EXX => {
+            // waiting for https://github.com/rust-lang/rust/issues/71126
+            fn swap(a: &mut u8, b: &mut u8) {
+                let tmp1 = *a;
+                let tmp2 = *b;
+                *a = tmp2;
+                *b = tmp1;
+            }
+            swap(&mut s.r.B, &mut s.r.Bp);
+            swap(&mut s.r.C, &mut s.r.Cp);
+            swap(&mut s.r.D, &mut s.r.Dp);
+            swap(&mut s.r.E, &mut s.r.Ep);
+            swap(&mut s.r.H, &mut s.r.Hp);
+            swap(&mut s.r.L, &mut s.r.Lp);
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     if update_pc {
