@@ -146,6 +146,7 @@ pub enum Instruction {
     SET,
     RES,
     OUT,
+    IN,
     EXX,
 }
 
@@ -787,6 +788,18 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
                 ins: Instruction::OUT,
                 op1: Some(Operand::IOAddress(ins2)),
                 op2: Some(Operand::Reg8(Reg8::A)),
+                mcycles: 3,
+                tstates: vec![4, 3, 4],
+            });
+        }
+        0xDB => {
+            // IN A, (n)
+            return Some(OpCode {
+                data: vec![ins1, ins2],
+                length: 2,
+                ins: Instruction::IN,
+                op1: Some(Operand::Reg8(Reg8::A)),
+                op2: Some(Operand::IOAddress(ins2)),
                 mcycles: 3,
                 tstates: vec![4, 3, 4],
             });
