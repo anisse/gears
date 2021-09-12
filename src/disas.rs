@@ -687,6 +687,15 @@ fn disas_two_bytes_mask(ins1: u8, ins2: u8) -> Option<OpCode> {
     }
 }
 fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
+    let sub8imm = OpCode {
+        data: vec![ins1, ins2],
+        length: 2,
+        ins: Instruction::SUB,
+        op1: Some(Operand::Imm8(ins2)),
+        op2: None,
+        mcycles: 2,
+        tstates: vec![4, 3],
+    };
     match ins1 {
         0x10 => {
             // DJNZ, e
@@ -776,14 +785,34 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
         }
         0xD6 => {
             // SUB n
+            return Some(sub8imm);
+        }
+        0xE6 => {
+            // AND n
             return Some(OpCode {
-                data: vec![ins1, ins2],
-                length: 2,
-                ins: Instruction::SUB,
-                op1: Some(Operand::Imm8(ins2)),
-                op2: None,
-                mcycles: 2,
-                tstates: vec![4, 3],
+                ins: Instruction::AND,
+                ..sub8imm
+            });
+        }
+        0xF6 => {
+            // OR n
+            return Some(OpCode {
+                ins: Instruction::OR,
+                ..sub8imm
+            });
+        }
+        0xEE => {
+            // XOR n
+            return Some(OpCode {
+                ins: Instruction::XOR,
+                ..sub8imm
+            });
+        }
+        0xFE => {
+            // CP n
+            return Some(OpCode {
+                ins: Instruction::CP,
+                ..sub8imm
             });
         }
         _ => {}
