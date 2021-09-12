@@ -146,6 +146,7 @@ pub enum Instruction {
     SET,
     RES,
     OUT,
+    EXX,
 }
 
 #[derive(PartialEq, Clone)]
@@ -652,6 +653,13 @@ fn disas_one_byte(ins: u8) -> Option<OpCode> {
                 ins: Instruction::RET,
                 mcycles: 3,
                 tstates: vec![4, 3, 3],
+                ..nop
+            })
+        }
+        0xD9 => {
+            // EXX
+            Some(OpCode {
+                ins: Instruction::EXX,
                 ..nop
             })
         }
