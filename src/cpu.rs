@@ -1173,6 +1173,22 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 s.r.MEMPTR = low & 0xFF | ((val as u16) << 8);
             }
         }
+        Instruction::IN => {
+            let op1 = op.op1.ok_or("IN missing op1")?;
+            let op2 = op.op2.ok_or("IN missing op2")?;
+            if let Operand::IOAddress(addr) = op2 {
+                if op1 != Operand::Reg8(disas::Reg8::A) {
+                    return Err("IN op1 should be A".to_string());
+                }
+                // TODO: stop ignoring errors
+                if let Ok(val) = s.io.input(addr) {
+                    set_op8(s, op1, val);
+                }
+                // MEMPTR = (A_before_operation << 8) + port + 1
+                let low = addr.overflowing_add(1).0 as u16;
+                s.r.MEMPTR = low & 0xFF | ((s.r.A as u16) << 8);
+            }
+        }
         Instruction::EXX => {
             // waiting for https://github.com/rust-lang/rust/issues/71126
             fn swap(a: &mut u8, b: &mut u8) {
