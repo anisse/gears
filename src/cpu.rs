@@ -49,6 +49,17 @@ impl From<disas::Reg16> for RegPair {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy)]
+struct FChanged {
+    changed: bool, // No need to store Q itself, we only need to know if F was changed during the previous instruction cycle
+}
+
+impl PartialEq for FChanged {
+    fn eq(&self, _: &Self) -> bool {
+        true // always ignored
+    }
+}
+
 #[derive(Default, PartialEq, Clone, Copy)]
 #[allow(non_snake_case)]
 pub struct Regs {
@@ -85,6 +96,7 @@ pub struct Regs {
 #[allow(non_snake_case)]
 pub struct State<'a> {
     pub r: Regs,
+    q: FChanged,
     pub halted: bool,
     pub mem: mem::Memory,
     pub io: io::IO<'a>,
@@ -693,6 +705,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         0xCB | 0xDD | 0xFB | 0xED => s.r.R = (s.r.R + 1) & 0x7F,
         _ => {}
     };
+    let start_f = s.r.F;
     match op.ins {
         Instruction::ADD => {
             let op1 = op.op1.ok_or("add op1 missing")?;
@@ -965,13 +978,25 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.set_flag(Flag::C, true);
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
-            copy_f53_res(s.r.A, &mut s.r);
+            if s.q.changed {
+                copy_f53_res(s.r.A, &mut s.r);
+            } else {
+                // OR instead
+                s.r.set_flag(Flag::F5, ((s.r.A & (1 << 5)) | (s.r.F & (1 << 5))) != 0);
+                s.r.set_flag(Flag::F3, ((s.r.A & (1 << 3)) | (s.r.F & (1 << 3))) != 0);
+            }
         }
         Instruction::CCF => {
             s.r.set_flag(Flag::H, s.r.F & C != 0);
             s.r.set_flag(Flag::C, s.r.F & C == 0);
             s.r.set_flag(Flag::N, false);
-            copy_f53_res(s.r.A, &mut s.r);
+            if s.q.changed {
+                copy_f53_res(s.r.A, &mut s.r);
+            } else {
+                // OR instead
+                s.r.set_flag(Flag::F5, (s.r.A & (1 << 5) | (s.r.F & (1 << 5))) != 0);
+                s.r.set_flag(Flag::F3, (s.r.A & (1 << 3) | (s.r.F & (1 << 3))) != 0);
+            }
         }
         Instruction::HALT => {
             s.halted = true;
@@ -1205,6 +1230,9 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             swap(&mut s.r.L, &mut s.r.Lp);
         }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
+    }
+    if start_f != s.r.F {
+        s.q.changed = true;
     }
     if update_pc {
         s.r.PC += op.length as u16;
