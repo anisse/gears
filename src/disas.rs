@@ -9,6 +9,10 @@ pub enum Reg8 {
     E,
     H,
     L,
+    IXh,
+    IXl,
+    IYh,
+    IYl,
 }
 /*
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -27,6 +31,8 @@ pub enum Reg16 {
     HL,
     SP,
     AFp,
+    IX,
+    IY,
 }
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RegI {

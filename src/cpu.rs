@@ -33,7 +33,9 @@ pub enum RegPair {
     BCp,
     DEp,
     HLp,
-    SP, // for convenience
+    IX,
+    IY,
+    SP, /* for convenience */
 }
 
 impl From<disas::Reg16> for RegPair {
@@ -45,6 +47,8 @@ impl From<disas::Reg16> for RegPair {
             disas::Reg16::HL => RegPair::HL,
             disas::Reg16::AFp => RegPair::AFp,
             disas::Reg16::SP => RegPair::SP,
+            disas::Reg16::IX => RegPair::IX,
+            disas::Reg16::IY => RegPair::IY,
         }
     }
 }
@@ -81,8 +85,10 @@ pub struct Regs {
     pub Lp: u8,
     pub I: u8,
     pub R: u8,
-    pub IX: u16,
-    pub IY: u16,
+    pub IXh: u8,
+    pub IXl: u8,
+    pub IYh: u8,
+    pub IYl: u8,
     pub SP: u16,
     pub PC: u16,
     pub MEMPTR: u16,
@@ -142,6 +148,14 @@ impl Regs {
             RegPair::SP => {
                 self.SP = val;
             }
+            RegPair::IX => {
+                self.IXh = r1;
+                self.IXl = r2;
+            }
+            RegPair::IY => {
+                self.IYh = r1;
+                self.IYl = r2;
+            }
         }
     }
     pub fn get_regpair(&self, reg: RegPair) -> u16 {
@@ -179,6 +193,14 @@ impl Regs {
             RegPair::HLp => {
                 r1 = self.Hp;
                 r2 = self.Lp
+            }
+            RegPair::IX => {
+                r1 = self.IXh;
+                r2 = self.IXl
+            }
+            RegPair::IY => {
+                r1 = self.IYh;
+                r2 = self.IYl
             }
             RegPair::SP => return self.SP,
         }
@@ -223,6 +245,7 @@ impl fmt::Display for Regs {
              BC': {:04X} ({}) \
              DE': {:04X} ({}) \
              HL': {:04X} ({}) \n\
+             IX: {:04X} ({}) IY: {:04X} ({}) \n\
              SP: {:04X} PC: {:04X} R: {:X} MEMPTR: {:04X}",
             self.A,
             self.A as i8,
@@ -256,6 +279,10 @@ impl fmt::Display for Regs {
             self.get_regpair(RegPair::DEp) as i16,
             self.get_regpair(RegPair::HLp),
             self.get_regpair(RegPair::HLp) as i16,
+            self.get_regpair(RegPair::IX),
+            self.get_regpair(RegPair::IX) as i16,
+            self.get_regpair(RegPair::IY),
+            self.get_regpair(RegPair::IY) as i16,
             self.SP,
             self.PC,
             self.R,
@@ -279,6 +306,10 @@ fn get_op8(s: &State, op: Operand) -> u8 {
             disas::Reg8::E => s.r.E,
             disas::Reg8::H => s.r.H,
             disas::Reg8::L => s.r.L,
+            disas::Reg8::IXh => s.r.IXh,
+            disas::Reg8::IXl => s.r.IXl,
+            disas::Reg8::IYh => s.r.IYh,
+            disas::Reg8::IYl => s.r.IYl,
         },
         Operand::RegAddr(reg) => s.mem.fetch_u8(s.r.get_regpair(RegPair::from(reg))),
         Operand::Address(addr) => s.mem.fetch_u8(addr),
@@ -298,6 +329,10 @@ fn set_op8(s: &mut State, op: Operand, val: u8) {
             disas::Reg8::E => s.r.E = val,
             disas::Reg8::H => s.r.H = val,
             disas::Reg8::L => s.r.L = val,
+            disas::Reg8::IXh => s.r.IXh = val,
+            disas::Reg8::IXl => s.r.IXl = val,
+            disas::Reg8::IYh => s.r.IYh = val,
+            disas::Reg8::IYl => s.r.IYl = val,
         },
         Operand::RegAddr(reg) => s.mem.set_u8(s.r.get_regpair(RegPair::from(reg)), val),
         Operand::Address(addr) => s.mem.set_u8(addr, val),
@@ -1161,8 +1196,8 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             copy_f53_res(val, &mut s.r);
             if let Operand::RegI(i) = op2 {
                 let val = match i {
-                    disas::RegI::IX(d) => (s.r.IX as i32 + d as i32) as u16,
-                    disas::RegI::IY(d) => (s.r.IY as i32 + d as i32) as u16,
+                    disas::RegI::IX(d) => (s.r.get_regpair(RegPair::IX) as i32 + d as i32) as u16,
+                    disas::RegI::IY(d) => (s.r.get_regpair(RegPair::IY) as i32 + d as i32) as u16,
                 };
                 copy_f53_res(((val >> 8) & 0xFF) as u8, &mut s.r);
                 todo!(); // to check

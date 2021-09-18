@@ -49,6 +49,8 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
         ("BC'", RegPair::BCp),
         ("DE'", RegPair::DEp),
         ("HL'", RegPair::HLp),
+        ("IX", RegPair::IX),
+        ("IY", RegPair::IY),
     ]
     .iter()
     .enumerate()
@@ -61,8 +63,6 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
     }
 
     for (i, (name, reg)) in vec![
-        ("IX", &mut st.r.IX),
-        ("IY", &mut st.r.IY),
         ("SP", &mut st.r.SP),
         ("PC", &mut st.r.PC),
         ("MEMPTR", &mut st.r.MEMPTR),
@@ -70,7 +70,7 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
     .into_iter()
     .enumerate()
     {
-        *reg = match u16::from_str_radix(regs[i + 8], 16) {
+        *reg = match u16::from_str_radix(regs[i + 10], 16) {
             Ok(x) => x,
             Err(_) => {
                 return Err(format!(
