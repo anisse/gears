@@ -52,6 +52,14 @@ impl From<disas::Reg16> for RegPair {
         }
     }
 }
+impl From<disas::RegI> for RegPair {
+    fn from(r: disas::RegI) -> Self {
+        match r {
+            disas::RegI::IX(_) => RegPair::IX,
+            disas::RegI::IY(_) => RegPair::IY,
+        }
+    }
+}
 
 #[derive(Default, Debug, Clone, Copy)]
 struct FChanged {
@@ -314,6 +322,7 @@ fn get_op8(s: &State, op: Operand) -> u8 {
         Operand::RegAddr(reg) => s.mem.fetch_u8(s.r.get_regpair(RegPair::from(reg))),
         Operand::Address(addr) => s.mem.fetch_u8(addr),
         Operand::Imm8(imm) => imm,
+        Operand::RegI(reg) => s.mem.fetch_u8(reg_i_addr(&reg, &s.r)),
         _ => panic!("Unknown operand {:?} or size not 8", op),
     }
 }
@@ -336,6 +345,7 @@ fn set_op8(s: &mut State, op: Operand, val: u8) {
         },
         Operand::RegAddr(reg) => s.mem.set_u8(s.r.get_regpair(RegPair::from(reg)), val),
         Operand::Address(addr) => s.mem.set_u8(addr, val),
+        Operand::RegI(reg) => s.mem.set_u8(reg_i_addr(&reg, &s.r), val),
         _ => panic!(
             "Unknown operand {:?} or size not 8, or writing unsupported",
             op
@@ -726,6 +736,20 @@ fn set_bitops_flags(res: u8, r: &mut Regs) {
 fn set_bitops_flags_c(res: u8, r: &mut Regs) {
     set_bitops_flags(res, r);
     r.set_flag(Flag::C, false);
+}
+
+fn reg_i_addr(reg: &disas::RegI, r: &Regs) -> u16 {
+    (r.get_regpair(RegPair::from(*reg)) as i32 + reg.offset() as i32) as u16
+}
+
+fn memptr_idx(op: &Option<disas::Operand>, r: &mut Regs) {
+    if let Some(Operand::RegI(reg)) = op {
+        r.MEMPTR = reg_i_addr(reg, r);
+    }
+}
+fn memptr_index(opcode: &disas::OpCode, r: &mut Regs) {
+    memptr_idx(&opcode.op1, r);
+    memptr_idx(&opcode.op2, r);
 }
 
 pub fn init() -> State<'static> {
@@ -1268,6 +1292,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
+    memptr_index(op, &mut s.r);
     if start_f != s.r.F {
         s.q.changed = true;
     }
