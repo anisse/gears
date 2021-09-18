@@ -39,6 +39,22 @@ pub enum RegI {
     IX(i8),
     IY(i8),
 }
+impl RegI {
+    pub fn offset(&self) -> i8 {
+        match self {
+            RegI::IX(d) => *d,
+            RegI::IY(d) => *d,
+        }
+    }
+}
+impl fmt::Display for RegI {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            RegI::IX(d) => write!(f, "(IX{:+})", d),
+            RegI::IY(d) => write!(f, "(IY{:+})", d),
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum FlagCondition {
@@ -98,7 +114,7 @@ impl fmt::Display for Operand {
             Operand::RelAddr(x) => write!(f, "{:+}", x),
             Operand::Address(x) => write!(f, "({:04X})", x),
             Operand::IOAddress(x) => write!(f, "({:02X})", x),
-            Operand::RegI(x) => write!(f, "{:?}", x),
+            Operand::RegI(x) => write!(f, "{}", x),
             Operand::Reg8(x) => write!(f, "{:?}", x),
             Operand::Reg16(x) => write!(f, "{:?}", x),
             Operand::RegAddr(x) => write!(f, "({:?})", x),
@@ -686,7 +702,42 @@ fn disas_one_byte(ins: u8) -> Option<OpCode> {
     }
 }
 
-fn replace_hl(op: &mut Operand, reg: Reg16) -> bool {
+fn replace_hl_addr(op: &mut OpCode, reg: Reg16, d: i8) -> bool {
+    let mut o1 = false;
+    let mut o2 = false;
+    if let Some(ref mut op1) = op.op1 {
+        o1 = replace_hl_addr_op(op1, reg, d);
+    }
+    if let Some(ref mut op2) = op.op2 {
+        o2 = replace_hl_addr_op(op2, reg, d);
+    }
+    o1 || o2
+}
+
+fn replace_hl_addr_op(op: &mut Operand, reg: Reg16, d: i8) -> bool {
+    if let Operand::RegAddr(Reg16::HL) = op {
+        *op = Operand::RegI(match reg {
+            Reg16::IX => RegI::IX(d),
+            Reg16::IY => RegI::IY(d),
+            _ => unreachable!(),
+        });
+        true
+    } else {
+        false
+    }
+}
+fn replace_hl(op: &mut OpCode, reg: Reg16) -> bool {
+    let mut o1 = false;
+    let mut o2 = false;
+    if let Some(ref mut op1) = op.op1 {
+        o1 = replace_hl_op(op1, reg);
+    }
+    if let Some(ref mut op2) = op.op2 {
+        o2 = replace_hl_op(op2, reg);
+    }
+    o1 || o2
+}
+fn replace_hl_op(op: &mut Operand, reg: Reg16) -> bool {
     match op {
         Operand::Reg16(Reg16::HL) => {
             *op = Operand::Reg16(reg);
@@ -708,19 +759,16 @@ fn replace_hl(op: &mut Operand, reg: Reg16) -> bool {
             });
             true
         }
-        /*
-         // not correct: needs d offset
-        Operand::RegAddr(Reg16::HL) => {
-            *op = Operand::RegAddr(reg);
-            true
-        }
-        */
         _ => false,
     }
 }
 
 fn disas_dd_fd_prefix(ins: &[u8]) -> Option<OpCode> {
-    if (ins[0] == 0xDD && ins[1] != 0xCB) || ins[0] == 0xFD {
+    if (ins[0] == 0xDD || ins[0] == 0xFD) &&
+        ins[1] != 0xCB /* DDCB */ &&
+            ins[1] != 0xEB
+    /* EX DE, HL */
+    {
         let reg = match ins[0] {
             0xDD => Reg16::IX,
             0xFD => Reg16::IY,
@@ -728,19 +776,27 @@ fn disas_dd_fd_prefix(ins: &[u8]) -> Option<OpCode> {
         };
         // Disas by looking ahead and replacing an eventual HL
         if let Some(mut opcode) = disas(&ins[1..ins.len()]) {
-            let mut found_hl = false;
-            if let Some(ref mut op) = opcode.op1 {
-                found_hl = replace_hl(op, reg) || found_hl;
-            }
-            if let Some(ref mut op) = opcode.op2 {
-                found_hl = replace_hl(op, reg) || found_hl;
-            }
-            if found_hl {
+            if replace_hl_addr(&mut opcode, reg, ins[2] as i8) {
+                // update timings
+                opcode.data.insert(0, ins[0]);
+                opcode.data.insert(2, ins[2]);
+                opcode.length += 2;
+                opcode.mcycles += 3;
+                opcode.tstates.insert(1, 4);
+                opcode.tstates.insert(2, 3);
+                opcode.tstates.insert(3, 5);
+                /* Manual fix for LD (IX+d), n */
+                if let Some(Operand::Imm8(ref mut v)) = opcode.op2 {
+                    *v = ins[3];
+                    opcode.data[3] = ins[3];
+                }
+                return Some(opcode);
+            } else if replace_hl(&mut opcode, reg) {
                 // update timings
                 opcode.data.insert(0, ins[0]);
                 opcode.length += 1;
                 opcode.mcycles += 1;
-                opcode.tstates.insert(0, 4);
+                opcode.tstates.insert(1, 4);
                 return Some(opcode);
             }
         }
