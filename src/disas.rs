@@ -263,6 +263,9 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
     if ins.len() < 2 {
         return None;
     }
+    if let Some(opcode) = disas_dd_fd_prefix(ins) {
+        return Some(opcode);
+    }
     if let Some(opcode) = disas_two_bytes_mask(ins[0], ins[1]) {
         return Some(opcode);
     }
@@ -681,6 +684,68 @@ fn disas_one_byte(ins: u8) -> Option<OpCode> {
         }
         _ => None,
     }
+}
+
+fn replace_hl(op: &mut Operand, reg: Reg16) -> bool {
+    match op {
+        Operand::Reg16(Reg16::HL) => {
+            *op = Operand::Reg16(reg);
+            true
+        }
+        Operand::Reg8(Reg8::H) => {
+            *op = Operand::Reg8(match reg {
+                Reg16::IX => Reg8::IXh,
+                Reg16::IY => Reg8::IYh,
+                _ => unreachable!(),
+            });
+            true
+        }
+        Operand::Reg8(Reg8::L) => {
+            *op = Operand::Reg8(match reg {
+                Reg16::IX => Reg8::IXl,
+                Reg16::IY => Reg8::IYl,
+                _ => unreachable!(),
+            });
+            true
+        }
+        /*
+         // not correct: needs d offset
+        Operand::RegAddr(Reg16::HL) => {
+            *op = Operand::RegAddr(reg);
+            true
+        }
+        */
+        _ => false,
+    }
+}
+
+fn disas_dd_fd_prefix(ins: &[u8]) -> Option<OpCode> {
+    if (ins[0] == 0xDD && ins[1] != 0xCB) || ins[0] == 0xFD {
+        let reg = match ins[0] {
+            0xDD => Reg16::IX,
+            0xFD => Reg16::IY,
+            _ => unreachable!(),
+        };
+        // Disas by looking ahead and replacing an eventual HL
+        if let Some(mut opcode) = disas(&ins[1..ins.len()]) {
+            let mut found_hl = false;
+            if let Some(ref mut op) = opcode.op1 {
+                found_hl = replace_hl(op, reg) || found_hl;
+            }
+            if let Some(ref mut op) = opcode.op2 {
+                found_hl = replace_hl(op, reg) || found_hl;
+            }
+            if found_hl {
+                // update timings
+                opcode.data.insert(0, ins[0]);
+                opcode.length += 1;
+                opcode.mcycles += 1;
+                opcode.tstates.insert(0, 4);
+                return Some(opcode);
+            }
+        }
+    }
+    None
 }
 
 fn disas_two_bytes_mask(ins1: u8, ins2: u8) -> Option<OpCode> {
