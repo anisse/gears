@@ -272,7 +272,16 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
     if let Some(opcode) = disas_three_bytes(ins[0], ins[1], ins[2]) {
         return Some(opcode);
     }
-    None
+    /* By default the CPU act as NOPs */
+    Some(OpCode {
+        data: vec![ins[0]],
+        length: 1,
+        ins: Instruction::NOP,
+        op1: None,
+        op2: None,
+        mcycles: 1,
+        tstates: vec![4],
+    })
 }
 
 fn disas_one_byte_shift3(ins: u8) -> Option<OpCode> {
