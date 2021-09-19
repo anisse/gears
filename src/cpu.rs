@@ -1264,6 +1264,10 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             let shift = get_op8(s, op1);
             let val = get_op8(s, op2) & (!(1 << shift));
             set_op8(s, op2, val);
+            if let Some(op3) = op.op3 {
+                // Copy result to op3 as well
+                set_op8(s, op3, val);
+            }
         }
         Instruction::SET => {
             let op1 = op.op1.ok_or("SET missing op1")?;
@@ -1271,6 +1275,10 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             let shift = get_op8(s, op1);
             let val = get_op8(s, op2) | (1 << shift);
             set_op8(s, op2, val);
+            if let Some(op3) = op.op3 {
+                // Copy result to op3 as well
+                set_op8(s, op3, val);
+            }
         }
         Instruction::OUT => {
             let op1 = op.op1.ok_or("OUT missing op1")?;

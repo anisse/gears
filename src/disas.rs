@@ -1295,6 +1295,22 @@ fn disas_ddcb_fdcb_prefix(ins: &[u8; 4]) -> Option<OpCode> {
             tstates: vec![4, 4, 3, 5, 4],
             ..rlc
         }),
+        // RES n, (IX+d), r
+        0x80 | 0x88 | 0x90 | 0x98 | 0xA0 | 0xA8 | 0xB0 | 0xB8 => Some(OpCode {
+            ins: Instruction::RES,
+            op1: Some(Operand::Imm8((ins[3] >> 3) & 0x7)),
+            op2: opidx,
+            op3: opcp,
+            ..rlc
+        }),
+        // SET n, (IX+d), r
+        0xC0 | 0xC8 | 0xD0 | 0xD8 | 0xE0 | 0xE8 | 0xF0 | 0xF8 => Some(OpCode {
+            ins: Instruction::SET,
+            op1: Some(Operand::Imm8((ins[3] >> 3) & 0x7)),
+            op2: opidx,
+            op3: opcp,
+            ..rlc
+        }),
         _ => None,
     }
 }
