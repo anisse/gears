@@ -743,6 +743,16 @@ fn disas_one_byte(ins: u8) -> Option<OpCode> {
                 ..nop
             })
         }
+        0xF9 => {
+            // LD SP, HL
+            Some(OpCode {
+                ins: Instruction::LD,
+                op1: Some(Operand::Reg16(Reg16::SP)),
+                op2: Some(Operand::Reg16(Reg16::HL)),
+                tstates: vec![6],
+                ..nop
+            })
+        }
         _ => None,
     }
 }
