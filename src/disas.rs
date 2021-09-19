@@ -735,6 +735,14 @@ fn disas_one_byte(ins: u8) -> Option<OpCode> {
                 ..nop
             })
         }
+        0xE9 => {
+            // JP HL (no, not writing it JP (HL))
+            Some(OpCode {
+                ins: Instruction::JP,
+                op1: Some(Operand::Reg16(Reg16::HL)),
+                ..nop
+            })
+        }
         _ => None,
     }
 }
