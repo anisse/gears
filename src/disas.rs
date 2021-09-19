@@ -1232,23 +1232,59 @@ fn disas_ddcb_fdcb_prefix(ins: &[u8; 4]) -> Option<OpCode> {
     if (ins[0] != 0xDD && ins[0] != 0xFD) || ins[1] != 0xCB {
         return None;
     }
-    let opidx = match ins[0] {
+    let opidx = Some(Operand::RegI(match ins[0] {
         0xDD => RegI::IX(ins[2] as i8),
         0xFD => RegI::IY(ins[2] as i8),
         _ => unreachable!(),
-    };
+    }));
     let opcp = decode_operand_reg_ddcb(ins[3]);
+    let rlc = OpCode {
+        data: (*ins).try_into().expect("cannot convert ins array to vec"),
+        length: 4,
+        ins: Instruction::RLC,
+        op1: opidx,
+        op2: opcp,
+        op3: None,
+        mcycles: 6,
+        tstates: vec![4, 4, 3, 5, 4, 3],
+    };
     match ins[3] & 0xF8 {
         // RLC (IX+d), r
-        0x00 => Some(OpCode {
-            data: (*ins).try_into().expect("yolo"),
-            length: 4,
-            ins: Instruction::RLC,
-            op1: Some(Operand::RegI(opidx)),
-            op2: opcp,
-            op3: None,
-            mcycles: 6,
-            tstates: vec![4, 4, 3, 5, 4, 3],
+        0x00 => Some(rlc),
+        // RRC (IX+d), r
+        0x08 => Some(OpCode {
+            ins: Instruction::RRC,
+            ..rlc
+        }),
+        // RL (IX+d), r
+        0x10 => Some(OpCode {
+            ins: Instruction::RL,
+            ..rlc
+        }),
+        // RR (IX+d), r
+        0x18 => Some(OpCode {
+            ins: Instruction::RR,
+            ..rlc
+        }),
+        // SLA (IX+d), r
+        0x20 => Some(OpCode {
+            ins: Instruction::SLA,
+            ..rlc
+        }),
+        // SRA (IX+d), r
+        0x28 => Some(OpCode {
+            ins: Instruction::SRA,
+            ..rlc
+        }),
+        // SLL (IX+d), r
+        0x30 => Some(OpCode {
+            ins: Instruction::SLL,
+            ..rlc
+        }),
+        // SRL (IX+d), r
+        0x38 => Some(OpCode {
+            ins: Instruction::SRL,
+            ..rlc
         }),
         _ => None,
     }
