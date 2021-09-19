@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{convert::TryInto, fmt};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Reg8 {
@@ -301,6 +301,15 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         return Some(opcode);
     }
     if let Some(opcode) = disas_three_bytes(ins[0], ins[1], ins[2]) {
+        return Some(opcode);
+    }
+    if ins.len() < 4 {
+        return None;
+    }
+    if let Some(opcode) = disas_ddcb_fdcb_prefix(
+        ins.try_into()
+            .expect("slice to array fail should not happen, size was checked"),
+    ) {
         return Some(opcode);
     }
     /* By default the CPU act as NOPs */
@@ -1208,6 +1217,39 @@ fn disas_three_bytes(ins1: u8, ins2: u8, ins3: u8) -> Option<OpCode> {
                 tstates: vec![4, 3, 4, 3, 3], // Warning: varies
             })
         }
+        _ => None,
+    }
+}
+
+fn decode_operand_reg_ddcb(arg: u8) -> Option<Operand> {
+    if arg & 0x7 == 6 {
+        return None;
+    }
+    Some(Operand::Reg8(decode_operand_reg_r(arg)))
+}
+
+fn disas_ddcb_fdcb_prefix(ins: &[u8; 4]) -> Option<OpCode> {
+    if (ins[0] != 0xDD && ins[0] != 0xFD) || ins[1] != 0xCB {
+        return None;
+    }
+    let opidx = match ins[0] {
+        0xDD => RegI::IX(ins[2] as i8),
+        0xFD => RegI::IY(ins[2] as i8),
+        _ => unreachable!(),
+    };
+    let opcp = decode_operand_reg_ddcb(ins[3]);
+    match ins[3] & 0xF8 {
+        // RLC (IX+d), r
+        0x00 => Some(OpCode {
+            data: (*ins).try_into().expect("yolo"),
+            length: 4,
+            ins: Instruction::RLC,
+            op1: Some(Operand::RegI(opidx)),
+            op2: opcp,
+            op3: None,
+            mcycles: 6,
+            tstates: vec![4, 4, 3, 5, 4, 3],
+        }),
         _ => None,
     }
 }
