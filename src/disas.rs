@@ -629,17 +629,30 @@ fn disas_one_byte(ins: u8) -> Option<OpCode> {
                 ..nop
             })
         }
-        0x08 | 0xEB => {
+        0x08 | 0xEB | 0xE3 => {
             // EX AF, AF'
             // EX DE, HL
+            // EX (SP), HL
             let op1;
             let op2;
-            if ins == 0x08 {
-                op1 = Some(Operand::Reg16(Reg16::AF));
-                op2 = Some(Operand::Reg16(Reg16::AFp));
-            } else {
-                op1 = Some(Operand::Reg16(Reg16::DE));
-                op2 = Some(Operand::Reg16(Reg16::HL));
+            let tstates;
+            match ins {
+                0x08 => {
+                    op1 = Some(Operand::Reg16(Reg16::AF));
+                    op2 = Some(Operand::Reg16(Reg16::AFp));
+                    tstates = vec![4];
+                }
+                0xEB => {
+                    op1 = Some(Operand::Reg16(Reg16::DE));
+                    op2 = Some(Operand::Reg16(Reg16::HL));
+                    tstates = vec![4];
+                }
+                0xE3 => {
+                    op1 = Some(Operand::RegAddr(Reg16::SP));
+                    op2 = Some(Operand::Reg16(Reg16::HL));
+                    tstates = vec![4, 3, 4, 3, 5];
+                }
+                _ => unreachable!(),
             }
             Some(OpCode {
                 data: vec![ins],
@@ -648,8 +661,8 @@ fn disas_one_byte(ins: u8) -> Option<OpCode> {
                 op1,
                 op2,
                 op3: None,
-                mcycles: 1,
-                tstates: vec![4],
+                mcycles: tstates.len() as u8,
+                tstates,
             })
         }
         0x0A | 0x1A => {

@@ -357,6 +357,7 @@ fn get_op16(s: &State, op: Operand) -> u16 {
     match op {
         Operand::Imm16(x) => x,
         Operand::Reg16(reg) => s.r.get_regpair(RegPair::from(reg)),
+        Operand::RegAddr(reg) => s.mem.fetch_u16(s.r.get_regpair(RegPair::from(reg))),
         Operand::Address(addr) => s.mem.fetch_u16(addr),
         _ => panic!("Unknown operand {:?} or size not 16", op),
     }
@@ -365,6 +366,7 @@ fn get_op16(s: &State, op: Operand) -> u16 {
 fn set_op16(s: &mut State, op: Operand, val: u16) {
     match op {
         Operand::Reg16(reg) => s.r.set_regpair(RegPair::from(reg), val),
+        Operand::RegAddr(reg) => s.mem.set_u16(s.r.get_regpair(RegPair::from(reg)), val),
         Operand::Address(addr) => s.mem.set_u16(addr, val),
         _ => panic!(
             "Unknown operand {:?} or size not 16, or writing unsupported",
@@ -1003,6 +1005,10 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             let b = get_op16(s, op2);
             set_op16(s, op1, b);
             set_op16(s, op2, a);
+            if let Operand::RegAddr(disas::Reg16::SP) = op1 {
+                // MEMPTR = rp value after the operation
+                s.r.MEMPTR = a;
+            }
         }
         Instruction::DJNZ => {
             let op1 = op.op1.ok_or("No immediate arg for DJNZ")?;
