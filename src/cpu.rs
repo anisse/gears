@@ -913,6 +913,10 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             let val = get_op8(s, op1);
             let val = val.rotate_left(1);
             set_op8(s, op1, val);
+            if let Some(op2) = op.op2 {
+                // Copy result to op2 as well
+                set_op8(s, op2, val);
+            }
             set_bitops_flags(val, &mut s.r);
             s.r.set_flag(Flag::C, val & 0x1 != 0);
             s.r.set_flag(Flag::H, false);
