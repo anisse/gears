@@ -1286,6 +1286,15 @@ fn disas_ddcb_fdcb_prefix(ins: &[u8; 4]) -> Option<OpCode> {
             ins: Instruction::SRL,
             ..rlc
         }),
+        // BIT n, (IX+d)
+        0x40 | 0x48 | 0x50 | 0x58 | 0x60 | 0x68 | 0x70 | 0x78 => Some(OpCode {
+            ins: Instruction::BIT,
+            op1: Some(Operand::Imm8((ins[3] >> 3) & 0x7)),
+            op2: opidx,
+            mcycles: 5,
+            tstates: vec![4, 4, 3, 5, 4],
+            ..rlc
+        }),
         _ => None,
     }
 }

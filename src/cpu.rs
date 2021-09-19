@@ -1251,12 +1251,8 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
              * later, but trust the more recent FUSE interpretation for now */
             copy_f53_res(val, &mut s.r);
             if let Operand::RegI(i) = op2 {
-                let val = match i {
-                    disas::RegI::IX(d) => (s.r.get_regpair(RegPair::IX) as i32 + d as i32) as u16,
-                    disas::RegI::IY(d) => (s.r.get_regpair(RegPair::IY) as i32 + d as i32) as u16,
-                };
+                let val = reg_i_addr(&i, &s.r);
                 copy_f53_res(((val >> 8) & 0xFF) as u8, &mut s.r);
-                todo!(); // to check
             } else if op2 == Operand::RegAddr(disas::Reg16::HL) {
                 // infamous MEMPTR leaking
                 copy_f53_res(((s.r.MEMPTR >> 8) & 0xFF) as u8, &mut s.r);
