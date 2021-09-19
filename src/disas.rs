@@ -179,6 +179,7 @@ pub struct OpCode {
     pub ins: Instruction,
     pub op1: Option<Operand>,
     pub op2: Option<Operand>,
+    pub op3: Option<Operand>,
     pub mcycles: u8,
     pub tstates: Vec<u8>,
 }
@@ -195,7 +196,12 @@ impl fmt::Display for OpCode {
         } else {
             "".to_string()
         };
-        write!(f, "{:?}\t{}{}", self.ins, op1, op2)
+        let op3 = if let Some(x) = self.op3 {
+            format!(", {}", x)
+        } else {
+            "".to_string()
+        };
+        write!(f, "{:?}\t{}{}{}", self.ins, op1, op2, op3)
     }
 }
 
@@ -304,6 +310,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         ins: Instruction::NOP,
         op1: None,
         op2: None,
+        op3: None,
         mcycles: 1,
         tstates: vec![4],
     })
@@ -317,6 +324,7 @@ fn disas_one_byte_shift3(ins: u8) -> Option<OpCode> {
         ins: Instruction::ADD,
         op1: Some(Operand::Reg8(Reg8::A)),
         op2: Some(decode_operand_reg_r_hladdr(arg)),
+        op3: None,
         mcycles: match arg {
             0x6 => 2,
             _ => 1,
@@ -408,6 +416,7 @@ fn disas_one_byte_mask(ins: u8) -> Option<OpCode> {
         ins: Instruction::INC,
         op1: Some(Operand::Reg16(reg)),
         op2: None,
+        op3: None,
         mcycles: 1,
         tstates: vec![6],
     };
@@ -431,6 +440,7 @@ fn disas_one_byte_mask(ins: u8) -> Option<OpCode> {
                 ins: Instruction::ADD,
                 op1: Some(Operand::Reg16(Reg16::HL)),
                 op2: Some(Operand::Reg16(reg)),
+                op3: None,
                 mcycles: 3,
                 tstates: vec![4, 4, 3],
             });
@@ -484,6 +494,7 @@ fn disas_one_byte_mask(ins: u8) -> Option<OpCode> {
                 ins: typ,
                 op1: Some(op),
                 op2: None,
+                op3: None,
                 mcycles: tstates.len() as u8,
                 tstates,
             };
@@ -554,6 +565,7 @@ fn disas_one_byte(ins: u8) -> Option<OpCode> {
         ins: Instruction::NOP,
         op1: None,
         op2: None,
+        op3: None,
         mcycles: 1,
         tstates: vec![4],
     };
@@ -575,6 +587,7 @@ fn disas_one_byte(ins: u8) -> Option<OpCode> {
                 ins: Instruction::LD,
                 op1: Some(Operand::RegAddr(reg)),
                 op2: Some(Operand::Reg8(Reg8::A)),
+                op3: None,
                 mcycles: 2,
                 tstates: vec![4, 3],
             })
@@ -625,6 +638,7 @@ fn disas_one_byte(ins: u8) -> Option<OpCode> {
                 ins: Instruction::EX,
                 op1,
                 op2,
+                op3: None,
                 mcycles: 1,
                 tstates: vec![4],
             })
@@ -643,6 +657,7 @@ fn disas_one_byte(ins: u8) -> Option<OpCode> {
                 ins: Instruction::LD,
                 op1: Some(Operand::Reg8(Reg8::A)),
                 op2,
+                op3: None,
                 mcycles: 2,
                 tstates: vec![4, 3],
             })
@@ -823,6 +838,7 @@ fn disas_two_bytes_mask(ins1: u8, ins2: u8) -> Option<OpCode> {
                 ins: Instruction::LD,
                 op1: Some(op),
                 op2: Some(Operand::Imm8(ins2)),
+                op3: None,
                 mcycles: tstates.len() as u8,
                 tstates,
             };
@@ -838,6 +854,7 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
         ins: Instruction::SUB,
         op1: Some(Operand::Imm8(ins2)),
         op2: None,
+        op3: None,
         mcycles: 2,
         tstates: vec![4, 3],
     };
@@ -850,6 +867,7 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
                 ins: Instruction::DJNZ,
                 op1: Some(Operand::RelAddr((ins2 as i8) as i16 + 2)),
                 op2: None,
+                op3: None,
                 mcycles: 3,
                 tstates: vec![5, 3, 5], // Warning: varies
             });
@@ -862,6 +880,7 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
                 ins: Instruction::JR,
                 op1: Some(Operand::RelAddr((ins2 as i8) as i16 + 2)),
                 op2: None,
+                op3: None,
                 mcycles: 3,
                 tstates: vec![4, 3, 5], // Warning: varies
             });
@@ -884,6 +903,7 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
                 ins: Instruction::JR,
                 op1: Some(Operand::FlagCondition(cond)),
                 op2: Some(Operand::RelAddr((ins2 as i8) as i16 + 2)),
+                op3: None,
                 mcycles: 3,
                 tstates: vec![4, 3, 5], // Warning: varies
             });
@@ -897,6 +917,7 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
                 ins: Instruction::ADD,
                 op1: Some(Operand::Reg8(Reg8::A)),
                 op2: Some(Operand::Imm8(arg)),
+                op3: None,
                 mcycles: 2,
                 tstates: vec![4, 3],
             };
@@ -911,6 +932,7 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
                 ins: Instruction::ADC,
                 op1: Some(Operand::Reg8(Reg8::A)),
                 op2: Some(Operand::Imm8(arg)),
+                op3: None,
                 mcycles: 2,
                 tstates: vec![4, 3],
             };
@@ -924,6 +946,7 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
                 ins: Instruction::OUT,
                 op1: Some(Operand::IOAddress(ins2)),
                 op2: Some(Operand::Reg8(Reg8::A)),
+                op3: None,
                 mcycles: 3,
                 tstates: vec![4, 3, 4],
             });
@@ -936,6 +959,7 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
                 ins: Instruction::IN,
                 op1: Some(Operand::Reg8(Reg8::A)),
                 op2: Some(Operand::IOAddress(ins2)),
+                op3: None,
                 mcycles: 3,
                 tstates: vec![4, 3, 4],
             });
@@ -1012,6 +1036,7 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
                 },
                 op1,
                 op2: None,
+                op3: None,
                 mcycles: tstates.len() as u8,
                 tstates,
             });
@@ -1045,6 +1070,7 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
                 },
                 op1,
                 op2,
+                op3: None,
                 mcycles: tstates.len() as u8,
                 tstates,
             })
@@ -1064,6 +1090,7 @@ fn disas_three_bytes_mask(ins1: u8, ins2: u8, ins3: u8) -> Option<OpCode> {
             ins: Instruction::LD,
             op1: Some(Operand::Reg16(reg)),
             op2: Some(Operand::Imm16(arg)),
+            op3: None,
             mcycles: 3, // error in datasheet page 99 ?
             tstates: vec![4, 3, 3],
         };
@@ -1079,6 +1106,7 @@ fn disas_three_bytes_mask(ins1: u8, ins2: u8, ins3: u8) -> Option<OpCode> {
                 ins: Instruction::JP,
                 op1: Some(Operand::FlagCondition(cond)),
                 op2: Some(Operand::Imm16(ins2 as u16 | ((ins3 as u16) << 8))),
+                op3: None,
                 mcycles: 3,
                 tstates: vec![4, 3, 3], // Warning: varies
             })
@@ -1092,6 +1120,7 @@ fn disas_three_bytes_mask(ins1: u8, ins2: u8, ins3: u8) -> Option<OpCode> {
                 ins: Instruction::CALL,
                 op1: Some(Operand::FlagCondition(cond)),
                 op2: Some(Operand::Imm16(ins2 as u16 | ((ins3 as u16) << 8))),
+                op3: None,
                 mcycles: 5,
                 tstates: vec![4, 3, 4, 3, 3], // Warning: varies
             })
@@ -1109,6 +1138,7 @@ fn disas_three_bytes(ins1: u8, ins2: u8, ins3: u8) -> Option<OpCode> {
                 ins: Instruction::LD,
                 op1: Some(Operand::Address(ins2 as u16 | (ins3 as u16) << 8)),
                 op2: Some(Operand::Reg16(Reg16::HL)),
+                op3: None,
                 mcycles: 5,
                 tstates: vec![4, 3, 3, 3, 3],
             })
@@ -1121,6 +1151,7 @@ fn disas_three_bytes(ins1: u8, ins2: u8, ins3: u8) -> Option<OpCode> {
                 ins: Instruction::LD,
                 op1: Some(Operand::Reg16(Reg16::HL)),
                 op2: Some(Operand::Address(ins2 as u16 | (ins3 as u16) << 8)),
+                op3: None,
                 mcycles: 5,
                 tstates: vec![4, 3, 3, 3, 3],
             })
@@ -1133,6 +1164,7 @@ fn disas_three_bytes(ins1: u8, ins2: u8, ins3: u8) -> Option<OpCode> {
                 ins: Instruction::LD,
                 op1: Some(Operand::Address(ins2 as u16 | (ins3 as u16) << 8)),
                 op2: Some(Operand::Reg8(Reg8::A)),
+                op3: None,
                 mcycles: 4,
                 tstates: vec![4, 3, 3, 3],
             })
@@ -1145,6 +1177,7 @@ fn disas_three_bytes(ins1: u8, ins2: u8, ins3: u8) -> Option<OpCode> {
                 ins: Instruction::LD,
                 op1: Some(Operand::Reg8(Reg8::A)),
                 op2: Some(Operand::Address(ins2 as u16 | (ins3 as u16) << 8)),
+                op3: None,
                 mcycles: 4,
                 tstates: vec![4, 3, 3, 3],
             })
@@ -1157,6 +1190,7 @@ fn disas_three_bytes(ins1: u8, ins2: u8, ins3: u8) -> Option<OpCode> {
                 ins: Instruction::JP,
                 op1: Some(Operand::Imm16(ins2 as u16 | ((ins3 as u16) << 8))),
                 op2: None,
+                op3: None,
                 mcycles: 3,
                 tstates: vec![4, 3, 3], // Warning: varies
             })
@@ -1169,6 +1203,7 @@ fn disas_three_bytes(ins1: u8, ins2: u8, ins3: u8) -> Option<OpCode> {
                 ins: Instruction::CALL,
                 op1: Some(Operand::Imm16(ins2 as u16 | ((ins3 as u16) << 8))),
                 op2: None,
+                op3: None,
                 mcycles: 5,
                 tstates: vec![4, 3, 4, 3, 3], // Warning: varies
             })
@@ -1191,6 +1226,7 @@ mod tests {
                 ins: Instruction::ADD,
                 op1: Some(Operand::Reg8(Reg8::A)),
                 op2: Some(Operand::Reg8(Reg8::A)),
+                op3: None,
                 mcycles: 1,
                 tstates: vec!(4),
             })
@@ -1204,6 +1240,7 @@ mod tests {
                 ins: Instruction::ADD,
                 op1: Some(Operand::Reg8(Reg8::A)),
                 op2: Some(Operand::RegAddr(Reg16::HL)),
+                op3: None,
                 mcycles: 2,
                 tstates: vec!(4, 3),
             })
@@ -1217,6 +1254,7 @@ mod tests {
                 ins: Instruction::ADC,
                 op1: Some(Operand::Reg8(Reg8::A)),
                 op2: Some(Operand::RegAddr(Reg16::HL)),
+                op3: None,
                 mcycles: 2,
                 tstates: vec!(4, 3),
             })
@@ -1230,6 +1268,7 @@ mod tests {
                 ins: Instruction::ADD,
                 op1: Some(Operand::Reg8(Reg8::A)),
                 op2: Some(Operand::Imm8(0x42)),
+                op3: None,
                 mcycles: 2,
                 tstates: vec!(4, 3),
             })
@@ -1243,6 +1282,7 @@ mod tests {
                 ins: Instruction::ADC,
                 op1: Some(Operand::Reg8(Reg8::A)),
                 op2: Some(Operand::Imm8(0x55)),
+                op3: None,
                 mcycles: 2,
                 tstates: vec!(4, 3),
             })
@@ -1256,6 +1296,7 @@ mod tests {
                 ins: Instruction::LD,
                 op1: Some(Operand::Reg16(Reg16::BC)),
                 op2: Some(Operand::Imm16(0x1042)),
+                op3: None,
                 mcycles: 3,
                 tstates: vec!(4, 3, 3),
             })
@@ -1269,6 +1310,7 @@ mod tests {
                 ins: Instruction::LD,
                 op1: Some(Operand::Reg16(Reg16::HL)),
                 op2: Some(Operand::Imm16(0x1042)),
+                op3: None,
                 mcycles: 3,
                 tstates: vec!(4, 3, 3),
             })
@@ -1282,6 +1324,7 @@ mod tests {
                 ins: Instruction::LD,
                 op1: Some(Operand::RegAddr(Reg16::DE)),
                 op2: Some(Operand::Reg8(Reg8::A)),
+                op3: None,
                 mcycles: 2,
                 tstates: vec!(4, 3),
             })
@@ -1295,6 +1338,7 @@ mod tests {
                 ins: Instruction::LD,
                 op1: Some(Operand::Reg8(Reg8::A)),
                 op2: Some(Operand::Imm8(0x42)),
+                op3: None,
                 mcycles: 2,
                 tstates: vec!(4, 3),
             })
@@ -1308,6 +1352,7 @@ mod tests {
                 ins: Instruction::LD,
                 op1: Some(Operand::RegAddr(Reg16::HL)),
                 op2: Some(Operand::Imm8(0x33)),
+                op3: None,
                 mcycles: 3,
                 tstates: vec!(4, 3, 3),
             })
@@ -1321,6 +1366,7 @@ mod tests {
                 ins: Instruction::INC,
                 op1: Some(Operand::Reg16(Reg16::SP)),
                 op2: None,
+                op3: None,
                 mcycles: 1,
                 tstates: vec!(6),
             })
@@ -1334,6 +1380,7 @@ mod tests {
                 ins: Instruction::INC,
                 op1: Some(Operand::Reg8(Reg8::D)),
                 op2: None,
+                op3: None,
                 mcycles: 1,
                 tstates: vec!(4),
             })
@@ -1347,6 +1394,7 @@ mod tests {
                 ins: Instruction::DEC,
                 op1: Some(Operand::Reg8(Reg8::A)),
                 op2: None,
+                op3: None,
                 mcycles: 1,
                 tstates: vec!(4),
             })
@@ -1360,6 +1408,7 @@ mod tests {
                 ins: Instruction::LD,
                 op1: Some(Operand::Reg8(Reg8::A)),
                 op2: Some(Operand::RegAddr(Reg16::DE)),
+                op3: None,
                 mcycles: 2,
                 tstates: vec!(4, 3),
             })
