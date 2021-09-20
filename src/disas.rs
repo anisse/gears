@@ -307,7 +307,8 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
         return None;
     }
     if let Some(opcode) = disas_ddcb_fdcb_prefix(
-        ins.try_into()
+        ins[0..4]
+            .try_into()
             .expect("slice to array fail should not happen, size was checked"),
     ) {
         return Some(opcode);
