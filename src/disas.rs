@@ -70,15 +70,16 @@ pub enum FlagCondition {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Operand {
-    Imm8(u8),       // immediate addressing
-    Imm16(u16),     // immediate extended adressing
-    RelAddr(i16),   // Relative addressing
-    Address(u16),   // extended addressing
-    IOAddress(u8),  // extended addressing
-    RegI(RegI),     // indexed addressing
-    Reg8(Reg8),     // 8 bit register
-    Reg16(Reg16),   // 16 bit register
-    RegAddr(Reg16), //register indirect addressing
+    Imm8(u8),        // immediate addressing
+    Imm16(u16),      // immediate extended adressing
+    RelAddr(i16),    // Relative addressing
+    Address(u16),    // extended addressing
+    IOAddress(u8),   // extended addressing
+    RegI(RegI),      // indexed addressing
+    Reg8(Reg8),      // 8 bit register
+    Reg16(Reg16),    // 16 bit register
+    RegAddr(Reg16),  //register indirect addressing
+    RegIOAddr(Reg8), //register indirect addressing
     FlagCondition(FlagCondition),
     //RegSpe(RegSpe), // special register ? XXX ?
 }
@@ -101,6 +102,7 @@ impl Operand {
             Operand::Reg8(_) => Some(OpSize::S1),
             Operand::Reg16(_) => Some(OpSize::S2),
             Operand::RegAddr(_) => None,
+            Operand::RegIOAddr(_) => None,
             Operand::FlagCondition(_) => None,
         }
     }
@@ -118,6 +120,7 @@ impl fmt::Display for Operand {
             Operand::Reg8(x) => write!(f, "{:?}", x),
             Operand::Reg16(x) => write!(f, "{:?}", x),
             Operand::RegAddr(x) => write!(f, "({:?})", x),
+            Operand::RegIOAddr(x) => write!(f, "({:?})", x),
             Operand::FlagCondition(x) => write!(f, "{:?}", x),
         }
     }
@@ -245,6 +248,13 @@ fn decode_operand_reg_r(arg: u8) -> Reg8 {
         7 => Reg8::A,
         _ => panic!("unknown reg arg {}", arg),
     }
+}
+
+fn decode_operand_reg_r_in(arg: u8) -> Operand {
+    if arg & 0x7 == 6 {
+        return Operand::Reg8(Reg8::A);
+    }
+    Operand::Reg8(decode_operand_reg_r(arg))
 }
 
 fn decode_operand_reg_r_hladdr(arg: u8) -> Operand {
@@ -1094,7 +1104,7 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
             } else {
                 vec![4, 4]
             };
-            Some(OpCode {
+            return Some(OpCode {
                 data: vec![ins[0], ins[1]],
                 length: 2,
                 ins: match insw & 0xFFC0 {
@@ -1108,6 +1118,22 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
                 op3: None,
                 mcycles: tstates.len() as u8,
                 tstates,
+            });
+        }
+        _ => {}
+    }
+    match insw & 0xFFC7 {
+        0xED40 => {
+            let op1 = Some(decode_operand_reg_r_in(ins[1]));
+            Some(OpCode {
+                data: vec![ins[0], ins[1]],
+                length: 2,
+                ins: Instruction::IN,
+                op1,
+                op2: Some(Operand::RegIOAddr(Reg8::C)),
+                op3: None,
+                mcycles: 12,
+                tstates: vec![4, 4, 4],
             })
         }
         _ => None,
