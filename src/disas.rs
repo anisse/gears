@@ -291,7 +291,7 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
     if let Some(opcode) = disas_two_bytes_mask(ins[0], ins[1]) {
         return Some(opcode);
     }
-    if let Some(opcode) = disas_two_bytes(ins[0], ins[1]) {
+    if let Some(opcode) = disas_two_bytes(ins[0..2].try_into().expect("slice into fail")) {
         return Some(opcode);
     }
     if ins.len() < 3 {
@@ -887,25 +887,31 @@ fn disas_two_bytes_mask(ins1: u8, ins2: u8) -> Option<OpCode> {
         _ => None,
     }
 }
-fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
+fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
     let sub8imm = OpCode {
-        data: vec![ins1, ins2],
+        data: vec![ins[0], ins[1]],
         length: 2,
         ins: Instruction::SUB,
-        op1: Some(Operand::Imm8(ins2)),
+        op1: Some(Operand::Imm8(ins[1])),
         op2: None,
         op3: None,
         mcycles: 2,
         tstates: vec![4, 3],
     };
-    match ins1 {
+    let add8imm = OpCode {
+        ins: Instruction::ADD,
+        op1: Some(Operand::Reg8(Reg8::A)),
+        op2: Some(Operand::Imm8(ins[1])),
+        ..sub8imm.clone()
+    };
+    match ins[0] {
         0x10 => {
             // DJNZ, e
             return Some(OpCode {
-                data: vec![ins1, ins2],
+                data: vec![ins[0], ins[1]],
                 length: 2,
                 ins: Instruction::DJNZ,
-                op1: Some(Operand::RelAddr((ins2 as i8) as i16 + 2)),
+                op1: Some(Operand::RelAddr((ins[1] as i8) as i16 + 2)),
                 op2: None,
                 op3: None,
                 mcycles: 3,
@@ -915,10 +921,10 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
         0x18 => {
             // JR e
             return Some(OpCode {
-                data: vec![ins1, ins2],
+                data: vec![ins[0], ins[1]],
                 length: 2,
                 ins: Instruction::JR,
-                op1: Some(Operand::RelAddr((ins2 as i8) as i16 + 2)),
+                op1: Some(Operand::RelAddr((ins[1] as i8) as i16 + 2)),
                 op2: None,
                 op3: None,
                 mcycles: 3,
@@ -930,7 +936,7 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
             // JR NC, e
             // JR Z, e
             // JR NZ, e
-            let cond = match ins1 {
+            let cond = match ins[0] {
                 0x38 => FlagCondition::C,
                 0x30 => FlagCondition::NC,
                 0x28 => FlagCondition::Z,
@@ -938,53 +944,34 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
                 _ => unreachable!(),
             };
             return Some(OpCode {
-                data: vec![ins1, ins2],
+                data: vec![ins[0], ins[1]],
                 length: 2,
                 ins: Instruction::JR,
                 op1: Some(Operand::FlagCondition(cond)),
-                op2: Some(Operand::RelAddr((ins2 as i8) as i16 + 2)),
+                op2: Some(Operand::RelAddr((ins[1] as i8) as i16 + 2)),
                 op3: None,
                 mcycles: 3,
                 tstates: vec![4, 3, 5], // Warning: varies
             });
         }
         0xC6 => {
-            // ADD a, n
-            let arg = ins2;
-            let opcode = OpCode {
-                data: vec![ins1, ins2],
-                length: 2,
-                ins: Instruction::ADD,
-                op1: Some(Operand::Reg8(Reg8::A)),
-                op2: Some(Operand::Imm8(arg)),
-                op3: None,
-                mcycles: 2,
-                tstates: vec![4, 3],
-            };
-            return Some(opcode);
+            // ADD A, n
+            return Some(add8imm);
         }
         0xCE => {
-            // ADC a, n
-            let arg = ins2;
-            let opcode = OpCode {
-                data: vec![ins1, ins2],
-                length: 2,
+            // ADC A, n
+            return Some(OpCode {
                 ins: Instruction::ADC,
-                op1: Some(Operand::Reg8(Reg8::A)),
-                op2: Some(Operand::Imm8(arg)),
-                op3: None,
-                mcycles: 2,
-                tstates: vec![4, 3],
-            };
-            return Some(opcode);
+                ..add8imm
+            });
         }
         0xD3 => {
             // OUT (n), A
             return Some(OpCode {
-                data: vec![ins1, ins2],
+                data: vec![ins[0], ins[1]],
                 length: 2,
                 ins: Instruction::OUT,
-                op1: Some(Operand::IOAddress(ins2)),
+                op1: Some(Operand::IOAddress(ins[1])),
                 op2: Some(Operand::Reg8(Reg8::A)),
                 op3: None,
                 mcycles: 3,
@@ -994,11 +981,11 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
         0xDB => {
             // IN A, (n)
             return Some(OpCode {
-                data: vec![ins1, ins2],
+                data: vec![ins[0], ins[1]],
                 length: 2,
                 ins: Instruction::IN,
                 op1: Some(Operand::Reg8(Reg8::A)),
-                op2: Some(Operand::IOAddress(ins2)),
+                op2: Some(Operand::IOAddress(ins[1])),
                 op3: None,
                 mcycles: 3,
                 tstates: vec![4, 3, 4],
@@ -1039,9 +1026,9 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
         _ => {}
     }
     // two bytes opcodes
-    let insw = (ins1 as u16) << 8 | ins2 as u16;
+    let insw = (ins[0] as u16) << 8 | ins[1] as u16;
     /*
-    match ins2 {
+    match ins[1] {
         _ => {}
     }
     */
@@ -1054,14 +1041,14 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
             //SLA r
             //SRA r
             //SRL r
-            let op1 = Some(decode_operand_reg_r_hladdr(ins2 & 0x7));
+            let op1 = Some(decode_operand_reg_r_hladdr(ins[1] & 0x7));
             let tstates = if op1 == Some(Operand::RegAddr(Reg16::HL)) {
                 vec![4, 4, 4, 3]
             } else {
                 vec![4, 4]
             };
             return Some(OpCode {
-                data: vec![ins1, ins2],
+                data: vec![ins[0], ins[1]],
                 length: 2,
                 ins: match insw & 0xFFF8 {
                     0xCB00 => Instruction::RLC,
@@ -1088,8 +1075,8 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
             // BIT b, r
             // SET b, r
             // RES b, r
-            let op1 = Some(Operand::Imm8((ins2 >> 3) & 0x7));
-            let op2 = Some(decode_operand_reg_r_hladdr(ins2 & 0x7));
+            let op1 = Some(Operand::Imm8((ins[1] >> 3) & 0x7));
+            let op2 = Some(decode_operand_reg_r_hladdr(ins[1] & 0x7));
             let tstates = if op1 == Some(Operand::RegAddr(Reg16::HL)) {
                 if insw & 0xFFC0 == 0xCB40 {
                     vec![4, 4, 4]
@@ -1100,7 +1087,7 @@ fn disas_two_bytes(ins1: u8, ins2: u8) -> Option<OpCode> {
                 vec![4, 4]
             };
             Some(OpCode {
-                data: vec![ins1, ins2],
+                data: vec![ins[0], ins[1]],
                 length: 2,
                 ins: match insw & 0xFFC0 {
                     0xCB40 => Instruction::BIT,
