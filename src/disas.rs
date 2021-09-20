@@ -966,6 +966,13 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
                 ..add8imm
             });
         }
+        0xDE => {
+            // SBC A, n
+            return Some(OpCode {
+                ins: Instruction::SBC,
+                ..add8imm
+            });
+        }
         0xD3 => {
             // OUT (n), A
             return Some(OpCode {
