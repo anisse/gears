@@ -1289,16 +1289,23 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         Instruction::OUT => {
             let op1 = op.op1.ok_or("OUT missing op1")?;
             let op2 = op.op2.ok_or("OUT missing op2")?;
-            if op2 != Operand::Reg8(disas::Reg8::A) {
-                return Err("Op2 should be A".to_string());
-            }
             if let Operand::IOAddress(addr) = op1 {
+                if op2 != Operand::Reg8(disas::Reg8::A) {
+                    return Err("Op2 should be A".to_string());
+                }
                 let val = s.r.A;
                 // TODO: stop ignoring errors
                 s.io.out(addr, val).ok();
                 // MEMPTR_low = (port + 1) & #FF,  MEMPTR_hi = A
                 let low = addr.overflowing_add(1).0 as u16;
                 s.r.MEMPTR = low & 0xFF | ((val as u16) << 8);
+            } else if Operand::RegIOAddr(disas::Reg8::C) == op1 {
+                let val = get_op8(s, op2);
+                // TODO: stop ignoring errors
+                s.io.out(s.r.C, val).ok();
+
+                // MEMPTR = BC + 1
+                s.r.MEMPTR = s.r.get_regpair(RegPair::BC).overflowing_add(1).0;
             }
         }
         Instruction::IN => {
@@ -1315,7 +1322,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 // MEMPTR = (A_before_operation << 8) + port + 1
                 let low = addr.overflowing_add(1).0 as u16;
                 s.r.MEMPTR = low & 0xFF | ((s.r.A as u16) << 8);
-            } else if let Operand::RegIOAddr(disas::Reg8::C) = op2 {
+            } else if Operand::RegIOAddr(disas::Reg8::C) == op2 {
                 if let Ok(val) = s.io.input(s.r.C) {
                     set_op8(s, op1, val);
                 }
