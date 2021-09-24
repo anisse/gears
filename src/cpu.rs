@@ -1315,6 +1315,17 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 // MEMPTR = (A_before_operation << 8) + port + 1
                 let low = addr.overflowing_add(1).0 as u16;
                 s.r.MEMPTR = low & 0xFF | ((s.r.A as u16) << 8);
+            } else if let Operand::RegIOAddr(disas::Reg8::C) = op2 {
+                if let Ok(val) = s.io.input(s.r.C) {
+                    set_op8(s, op1, val);
+                }
+                //flags
+                // TODO: move to using val directly ?
+                set_bitops_flags(get_op8(s, op1), &mut s.r);
+                s.r.set_flag(Flag::H, false);
+
+                // MEMPTR = BC + 1
+                s.r.MEMPTR = s.r.get_regpair(RegPair::BC).overflowing_add(1).0;
             }
         }
         Instruction::EXX => {
