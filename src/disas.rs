@@ -1124,6 +1124,7 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
     }
     match insw & 0xFFC7 {
         0xED40 => {
+            // IN r, (C)
             let op1 = Some(decode_operand_reg_r_in(ins[1]));
             Some(OpCode {
                 data: vec![ins[0], ins[1]],
@@ -1137,6 +1138,7 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
             })
         }
         0xED41 => {
+            // OUT (C), r
             let op2 = Some(decode_operand_reg_r_in(ins[1]));
             Some(OpCode {
                 data: vec![ins[0], ins[1]],
