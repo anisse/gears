@@ -1136,6 +1136,19 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
                 tstates: vec![4, 4, 4],
             })
         }
+        0xED41 => {
+            let op2 = Some(decode_operand_reg_r_in(ins[1]));
+            Some(OpCode {
+                data: vec![ins[0], ins[1]],
+                length: 2,
+                ins: Instruction::OUT,
+                op1: Some(Operand::RegIOAddr(Reg8::C)),
+                op2,
+                op3: None,
+                mcycles: 12,
+                tstates: vec![4, 4, 4],
+            })
+        }
         _ => None,
     }
 }
