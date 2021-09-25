@@ -1050,6 +1050,37 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
         _ => {}
     }
     */
+    match insw & 0xFFC7 {
+        0xED42 => {
+            // SBC HL, ss
+            let reg = decode_operand_reg_ddss((ins[1] >> 4) & 0x3);
+            return Some(OpCode {
+                data: vec![ins[0], ins[1]],
+                length: 2,
+                ins: Instruction::SBC,
+                op1: Some(Operand::Reg16(Reg16::HL)),
+                op2: Some(Operand::Reg16(reg)),
+                op3: None,
+                mcycles: 4,
+                tstates: vec![4, 4, 4, 3],
+            });
+        }
+        0xED4A => {
+            // ADC HL, ss
+            let reg = decode_operand_reg_ddss((ins[1] >> 4) & 0x3);
+            return Some(OpCode {
+                data: vec![ins[0], ins[1]],
+                length: 2,
+                ins: Instruction::ADC,
+                op1: Some(Operand::Reg16(Reg16::HL)),
+                op2: Some(Operand::Reg16(reg)),
+                op3: None,
+                mcycles: 4,
+                tstates: vec![4, 4, 4, 3],
+            });
+        }
+        _ => {}
+    }
     match insw & 0xFFF8 {
         0xCB00 | 0xCB08 | 0xCB10 | 0xCB18 | 0xCB20 | 0xCB28 | 0xCB30 | 0xCB38 => {
             //RLC r
