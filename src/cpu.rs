@@ -468,11 +468,11 @@ fn set_conditions_add_16(r: &mut Regs, a: i16, b: i16, c: i16) -> u16 {
 
 fn set_conditions_sbc_16(r: &mut Regs, a: i16, b: i16) -> u16 {
     let c = (r.F & C) as i16;
-    let real_res = a as i32 + b as i32 + c as i32; // easier for overflows, etc
+    let real_res = a as i32 - b as i32 - c as i32; // easier for overflows, etc
     let res = (real_res & 0xFFFF) as i16;
     r.set_flag(Flag::S, res < 0);
     r.set_flag(Flag::Z, res == 0);
-    r.set_flag(Flag::H, (a ^ b ^ res) & 0x1000 == 0);
+    r.set_flag(Flag::H, (a ^ b ^ res) & 0x1000 != 0);
     r.set_flag(
         Flag::PV,
         (a != 0 || b == i16::MIN) && a.signum() != b.signum() && a.signum() != res.signum(),
@@ -480,8 +480,8 @@ fn set_conditions_sbc_16(r: &mut Regs, a: i16, b: i16) -> u16 {
     r.set_flag(Flag::N, true);
     copy_f53_res((res >> 8) as u8, r);
 
-    let (tmp, ov1) = (a as u8).overflowing_sub(b as u8);
-    let (_, ov2) = (tmp as u8).overflowing_sub(c as u8);
+    let (tmp, ov1) = (a as u16).overflowing_sub(b as u16);
+    let (_, ov2) = (tmp as u16).overflowing_sub(c as u16);
     r.set_flag(Flag::C, ov1 || ov2);
 
     res as u16
