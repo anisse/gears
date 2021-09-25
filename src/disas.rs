@@ -316,11 +316,13 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
     if ins.len() < 4 {
         return None;
     }
-    if let Some(opcode) = disas_ddcb_fdcb_prefix(
-        ins[0..4]
-            .try_into()
-            .expect("slice to array fail should not happen, size was checked"),
-    ) {
+    let ins4 = ins[0..4]
+        .try_into()
+        .expect("slice to array fail should not happen, size was checked");
+    if let Some(opcode) = disas_ddcb_fdcb_prefix(ins4) {
+        return Some(opcode);
+    }
+    if let Some(opcode) = disas_four_bytes_mask(ins4) {
         return Some(opcode);
     }
     /* By default the CPU act as NOPs */
@@ -1408,6 +1410,36 @@ fn disas_ddcb_fdcb_prefix(ins: &[u8; 4]) -> Option<OpCode> {
             op2: opidx,
             op3: opcp,
             ..rlc
+        }),
+        _ => None,
+    }
+}
+fn disas_four_bytes_mask(ins: &[u8; 4]) -> Option<OpCode> {
+    let insw = (ins[0] as u16) << 8 | ins[1] as u16;
+    let reg = decode_operand_reg_ddss((ins[1] >> 4) & 0x3);
+    let nn = (ins[3] as u16) << 8 | ins[2] as u16;
+    match insw & 0xFFC7 {
+        // LD (nn), dd
+        0xED43 => Some(OpCode {
+            data: ins.to_vec(),
+            length: 4,
+            ins: Instruction::LD,
+            op1: Some(Operand::Address(nn)),
+            op2: Some(Operand::Reg16(reg)),
+            op3: None,
+            mcycles: 6,
+            tstates: vec![4, 4, 3, 3, 3, 3],
+        }),
+        // LD dd, (nn)
+        0xED4B => Some(OpCode {
+            data: ins.to_vec(),
+            length: 4,
+            ins: Instruction::LD,
+            op1: Some(Operand::Reg16(reg)),
+            op2: Some(Operand::Address(nn)),
+            op3: None,
+            mcycles: 6,
+            tstates: vec![4, 4, 3, 3, 3, 3],
         }),
         _ => None,
     }
