@@ -84,35 +84,38 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
     }
 
     let regs: Vec<&str> = input[1].split_ascii_whitespace().collect();
-    for (i, (name, reg)) in vec![
-        ("I", &mut st.r.I),
-        ("R", &mut st.r.R),
-        ("Int Mode", &mut st.r.IM),
+    for (_, (name, reg, offset)) in vec![
+        ("I", &mut st.r.I, 0),
+        ("R", &mut st.r.R, 1),
+        ("Int Mode", &mut st.r.IM, 4),
     ]
     .into_iter()
     .enumerate()
     {
-        *reg = match u8::from_str_radix(regs[i], 16) {
+        *reg = match u8::from_str_radix(regs[offset], 16) {
             Ok(x) => x,
-            Err(_) => return Err(format!("bad {} at line {}: {}", name, input[1], regs[i])),
+            Err(_) => {
+                return Err(format!(
+                    "bad {} at line {}: {}",
+                    name, input[1], regs[offset]
+                ))
+            }
         };
     }
-    for (i, (name, reg)) in vec![
-        ("IFF1", &mut st.r.IFF1),
-        ("IFF2", &mut st.r.IFF2),
-        ("halted ", &mut st.halted),
+    for (_, (name, reg, offset)) in vec![
+        ("IFF1", &mut st.r.IFF1, 2),
+        ("IFF2", &mut st.r.IFF2, 3),
+        ("halted ", &mut st.halted, 5),
     ]
     .into_iter()
     .enumerate()
     {
-        *reg = match u8::from_str_radix(regs[i + 2], 16) {
+        *reg = match u8::from_str_radix(regs[offset], 16) {
             Ok(x) => x != 0,
             Err(_) => {
                 return Err(format!(
                     "bad {} at line {}: {}",
-                    name,
-                    input[1],
-                    regs[i + 2]
+                    name, input[1], regs[offset]
                 ))
             }
         };
@@ -276,7 +279,6 @@ fn run_instructions() {
 
         dbg!(t);
         cpu::run(&mut state, t.tstate_to_run as usize).unwrap();
-        state.halted = false; // not supported by testsuite, maybe move out of structure ?
         assert_eq!(state, end_state, "test {}", t.desc);
         //assert_eq!(state.mem, mem_result);
     }
