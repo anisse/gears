@@ -175,6 +175,7 @@ pub enum Instruction {
     EXX,
     NEG,
     IM,
+    RETN,
 }
 
 #[derive(PartialEq, Clone)]
@@ -1062,6 +1063,14 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
     match insw {
         // NEG
         0xED44 => return Some(neg),
+        0xED45 => {
+            return Some(OpCode {
+                ins: Instruction::RETN,
+                mcycles: 4,
+                tstates: vec![4, 4, 3, 3],
+                ..neg
+            })
+        }
         // IM 0
         // IM 1
         // IM 2

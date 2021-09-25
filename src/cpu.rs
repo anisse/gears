@@ -1360,6 +1360,14 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             let res = set_conditions_sub_8(&mut s.r, 0, a);
             s.r.A = res;
         }
+        Instruction::RETN => {
+            s.r.PC = s.mem.fetch_u16(s.r.SP);
+            s.r.SP = s.r.SP.overflowing_add(2).0;
+            s.r.MEMPTR = s.r.PC;
+            update_pc = false;
+            s.r.IFF1 = s.r.IFF2;
+            //s.r.IM =
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     memptr_index(op, &mut s.r);
