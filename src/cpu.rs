@@ -252,9 +252,10 @@ impl fmt::Display for Regs {
              AF': {:04X} ({}) F': {}{}{}{}{}{}{}{} \
              BC': {:04X} ({}) \
              DE': {:04X} ({}) \
-             HL': {:04X} ({}) \n\
+             HL': {:04X} ({}) \
              IX: {:04X} ({}) IY: {:04X} ({}) \n\
-             SP: {:04X} PC: {:04X} R: {:X} MEMPTR: {:04X}",
+             SP: {:04X} PC: {:04X} R: {:X} MEMPTR: {:04X} \
+             I: {} IFF1: {} IFF2: {} IM: {}\n",
             self.A,
             self.A as i8,
             flag("S", self.F & S),
@@ -294,7 +295,11 @@ impl fmt::Display for Regs {
             self.SP,
             self.PC,
             self.R,
-            self.MEMPTR
+            self.MEMPTR,
+            self.I,
+            self.IFF1,
+            self.IFF2,
+            self.IM
         )
     }
 }
