@@ -1350,6 +1350,11 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             swap(&mut s.r.H, &mut s.r.Hp);
             swap(&mut s.r.L, &mut s.r.Lp);
         }
+        Instruction::NEG => {
+            let a = s.r.A as i8;
+            let res = set_conditions_sub_8(&mut s.r, 0, a);
+            s.r.A = res;
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     memptr_index(op, &mut s.r);
