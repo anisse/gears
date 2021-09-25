@@ -13,15 +13,9 @@ pub enum Reg8 {
     IXl,
     IYh,
     IYl,
-}
-/*
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum RegSpe {
     I,
     R,
-    PC,
 }
-*/
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Reg16 {
@@ -81,7 +75,6 @@ pub enum Operand {
     RegAddr(Reg16),  //register indirect addressing
     RegIOAddr(Reg8), //register indirect addressing
     FlagCondition(FlagCondition),
-    //RegSpe(RegSpe), // special register ? XXX ?
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
