@@ -1053,6 +1053,13 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
         mcycles: 2,
         tstates: vec![4, 4],
     };
+    let ldia = OpCode {
+        ins: Instruction::LD,
+        op1: Some(Operand::Reg8(Reg8::I)),
+        op2: Some(Operand::Reg8(Reg8::A)),
+        tstates: vec![4, 5],
+        ..neg.clone()
+    };
     match insw {
         // NEG
         0xED44 => return Some(neg),
@@ -1087,6 +1094,17 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
                 op1: Some(Operand::Imm8(2)),
                 ..neg
             })
+        }
+        0xED47 => {
+            // LD I, A
+            return Some(ldia);
+        }
+        0xED4F => {
+            // LD R, A
+            return Some(OpCode {
+                op1: Some(Operand::Reg8(Reg8::R)),
+                ..ldia
+            });
         }
         _ => {}
     }
