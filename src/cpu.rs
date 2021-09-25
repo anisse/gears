@@ -1368,6 +1368,10 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.IFF1 = s.r.IFF2;
             //s.r.IM =
         }
+        Instruction::IM => {
+            let op1 = op.op1.ok_or("IM missing op1")?;
+            s.r.IM = get_op8(s, op1);
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     memptr_index(op, &mut s.r);
