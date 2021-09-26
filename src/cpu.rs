@@ -454,6 +454,8 @@ fn set_conditions_add8_base(r: &mut Regs, a: i8, b: i8, c: i8) -> u8 {
 fn set_conditions_adc_16(r: &mut Regs, a: i16, b: i16) -> u16 {
     let c = r.F & C;
     let res = set_conditions_add_16(r, a, b, c as i16) as i16;
+    r.set_flag(Flag::S, res < 0);
+    r.set_flag(Flag::Z, res == 0);
     r.set_flag(
         Flag::PV,
         a.signum() == b.signum() && a.signum() != res.signum(),
