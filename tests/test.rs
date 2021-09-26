@@ -84,13 +84,12 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
     }
 
     let regs: Vec<&str> = input[1].split_ascii_whitespace().collect();
-    for (_, (name, reg, offset)) in vec![
+    for (name, reg, offset) in vec![
         ("I", &mut st.r.I, 0),
         ("R", &mut st.r.R, 1),
         ("Int Mode", &mut st.r.IM, 4),
     ]
     .into_iter()
-    .enumerate()
     {
         *reg = match u8::from_str_radix(regs[offset], 16) {
             Ok(x) => x,
@@ -102,13 +101,12 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
             }
         };
     }
-    for (_, (name, reg, offset)) in vec![
+    for (name, reg, offset) in vec![
         ("IFF1", &mut st.r.IFF1, 2),
         ("IFF2", &mut st.r.IFF2, 3),
         ("halted ", &mut st.halted, 5),
     ]
     .into_iter()
-    .enumerate()
     {
         *reg = match u8::from_str_radix(regs[offset], 16) {
             Ok(x) => x != 0,
@@ -293,7 +291,7 @@ fn run_instructions() {
             (ZxSpectrumIODevice { value: 0x7D }, 0x1B), // disk status register
             (ZxSpectrumIODevice { value: 0xBB }, 0xCC), // ??
         ];
-        for (_, (dev, addr)) in devs.iter_mut().enumerate() {
+        for (dev, addr) in devs.iter_mut() {
             state.io.register(*addr, dev);
         }
 
