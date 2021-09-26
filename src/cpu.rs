@@ -780,6 +780,12 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         };
     }
     let start_f = s.r.F;
+    let mut ret = |r: &mut Regs, mem: &mem::Memory| {
+        r.PC = mem.fetch_u16(r.SP);
+        r.SP = r.SP.overflowing_add(2).0;
+        r.MEMPTR = r.PC;
+        update_pc = false;
+    };
     match op.ins {
         Instruction::ADD => {
             let op1 = op.op1.ok_or("add op1 missing")?;
@@ -1130,10 +1136,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 }
             }
             if jump {
-                s.r.PC = s.mem.fetch_u16(s.r.SP);
-                s.r.SP = s.r.SP.overflowing_add(2).0;
-                s.r.MEMPTR = s.r.PC;
-                update_pc = false;
+                ret(&mut s.r, &s.mem);
             }
         }
         Instruction::POP => {
@@ -1366,12 +1369,11 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.A = res;
         }
         Instruction::RETN => {
-            s.r.PC = s.mem.fetch_u16(s.r.SP);
-            s.r.SP = s.r.SP.overflowing_add(2).0;
-            s.r.MEMPTR = s.r.PC;
-            update_pc = false;
+            ret(&mut s.r, &s.mem);
             s.r.IFF1 = s.r.IFF2;
-            //s.r.IM =
+        }
+        Instruction::RETI => {
+            ret(&mut s.r, &s.mem);
         }
         Instruction::IM => {
             let op1 = op.op1.ok_or("IM missing op1")?;
