@@ -256,14 +256,16 @@ fn setup_memory(values: &[MemValues], mem: &mut mem::Memory) {
     }
 }
 
-struct ZxSpectrumDisk {}
+struct ZxSpectrumIODevice {
+    value: u8,
+}
 
-impl io::Device for ZxSpectrumDisk {
+impl io::Device for ZxSpectrumIODevice {
     fn out(&self, _: u8, _: u8) -> std::result::Result<(), std::string::String> {
         Ok(())
     }
     fn input(&self, _: u8) -> std::result::Result<u8, std::string::String> {
-        Ok(0x7D) // Status register
+        Ok(self.value) // Status register
     }
 }
 
@@ -287,8 +289,13 @@ fn run_instructions() {
         state.mem = data;
         state.io = io::IO::default();
         end_state.io = io::IO::default();
-        let mut disk = ZxSpectrumDisk {};
-        state.io.register(0x1B, &mut disk);
+        let mut devs = vec![
+            (ZxSpectrumIODevice { value: 0x7D }, 0x1B), // disk status register
+            (ZxSpectrumIODevice { value: 0xBB }, 0xCC), // ??
+        ];
+        for (_, (dev, addr)) in devs.iter_mut().enumerate() {
+            state.io.register(*addr, dev);
+        }
 
         dbg!(t);
         cpu::run(&mut state, t.tstate_to_run as usize).unwrap();
