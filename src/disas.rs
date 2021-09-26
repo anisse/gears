@@ -1085,21 +1085,21 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
         // IM 0
         // IM 1
         // IM 2
-        0xED46 => {
+        0xED46 | 0xED4E | 0xED66 | 0xED6E => {
             return Some(OpCode {
                 ins: Instruction::IM,
                 op1: Some(Operand::Imm8(0)),
                 ..neg
             })
         }
-        0xED56 => {
+        0xED56 | 0xED76 => {
             return Some(OpCode {
                 ins: Instruction::IM,
                 op1: Some(Operand::Imm8(1)),
                 ..neg
             })
         }
-        0xED5E => {
+        0xED5E | 0xED7E => {
             return Some(OpCode {
                 ins: Instruction::IM,
                 op1: Some(Operand::Imm8(2)),
