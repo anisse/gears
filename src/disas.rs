@@ -1108,7 +1108,7 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
         }
         _ => {}
     }
-    match insw & 0xFFC7 {
+    match insw & 0xFFCF {
         0xED42 => {
             // SBC HL, ss
             let reg = decode_operand_reg_ddss((ins[1] >> 4) & 0x3);
