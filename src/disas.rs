@@ -1474,7 +1474,7 @@ fn disas_four_bytes_mask(ins: &[u8; 4]) -> Option<OpCode> {
     let insw = (ins[0] as u16) << 8 | ins[1] as u16;
     let reg = decode_operand_reg_ddss((ins[1] >> 4) & 0x3);
     let nn = (ins[3] as u16) << 8 | ins[2] as u16;
-    match insw & 0xFFC7 {
+    match insw & 0xFFCF {
         // LD (nn), dd
         0xED43 => Some(OpCode {
             data: ins.to_vec(),
