@@ -1062,7 +1062,7 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
     };
     match insw {
         // NEG
-        0xED44 => return Some(neg),
+        0xED44 | 0xED4C | 0xED54 | 0xED5C | 0xED64 | 0xED6C | 0xED74 | 0xED7C => return Some(neg),
         0xED45 => {
             return Some(OpCode {
                 ins: Instruction::RETN,
