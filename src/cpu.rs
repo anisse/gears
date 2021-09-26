@@ -1324,14 +1324,16 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 if op1 != Operand::Reg8(disas::Reg8::A) {
                     return Err("IN op1 should be A".to_string());
                 }
+                // MEMPTR = (A_before_operation << 8) + port + 1
+                let low = addr.overflowing_add(1).0 as u16;
+                s.r.MEMPTR = low & 0xFF | ((s.r.A as u16) << 8);
                 // TODO: stop ignoring errors
                 if let Ok(val) = s.io.input(addr) {
                     set_op8(s, op1, val);
                 }
-                // MEMPTR = (A_before_operation << 8) + port + 1
-                let low = addr.overflowing_add(1).0 as u16;
-                s.r.MEMPTR = low & 0xFF | ((s.r.A as u16) << 8);
             } else if Operand::RegIOAddr(disas::Reg8::C) == op2 {
+                // MEMPTR = BC + 1
+                s.r.MEMPTR = s.r.get_regpair(RegPair::BC).overflowing_add(1).0;
                 if let Ok(val) = s.io.input(s.r.C) {
                     set_op8(s, op1, val);
                 }
@@ -1339,9 +1341,6 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 // TODO: move to using val directly ?
                 set_bitops_flags(get_op8(s, op1), &mut s.r);
                 s.r.set_flag(Flag::H, false);
-
-                // MEMPTR = BC + 1
-                s.r.MEMPTR = s.r.get_regpair(RegPair::BC).overflowing_add(1).0;
             }
         }
         Instruction::EXX => {
