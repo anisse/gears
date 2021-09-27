@@ -291,6 +291,7 @@ fn run_instructions() {
             (0x1B, ZxSpectrumIODevice { value: 0x7D }), // disk status register
             (0xCC, ZxSpectrumIODevice { value: 0xBB }), // ??
             (0x91, ZxSpectrumIODevice { value: 0x40 }), // ??
+            (0xAE, ZxSpectrumIODevice { value: 0x0D }), // ??
         ];
         for (addr, dev) in devs.iter_mut() {
             state.io.register(*addr, dev);
