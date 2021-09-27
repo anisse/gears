@@ -1117,6 +1117,22 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
                 ..ldia
             });
         }
+        0xED57 => {
+            // LD A, I
+            return Some(OpCode {
+                op1: Some(Operand::Reg8(Reg8::A)),
+                op2: Some(Operand::Reg8(Reg8::I)),
+                ..ldia
+            });
+        }
+        0xED5F => {
+            // LD A, R
+            return Some(OpCode {
+                op1: Some(Operand::Reg8(Reg8::A)),
+                op2: Some(Operand::Reg8(Reg8::R)),
+                ..ldia
+            });
+        }
         _ => {}
     }
     match insw & 0xFFCF {

@@ -873,6 +873,17 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 }
             }
             let a_reg = Operand::Reg8(disas::Reg8::A);
+            // LD A, I and LD A, R set condition bits
+            if op1 == a_reg
+                && (op2 == Operand::Reg8(disas::Reg8::R) || op2 == Operand::Reg8(disas::Reg8::I))
+            {
+                s.r.set_flag(Flag::PV, s.r.IFF2);
+                s.r.set_flag(Flag::S, (s.r.A as i8) < 0);
+                s.r.set_flag(Flag::Z, s.r.A == 0);
+                s.r.set_flag(Flag::H, false);
+                s.r.set_flag(Flag::N, false);
+                copy_f53_res(s.r.A, &mut s.r);
+            }
             // MEMPTR
             if op2 == a_reg {
                 match op1 {
