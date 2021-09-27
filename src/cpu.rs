@@ -1400,6 +1400,16 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             set_bitops_flags(s.r.A, &mut s.r);
             s.r.MEMPTR = addr.overflowing_add(1).0;
         }
+        Instruction::RLD => {
+            let a = s.r.A;
+            let addr = s.r.get_regpair(RegPair::HL);
+            let b = s.mem.fetch_u8(addr);
+            s.mem.set_u8(addr, b << 4 | (a & 0x0F));
+            s.r.A = (a & 0xF0) | (b >> 4);
+            s.r.set_flag(Flag::H, false);
+            set_bitops_flags(s.r.A, &mut s.r);
+            s.r.MEMPTR = addr.overflowing_add(1).0;
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     memptr_index(op, &mut s.r);
