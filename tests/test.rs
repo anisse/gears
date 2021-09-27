@@ -288,10 +288,10 @@ fn run_instructions() {
         state.io = io::IO::default();
         end_state.io = io::IO::default();
         let mut devs = vec![
-            (ZxSpectrumIODevice { value: 0x7D }, 0x1B), // disk status register
-            (ZxSpectrumIODevice { value: 0xBB }, 0xCC), // ??
+            (0x1B, ZxSpectrumIODevice { value: 0x7D }), // disk status register
+            (0xCC, ZxSpectrumIODevice { value: 0xBB }), // ??
         ];
-        for (dev, addr) in devs.iter_mut() {
+        for (addr, dev) in devs.iter_mut() {
             state.io.register(*addr, dev);
         }
 
