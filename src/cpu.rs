@@ -1409,6 +1409,22 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             set_bitops_flags(s.r.A, &mut s.r);
             s.r.MEMPTR = addr.overflowing_add(1).0;
         }
+        Instruction::LDI => {
+            let hl = s.r.get_regpair(RegPair::HL);
+            let de = s.r.get_regpair(RegPair::DE);
+            let bc = s.r.get_regpair(RegPair::BC).overflowing_sub(1).0;
+            let val = s.mem.fetch_u8(hl);
+            s.mem.set_u8(de, val);
+            s.r.set_regpair(RegPair::DE, de.overflowing_add(1).0);
+            s.r.set_regpair(RegPair::HL, hl.overflowing_add(1).0);
+            s.r.set_regpair(RegPair::BC, bc);
+            s.r.set_flag(Flag::PV, bc != 0);
+            s.r.set_flag(Flag::H, false);
+            s.r.set_flag(Flag::N, false);
+            let n = val.overflowing_add(s.r.A).0;
+            s.r.set_flag(Flag::F5, n & (1 << 1) != 0);
+            s.r.set_flag(Flag::F3, n & (1 << 3) != 0);
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     memptr_index(op, &mut s.r);
