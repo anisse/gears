@@ -170,6 +170,8 @@ pub enum Instruction {
     IM,
     RETN,
     RETI,
+    RRD,
+    RLD,
 }
 
 #[derive(PartialEq, Clone)]
@@ -1131,6 +1133,32 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
                 op1: Some(Operand::Reg8(Reg8::A)),
                 op2: Some(Operand::Reg8(Reg8::R)),
                 ..ldia
+            });
+        }
+        0xED67 => {
+            // RRD
+            return Some(OpCode {
+                data: vec![ins[0], ins[1]],
+                length: 2,
+                ins: Instruction::RRD,
+                op1: None,
+                op2: None,
+                op3: None,
+                mcycles: 5,
+                tstates: vec![4, 4, 3, 4, 3],
+            });
+        }
+        0xED6F => {
+            // RLD
+            return Some(OpCode {
+                data: vec![ins[0], ins[1]],
+                length: 2,
+                ins: Instruction::RLD,
+                op1: None,
+                op2: None,
+                op3: None,
+                mcycles: 5,
+                tstates: vec![4, 4, 3, 4, 3],
             });
         }
         _ => {}
