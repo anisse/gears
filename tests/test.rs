@@ -293,6 +293,8 @@ fn run_instructions() {
             (0x91, ZxSpectrumIODevice { value: 0x40 }), // ??
             (0xAE, ZxSpectrumIODevice { value: 0x0D }), // ??
             (0x4B, ZxSpectrumIODevice { value: 0x62 }), // ??
+            (0x6B, ZxSpectrumIODevice { value: 0x29 }), // ??
+            (0x06, ZxSpectrumIODevice { value: 0xF2 }), // ??
         ];
         for (addr, dev) in devs.iter_mut() {
             state.io.register(*addr, dev);
