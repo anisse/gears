@@ -772,10 +772,10 @@ pub fn init() -> State<'static> {
 pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
     let mut update_pc = true;
     let mut op_len: usize = op.tstates.iter().fold(0, |sum, x| sum + (*x as usize));
-    s.r.R = (s.r.R + 1) & 0x7F;
+    s.r.R = (((s.r.R & 0x7F) + 1) & 0x7F) | (s.r.R & 0x80);
     if op.length > 1 {
         match op.data[0] {
-            0xCB | 0xDD | 0xFB | 0xED => s.r.R = (s.r.R + 1) & 0x7F,
+            0xCB | 0xDD | 0xFB | 0xED => s.r.R = (((s.r.R & 0x7F) + 1) & 0x7F) | (s.r.R & 0x80),
             _ => {}
         };
     }
