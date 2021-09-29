@@ -1425,6 +1425,25 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.set_flag(Flag::F5, n & (1 << 1) != 0);
             s.r.set_flag(Flag::F3, n & (1 << 3) != 0);
         }
+        Instruction::CPI => {
+            let hl = s.r.get_regpair(RegPair::HL);
+            let bc = s.r.get_regpair(RegPair::BC).overflowing_sub(1).0;
+            let a = s.r.A as i8;
+            let val = s.mem.fetch_u8(hl) as i8;
+            set_conditions_sub8_base(&mut s.r, a, val, 0);
+            let n = a
+                .overflowing_sub(val)
+                .0
+                .overflowing_sub(((s.r.F & H) >> 4) as i8)
+                .0;
+            s.r.set_flag(Flag::F5, n & (1 << 1) != 0);
+            s.r.set_flag(Flag::F3, n & (1 << 3) != 0);
+            s.r.set_flag(Flag::PV, bc != 0);
+            s.r.set_regpair(RegPair::HL, hl.overflowing_add(1).0);
+            s.r.set_regpair(RegPair::BC, bc);
+            // MEMPTR = MEMPTR + 1
+            s.r.MEMPTR = s.r.MEMPTR.overflowing_add(1).0;
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     memptr_index(op, &mut s.r);
