@@ -173,6 +173,7 @@ pub enum Instruction {
     RRD,
     RLD,
     LDI,
+    CPI,
 }
 
 #[derive(PartialEq, Clone)]
@@ -1064,6 +1065,12 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
         tstates: vec![4, 5],
         ..neg.clone()
     };
+    let ldi = OpCode {
+        ins: Instruction::LDI,
+        mcycles: 4,
+        tstates: vec![4, 4, 3, 5],
+        ..neg.clone()
+    };
     match insw {
         // NEG
         0xED44 | 0xED4C | 0xED54 | 0xED5C | 0xED64 | 0xED6C | 0xED74 | 0xED7C => return Some(neg),
@@ -1164,15 +1171,13 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
         }
         0xEDA0 => {
             // LDI
+            return Some(ldi);
+        }
+        0xEDA1 => {
+            // CPI
             return Some(OpCode {
-                data: vec![ins[0], ins[1]],
-                length: 2,
-                ins: Instruction::LDI,
-                op1: None,
-                op2: None,
-                op3: None,
-                mcycles: 4,
-                tstates: vec![4, 4, 3, 5],
+                ins: Instruction::CPI,
+                ..ldi
             });
         }
         _ => {}
