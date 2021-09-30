@@ -173,7 +173,13 @@ pub enum Instruction {
     RRD,
     RLD,
     LDI,
+    LDIR,
     CPI,
+    CPIR,
+    LDD,
+    LDDR,
+    CPD,
+    CPDR,
 }
 
 #[derive(PartialEq, Clone)]
@@ -1173,10 +1179,56 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
             // LDI
             return Some(ldi);
         }
+        0xEDB0 => {
+            // LDIR
+            return Some(OpCode {
+                ins: Instruction::LDIR,
+                // warning: mcycles varies
+                ..ldi
+            });
+        }
         0xEDA1 => {
             // CPI
             return Some(OpCode {
                 ins: Instruction::CPI,
+                ..ldi
+            });
+        }
+        0xEDB1 => {
+            // CPIR
+            return Some(OpCode {
+                ins: Instruction::CPIR,
+                // warning: mcycles varies
+                ..ldi
+            });
+        }
+        0xEDA8 => {
+            // LDD
+            return Some(OpCode {
+                ins: Instruction::LDD,
+                ..ldi
+            });
+        }
+        0xEDB8 => {
+            // LDDR
+            return Some(OpCode {
+                ins: Instruction::LDDR,
+                // warning: mcycles varies
+                ..ldi
+            });
+        }
+        0xEDA9 => {
+            // CPD
+            return Some(OpCode {
+                ins: Instruction::CPD,
+                ..ldi
+            });
+        }
+        0xEDB9 => {
+            // CPDR
+            return Some(OpCode {
+                ins: Instruction::CPDR,
+                // warning: mcycles varies
                 ..ldi
             });
         }
