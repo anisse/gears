@@ -180,6 +180,14 @@ pub enum Instruction {
     LDDR,
     CPD,
     CPDR,
+    INI,
+    INIR,
+    IND,
+    INDR,
+    OUTI,
+    OTIR,
+    OUTD,
+    OTDR,
 }
 
 #[derive(PartialEq, Clone)]
@@ -1077,6 +1085,12 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
         tstates: vec![4, 4, 3, 5],
         ..neg.clone()
     };
+    let ini = OpCode {
+        ins: Instruction::INI,
+        mcycles: 4,
+        tstates: vec![4, 5, 3, 4],
+        ..neg.clone()
+    };
     match insw {
         // NEG
         0xED44 | 0xED4C | 0xED54 | 0xED5C | 0xED64 | 0xED6C | 0xED74 | 0xED7C => return Some(neg),
@@ -1230,6 +1244,66 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
                 ins: Instruction::CPDR,
                 // warning: mcycles varies
                 ..ldi
+            });
+        }
+        0xEDA2 => {
+            // INI
+            return Some(OpCode {
+                ins: Instruction::INI,
+                ..ini
+            });
+        }
+        0xEDB2 => {
+            // INIR
+            return Some(OpCode {
+                ins: Instruction::INIR,
+                // warning: mcycles varies
+                ..ini
+            });
+        }
+        0xEDAA => {
+            // IND
+            return Some(OpCode {
+                ins: Instruction::IND,
+                ..ini
+            });
+        }
+        0xEDBA => {
+            // INDR
+            return Some(OpCode {
+                ins: Instruction::INDR,
+                // warning: mcycles varies
+                ..ini
+            });
+        }
+        0xEDA3 => {
+            // OUTI
+            return Some(OpCode {
+                ins: Instruction::OUTI,
+                ..ini
+            });
+        }
+        0xEDB3 => {
+            // OTIR
+            return Some(OpCode {
+                ins: Instruction::OTIR,
+                // warning: mcycles varies
+                ..ini
+            });
+        }
+        0xEDAB => {
+            // OUTD
+            return Some(OpCode {
+                ins: Instruction::OUTD,
+                ..ini
+            });
+        }
+        0xEDBB => {
+            // OTDR
+            return Some(OpCode {
+                ins: Instruction::OTDR,
+                // warning: mcycles varies
+                ..ini
             });
         }
         _ => {}
