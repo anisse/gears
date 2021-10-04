@@ -765,6 +765,22 @@ fn memptr_index(opcode: &disas::OpCode, r: &mut Regs) {
     memptr_idx(&opcode.op2, r);
 }
 
+fn set_conditions_io_block_base(r: &mut Regs) {
+    let res = (r.B as i8).wrapping_sub(1);
+    r.set_flag(Flag::S, res < 0);
+    r.set_flag(Flag::Z, res == 0);
+    copy_f53_res(res as u8, r);
+
+    r.B = res as u8;
+}
+
+fn set_conditions_io_block(r: &mut Regs, c: u8, val: u8) {
+    let k = (c as u16).wrapping_add(val as u16);
+    r.set_flag(Flag::H, k > 0xFF);
+    r.set_flag(Flag::C, k > 0xFF);
+    r.set_flag(Flag::PV, ((k & 0x7) as u8 ^ r.B).count_ones() & 1 == 0);
+}
+
 pub fn init() -> State<'static> {
     State::default()
 }
@@ -1441,6 +1457,20 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.set_regpair(RegPair::BC, bc);
             // MEMPTR = MEMPTR + 1
             s.r.MEMPTR = s.r.MEMPTR.wrapping_add(1);
+        }
+        Instruction::INI => {
+            let hl = s.r.get_regpair(RegPair::HL);
+            let addr = s.r.get_regpair(RegPair::BC);
+            set_conditions_io_block_base(&mut s.r);
+            if let Ok(val) = s.io.input(addr) {
+                s.r.set_flag(Flag::N, (val & 0x80) != 0);
+                s.mem.set_u8(hl, val);
+                let c = s.r.C.wrapping_add(1);
+                set_conditions_io_block(&mut s.r, val, c);
+            }
+            s.r.set_regpair(RegPair::HL, hl.wrapping_add(1));
+            // MEMPTR = BC_before_decrementing_B + 1
+            s.r.MEMPTR = addr.wrapping_add(1);
         }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
