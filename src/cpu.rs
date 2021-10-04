@@ -782,7 +782,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
     let start_f = s.r.F;
     let mut ret = |r: &mut Regs, mem: &mem::Memory| {
         r.PC = mem.fetch_u16(r.SP);
-        r.SP = r.SP.overflowing_add(2).0;
+        r.SP = r.SP.wrapping_add(2);
         r.MEMPTR = r.PC;
         update_pc = false;
     };
@@ -801,7 +801,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                     let a = get_op16(s, op1) as i16;
                     let b = get_op16(s, op2) as i16;
                     let res = set_conditions_add_16(&mut s.r, a, b, 0);
-                    s.r.MEMPTR = a.overflowing_add(1).0 as u16;
+                    s.r.MEMPTR = a.wrapping_add(1) as u16;
                     set_op16(s, op1, res);
                 }
             }
@@ -820,7 +820,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                     let a = get_op16(s, op1) as i16;
                     let b = get_op16(s, op2) as i16;
                     let res = set_conditions_adc_16(&mut s.r, a, b);
-                    s.r.MEMPTR = a.overflowing_add(1).0 as u16;
+                    s.r.MEMPTR = a.wrapping_add(1) as u16;
                     set_op16(s, op1, res);
                 }
             }
@@ -846,7 +846,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                     let a = get_op16(s, op1) as i16;
                     let b = get_op16(s, op2) as i16;
                     let res = set_conditions_sbc_16(&mut s.r, a, b);
-                    s.r.MEMPTR = a.overflowing_add(1).0 as u16;
+                    s.r.MEMPTR = a.wrapping_add(1) as u16;
                     set_op16(s, op1, res);
                 }
             }
@@ -933,7 +933,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 OpSize::S2 => {
                     // Does not set conditions
                     let val = get_op16(s, op1);
-                    let (res, _) = val.overflowing_add(inc as u16);
+                    let res = val.wrapping_add(inc as u16);
                     set_op16(s, op1, res);
                 }
             }
@@ -1045,7 +1045,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             } else {
                 return Err(format!("Arg {} not rel addr for DJNZ", op1));
             };
-            s.r.B = s.r.B.overflowing_sub(1).0;
+            s.r.B = s.r.B.wrapping_sub(1);
             if s.r.B != 0 {
                 s.r.PC = (s.r.PC as i32 + jump as i32) as u16;
                 update_pc = false;
@@ -1154,12 +1154,12 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             let op1 = op.op1.ok_or("POP op1 missing")?;
             let val = s.mem.fetch_u16(s.r.SP);
             set_op16(s, op1, val);
-            s.r.SP = s.r.SP.overflowing_add(2).0;
+            s.r.SP = s.r.SP.wrapping_add(2);
         }
         Instruction::PUSH => {
             let op1 = op.op1.ok_or("PUSH op1 missing")?;
             let arg = get_op16(s, op1);
-            s.r.SP = s.r.SP.overflowing_sub(2).0;
+            s.r.SP = s.r.SP.wrapping_sub(2);
             s.mem.set_u16(s.r.SP, arg);
         }
         Instruction::JP => {
@@ -1194,9 +1194,8 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 addr = get_op16(s, op.op1.ok_or("CALL missing op1")?);
             }
             if jump {
-                s.r.SP = s.r.SP.overflowing_sub(2).0;
-                s.mem
-                    .set_u16(s.r.SP, s.r.PC.overflowing_add(op.length as u16).0);
+                s.r.SP = s.r.SP.wrapping_sub(2);
+                s.mem.set_u16(s.r.SP, s.r.PC.wrapping_add(op.length as u16));
                 s.r.PC = addr;
                 update_pc = false;
             }
@@ -1204,9 +1203,8 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         }
         Instruction::RST => {
             let op1 = op.op1.ok_or("RST op1 missing")?;
-            s.r.SP = s.r.SP.overflowing_sub(2).0;
-            s.mem
-                .set_u16(s.r.SP, s.r.PC.overflowing_add(op.length as u16).0);
+            s.r.SP = s.r.SP.wrapping_sub(2);
+            s.mem.set_u16(s.r.SP, s.r.PC.wrapping_add(op.length as u16));
             let addr = get_op8(s, op1) as u16;
             s.r.PC = addr;
             s.r.MEMPTR = addr;
@@ -1322,7 +1320,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 // TODO: stop ignoring errors
                 s.io.out(addr, val).ok();
                 // MEMPTR_low = (port + 1) & #FF,  MEMPTR_hi = A
-                let low = addr.overflowing_add(1).0 as u16;
+                let low = addr.wrapping_add(1) as u16;
                 s.r.MEMPTR = low & 0xFF | ((val as u16) << 8);
             } else if Operand::RegIOAddr(disas::Reg8::C) == op1 {
                 let val = get_op8(s, op2);
@@ -1330,7 +1328,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 s.io.out(s.r.C, val).ok();
 
                 // MEMPTR = BC + 1
-                s.r.MEMPTR = s.r.get_regpair(RegPair::BC).overflowing_add(1).0;
+                s.r.MEMPTR = s.r.get_regpair(RegPair::BC).wrapping_add(1);
             }
         }
         Instruction::IN => {
@@ -1341,7 +1339,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                     return Err("IN op1 should be A".to_string());
                 }
                 // MEMPTR = (A_before_operation << 8) + port + 1
-                let low = addr.overflowing_add(1).0 as u16;
+                let low = addr.wrapping_add(1) as u16;
                 s.r.MEMPTR = low & 0xFF | ((s.r.A as u16) << 8);
                 // TODO: stop ignoring errors
                 if let Ok(val) = s.io.input(addr) {
@@ -1349,7 +1347,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 }
             } else if Operand::RegIOAddr(disas::Reg8::C) == op2 {
                 // MEMPTR = BC + 1
-                s.r.MEMPTR = s.r.get_regpair(RegPair::BC).overflowing_add(1).0;
+                s.r.MEMPTR = s.r.get_regpair(RegPair::BC).wrapping_add(1);
                 if let Ok(val) = s.io.input(s.r.C) {
                     set_op8(s, op1, val);
                     //flags
@@ -1397,7 +1395,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.A = (a & 0xF0) | (b & 0x0F);
             s.r.set_flag(Flag::H, false);
             set_bitops_flags(s.r.A, &mut s.r);
-            s.r.MEMPTR = addr.overflowing_add(1).0;
+            s.r.MEMPTR = addr.wrapping_add(1);
         }
         Instruction::RLD => {
             let a = s.r.A;
@@ -1407,42 +1405,38 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.A = (a & 0xF0) | (b >> 4);
             s.r.set_flag(Flag::H, false);
             set_bitops_flags(s.r.A, &mut s.r);
-            s.r.MEMPTR = addr.overflowing_add(1).0;
+            s.r.MEMPTR = addr.wrapping_add(1);
         }
         Instruction::LDI => {
             let hl = s.r.get_regpair(RegPair::HL);
             let de = s.r.get_regpair(RegPair::DE);
-            let bc = s.r.get_regpair(RegPair::BC).overflowing_sub(1).0;
+            let bc = s.r.get_regpair(RegPair::BC).wrapping_sub(1);
             let val = s.mem.fetch_u8(hl);
             s.mem.set_u8(de, val);
-            s.r.set_regpair(RegPair::DE, de.overflowing_add(1).0);
-            s.r.set_regpair(RegPair::HL, hl.overflowing_add(1).0);
+            s.r.set_regpair(RegPair::DE, de.wrapping_add(1));
+            s.r.set_regpair(RegPair::HL, hl.wrapping_add(1));
             s.r.set_regpair(RegPair::BC, bc);
             s.r.set_flag(Flag::PV, bc != 0);
             s.r.set_flag(Flag::H, false);
             s.r.set_flag(Flag::N, false);
-            let n = val.overflowing_add(s.r.A).0;
+            let n = val.wrapping_add(s.r.A);
             s.r.set_flag(Flag::F5, n & (1 << 1) != 0);
             s.r.set_flag(Flag::F3, n & (1 << 3) != 0);
         }
         Instruction::CPI => {
             let hl = s.r.get_regpair(RegPair::HL);
-            let bc = s.r.get_regpair(RegPair::BC).overflowing_sub(1).0;
+            let bc = s.r.get_regpair(RegPair::BC).wrapping_sub(1);
             let a = s.r.A as i8;
             let val = s.mem.fetch_u8(hl) as i8;
             set_conditions_sub8_base(&mut s.r, a, val, 0);
-            let n = a
-                .overflowing_sub(val)
-                .0
-                .overflowing_sub(((s.r.F & H) >> 4) as i8)
-                .0;
+            let n = a.wrapping_sub(val).wrapping_sub(((s.r.F & H) >> 4) as i8);
             s.r.set_flag(Flag::F5, n & (1 << 1) != 0);
             s.r.set_flag(Flag::F3, n & (1 << 3) != 0);
             s.r.set_flag(Flag::PV, bc != 0);
-            s.r.set_regpair(RegPair::HL, hl.overflowing_add(1).0);
+            s.r.set_regpair(RegPair::HL, hl.wrapping_add(1));
             s.r.set_regpair(RegPair::BC, bc);
             // MEMPTR = MEMPTR + 1
-            s.r.MEMPTR = s.r.MEMPTR.overflowing_add(1).0;
+            s.r.MEMPTR = s.r.MEMPTR.wrapping_add(1);
         }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
