@@ -1317,6 +1317,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                     return Err("Op2 should be A".to_string());
                 }
                 let val = s.r.A;
+                let addr = addr as u16 | ((s.r.A as u16) << 8);
                 // TODO: stop ignoring errors
                 s.io.out(addr, val).ok();
                 // MEMPTR_low = (port + 1) & #FF,  MEMPTR_hi = A
@@ -1324,11 +1325,12 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 s.r.MEMPTR = low & 0xFF | ((val as u16) << 8);
             } else if Operand::RegIOAddr(disas::Reg8::C) == op1 {
                 let val = get_op8(s, op2);
+                let addr = s.r.get_regpair(RegPair::BC);
                 // TODO: stop ignoring errors
-                s.io.out(s.r.C, val).ok();
+                s.io.out(addr, val).ok();
 
                 // MEMPTR = BC + 1
-                s.r.MEMPTR = s.r.get_regpair(RegPair::BC).wrapping_add(1);
+                s.r.MEMPTR = addr.wrapping_add(1);
             }
         }
         Instruction::IN => {
@@ -1340,6 +1342,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 }
                 // MEMPTR = (A_before_operation << 8) + port + 1
                 let low = addr.wrapping_add(1) as u16;
+                let addr = addr as u16 | ((s.r.A as u16) << 8);
                 s.r.MEMPTR = low & 0xFF | ((s.r.A as u16) << 8);
                 // TODO: stop ignoring errors
                 if let Ok(val) = s.io.input(addr) {
@@ -1347,8 +1350,9 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 }
             } else if Operand::RegIOAddr(disas::Reg8::C) == op2 {
                 // MEMPTR = BC + 1
-                s.r.MEMPTR = s.r.get_regpair(RegPair::BC).wrapping_add(1);
-                if let Ok(val) = s.io.input(s.r.C) {
+                let addr = s.r.get_regpair(RegPair::BC);
+                s.r.MEMPTR = addr.wrapping_add(1);
+                if let Ok(val) = s.io.input(addr) {
                     set_op8(s, op1, val);
                     //flags
                     set_bitops_flags(val, &mut s.r);
