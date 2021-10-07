@@ -774,11 +774,12 @@ fn set_conditions_io_block_base(r: &mut Regs) {
     r.B = res as u8;
 }
 
-fn set_conditions_io_block(r: &mut Regs, c: u8, val: u8) {
-    let k = (c as u16).wrapping_add(val as u16);
+fn set_conditions_io_block(r: &mut Regs, val: u8, lc: u8) {
+    let k = (val as u16).wrapping_add(lc as u16);
     r.set_flag(Flag::H, k > 0xFF);
     r.set_flag(Flag::C, k > 0xFF);
     r.set_flag(Flag::PV, ((k & 0x7) as u8 ^ r.B).count_ones() & 1 == 0);
+    r.set_flag(Flag::N, (val & 0x80) != 0);
 }
 
 pub fn init() -> State<'static> {
@@ -1463,7 +1464,6 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             let addr = s.r.get_regpair(RegPair::BC);
             set_conditions_io_block_base(&mut s.r);
             if let Ok(val) = s.io.input(addr) {
-                s.r.set_flag(Flag::N, (val & 0x80) != 0);
                 s.mem.set_u8(hl, val);
                 let c = s.r.C.wrapping_add(1);
                 set_conditions_io_block(&mut s.r, val, c);
@@ -1471,6 +1471,20 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.set_regpair(RegPair::HL, hl.wrapping_add(1));
             // MEMPTR = BC_before_decrementing_B + 1
             s.r.MEMPTR = addr.wrapping_add(1);
+        }
+        Instruction::OUTI => {
+            let hl = s.r.get_regpair(RegPair::HL);
+            let val = s.mem.fetch_u8(hl);
+            let addr = s.r.get_regpair(RegPair::BC);
+            // TODO: stop ignoring errors ?
+            s.io.out(addr, val).ok();
+            set_conditions_io_block_base(&mut s.r);
+            s.r.set_regpair(RegPair::HL, hl.wrapping_add(1));
+            let l = s.r.L;
+            set_conditions_io_block(&mut s.r, val, l);
+            // MEMPTR = BC_after_decrementing_B + 1
+            let bc = s.r.get_regpair(RegPair::BC);
+            s.r.MEMPTR = bc.wrapping_add(1);
         }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
