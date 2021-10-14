@@ -1486,6 +1486,22 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             let bc = s.r.get_regpair(RegPair::BC);
             s.r.MEMPTR = bc.wrapping_add(1);
         }
+        Instruction::LDD => {
+            let hl = s.r.get_regpair(RegPair::HL);
+            let de = s.r.get_regpair(RegPair::DE);
+            let val = s.mem.fetch_u8(hl);
+            let bc = s.r.get_regpair(RegPair::BC).wrapping_sub(1);
+            let n = val.wrapping_add(s.r.A);
+            s.mem.set_u8(de, val);
+            s.r.set_regpair(RegPair::HL, hl.wrapping_sub(1));
+            s.r.set_regpair(RegPair::DE, de.wrapping_sub(1));
+            s.r.set_regpair(RegPair::BC, bc);
+            s.r.set_flag(Flag::F5, (n & (1 << 1)) != 0);
+            s.r.set_flag(Flag::F3, (n & (1 << 3)) != 0);
+            s.r.set_flag(Flag::H, false);
+            s.r.set_flag(Flag::N, false);
+            s.r.set_flag(Flag::PV, bc != 0);
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     memptr_index(op, &mut s.r);
