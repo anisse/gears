@@ -782,6 +782,20 @@ fn set_conditions_io_block(r: &mut Regs, val: u8, lc: u8) {
     r.set_flag(Flag::N, (val & 0x80) != 0);
 }
 
+fn input_block(s: &mut State, inc: i8) {
+    let hl = s.r.get_regpair(RegPair::HL);
+    let addr = s.r.get_regpair(RegPair::BC);
+    set_conditions_io_block_base(&mut s.r);
+    if let Ok(val) = s.io.input(addr) {
+        s.mem.set_u8(hl, val);
+        let c = s.r.C.wrapping_add(inc as u8);
+        set_conditions_io_block(&mut s.r, val, c);
+    }
+    s.r.set_regpair(RegPair::HL, hl.wrapping_add(inc as u16));
+    // MEMPTR = BC_before_decrementing_B +/- 1
+    s.r.MEMPTR = addr.wrapping_add(inc as u16);
+}
+
 fn mem_block_copy(r: &mut Regs, mem: &mut mem::Memory, inc: i8) {
     let hl = r.get_regpair(RegPair::HL);
     let de = r.get_regpair(RegPair::DE);
@@ -1472,17 +1486,10 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             mem_block_cmp(&mut s.r, &mut s.mem, -1);
         }
         Instruction::INI => {
-            let hl = s.r.get_regpair(RegPair::HL);
-            let addr = s.r.get_regpair(RegPair::BC);
-            set_conditions_io_block_base(&mut s.r);
-            if let Ok(val) = s.io.input(addr) {
-                s.mem.set_u8(hl, val);
-                let c = s.r.C.wrapping_add(1);
-                set_conditions_io_block(&mut s.r, val, c);
-            }
-            s.r.set_regpair(RegPair::HL, hl.wrapping_add(1));
-            // MEMPTR = BC_before_decrementing_B + 1
-            s.r.MEMPTR = addr.wrapping_add(1);
+            input_block(s, 1);
+        }
+        Instruction::IND => {
+            input_block(s, -1);
         }
         Instruction::OUTI => {
             let hl = s.r.get_regpair(RegPair::HL);
