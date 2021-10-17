@@ -1476,21 +1476,6 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             set_bitops_flags(s.r.A, &mut s.r);
             s.r.MEMPTR = addr.wrapping_add(1);
         }
-        Instruction::LDI => {
-            mem_block_copy(&mut s.r, &mut s.mem, 1);
-        }
-        Instruction::CPI => {
-            mem_block_cmp(&mut s.r, &mut s.mem, 1);
-        }
-        Instruction::CPD => {
-            mem_block_cmp(&mut s.r, &mut s.mem, -1);
-        }
-        Instruction::INI => {
-            input_block(s, 1);
-        }
-        Instruction::IND => {
-            input_block(s, -1);
-        }
         Instruction::OUTI => {
             let hl = s.r.get_regpair(RegPair::HL);
             let val = s.mem.fetch_u8(hl);
@@ -1505,9 +1490,12 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             let bc = s.r.get_regpair(RegPair::BC);
             s.r.MEMPTR = bc.wrapping_add(1);
         }
-        Instruction::LDD => {
-            mem_block_copy(&mut s.r, &mut s.mem, -1);
-        }
+        Instruction::LDI => mem_block_copy(&mut s.r, &mut s.mem, 1),
+        Instruction::LDD => mem_block_copy(&mut s.r, &mut s.mem, -1),
+        Instruction::CPI => mem_block_cmp(&mut s.r, &mut s.mem, 1),
+        Instruction::CPD => mem_block_cmp(&mut s.r, &mut s.mem, -1),
+        Instruction::INI => input_block(s, 1),
+        Instruction::IND => input_block(s, -1),
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     memptr_index(op, &mut s.r);
