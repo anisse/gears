@@ -800,6 +800,22 @@ fn mem_block_copy(r: &mut Regs, mem: &mut mem::Memory, inc: i8) {
     r.set_flag(Flag::PV, bc != 0);
 }
 
+fn mem_block_cmp(r: &mut Regs, mem: &mut mem::Memory, inc: i8) {
+    let hl = r.get_regpair(RegPair::HL);
+    let bc = r.get_regpair(RegPair::BC).wrapping_sub(1);
+    let a = r.A as i8;
+    let val = mem.fetch_u8(hl) as i8;
+    set_conditions_sub8_base(r, a, val, 0);
+    let n = a.wrapping_sub(val).wrapping_sub(((r.F & H) >> 4) as i8);
+    r.set_flag(Flag::F5, n & (1 << 1) != 0);
+    r.set_flag(Flag::F3, n & (1 << 3) != 0);
+    r.set_flag(Flag::PV, bc != 0);
+    r.set_regpair(RegPair::HL, hl.wrapping_add(inc as u16));
+    r.set_regpair(RegPair::BC, bc);
+    // MEMPTR = MEMPTR + 1
+    r.MEMPTR = r.MEMPTR.wrapping_add(inc as u16);
+}
+
 pub fn init() -> State<'static> {
     State::default()
 }
@@ -1450,19 +1466,10 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             mem_block_copy(&mut s.r, &mut s.mem, 1);
         }
         Instruction::CPI => {
-            let hl = s.r.get_regpair(RegPair::HL);
-            let bc = s.r.get_regpair(RegPair::BC).wrapping_sub(1);
-            let a = s.r.A as i8;
-            let val = s.mem.fetch_u8(hl) as i8;
-            set_conditions_sub8_base(&mut s.r, a, val, 0);
-            let n = a.wrapping_sub(val).wrapping_sub(((s.r.F & H) >> 4) as i8);
-            s.r.set_flag(Flag::F5, n & (1 << 1) != 0);
-            s.r.set_flag(Flag::F3, n & (1 << 3) != 0);
-            s.r.set_flag(Flag::PV, bc != 0);
-            s.r.set_regpair(RegPair::HL, hl.wrapping_add(1));
-            s.r.set_regpair(RegPair::BC, bc);
-            // MEMPTR = MEMPTR + 1
-            s.r.MEMPTR = s.r.MEMPTR.wrapping_add(1);
+            mem_block_cmp(&mut s.r, &mut s.mem, 1);
+        }
+        Instruction::CPD => {
+            mem_block_cmp(&mut s.r, &mut s.mem, -1);
         }
         Instruction::INI => {
             let hl = s.r.get_regpair(RegPair::HL);
