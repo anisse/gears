@@ -254,16 +254,14 @@ fn setup_memory(values: &[MemValues], mem: &mut mem::Memory) {
     }
 }
 
-struct ZxSpectrumIODevice {
-    value: u8,
-}
+struct ZxSpectrumIODevice {}
 
 impl io::Device for ZxSpectrumIODevice {
     fn out(&self, _: u16, _: u8) -> std::result::Result<(), std::string::String> {
         Ok(())
     }
-    fn input(&self, _: u16) -> std::result::Result<u8, std::string::String> {
-        Ok(self.value) // Status register
+    fn input(&self, addr: u16) -> std::result::Result<u8, std::string::String> {
+        Ok((addr >> 8) as u8)
     }
 }
 
@@ -287,25 +285,8 @@ fn run_instructions() {
         state.mem = data;
         state.io = io::IO::default();
         end_state.io = io::IO::default();
-        let mut devs = vec![
-            (0x7D1B, ZxSpectrumIODevice { value: 0x7D }), // disk status register
-            (0xBBCC, ZxSpectrumIODevice { value: 0xBB }), // ??
-            (0x4091, ZxSpectrumIODevice { value: 0x40 }), // ??
-            (0x0DAE, ZxSpectrumIODevice { value: 0x0D }), // ??
-            (0x624B, ZxSpectrumIODevice { value: 0x62 }), // ??
-            (0x296B, ZxSpectrumIODevice { value: 0x29 }), // ??
-            (0xF206, ZxSpectrumIODevice { value: 0xF2 }), // ??
-            (0x9A82, ZxSpectrumIODevice { value: 0x9A }), // ??
-            (0x0200, ZxSpectrumIODevice { value: 0x02 }), // ??
-            (0x569A, ZxSpectrumIODevice { value: 0x56 }), // ??
-            (0xABCC, ZxSpectrumIODevice { value: 0xAB }), // ??
-            (0xD791, ZxSpectrumIODevice { value: 0xD7 }), // ??
-            (0x0101, ZxSpectrumIODevice { value: 0x01 }), // ??
-            (0x56AA, ZxSpectrumIODevice { value: 0x56 }), // ??
-        ];
-        for (addr, dev) in devs.iter_mut() {
-            state.io.register(*addr, dev);
-        }
+        let mut dev = ZxSpectrumIODevice {};
+        state.io.register(0, 62464, &mut dev);
 
         dbg!(t);
         cpu::run(&mut state, t.tstate_to_run as usize).unwrap();

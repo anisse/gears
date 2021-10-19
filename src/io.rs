@@ -7,26 +7,38 @@ pub trait Device {
 }
 
 #[derive(Clone)]
+struct Entry<'a> {
+    start: u16,
+    end: u16,
+    dev: &'a dyn Device,
+}
+#[derive(Clone)]
 pub struct IO<'a> {
-    map: HashMap<u16, &'a dyn Device>,
+    devs: Vec<Entry<'a>>,
 }
 
 impl<'a> IO<'a> {
     pub fn new() -> Self {
-        IO {
-            map: HashMap::new(),
-        }
+        IO { devs: Vec::new() }
     }
-    pub fn register(&mut self, addr: u16, dev: &'a mut dyn Device) {
-        self.map.insert(addr, dev);
+    pub fn register(&mut self, start: u16, end: u16, dev: &'a mut dyn Device) {
+        self.devs.push(Entry { start, end, dev });
     }
     pub fn out(&self, addr: u16, val: u8) -> Result<(), String> {
-        let dev = self.map.get(&addr).ok_or("Out address not found")?;
-        dev.out(addr, val)
+        let dev = self
+            .devs
+            .iter()
+            .find(|&x| addr >= x.start && addr <= x.end)
+            .ok_or("Out address not found")?;
+        dev.dev.out(addr, val)
     }
     pub fn input(&self, addr: u16) -> Result<u8, String> {
-        let dev = self.map.get(&addr).ok_or("In address not found")?;
-        dev.input(addr)
+        let dev = self
+            .devs
+            .iter()
+            .find(|&x| addr >= x.start && addr <= x.end)
+            .ok_or("In address not found")?;
+        dev.dev.input(addr)
     }
 }
 
