@@ -829,7 +829,7 @@ fn mem_block_copy(r: &mut Regs, mem: &mut mem::Memory, inc: i8) {
     r.set_flag(Flag::PV, bc != 0);
 }
 
-fn mem_block_cmp(r: &mut Regs, mem: &mut mem::Memory, inc: i8) {
+fn mem_block_cmp(r: &mut Regs, mem: &mut mem::Memory, inc: i8) -> bool {
     let hl = r.get_regpair(RegPair::HL);
     let bc = r.get_regpair(RegPair::BC).wrapping_sub(1);
     let a = r.A as i8;
@@ -843,6 +843,39 @@ fn mem_block_cmp(r: &mut Regs, mem: &mut mem::Memory, inc: i8) {
     r.set_regpair(RegPair::BC, bc);
     // MEMPTR = MEMPTR + 1
     r.MEMPTR = r.MEMPTR.wrapping_add(inc as u16);
+
+    val == a
+}
+
+fn mem_block_copy_repeat(r: &mut Regs, op_len: &mut usize) -> bool {
+    let bc = r.get_regpair(RegPair::BC);
+    if bc == 0 {
+        return true;
+    }
+    // add looping tstate
+    *op_len += 5;
+    r.MEMPTR = r.PC.wrapping_add(1);
+    false
+}
+
+fn mem_block_cmp_repeat(r: &mut Regs, mem: &mut mem::Memory, inc: i8, op_len: &mut usize) -> bool {
+    let found = mem_block_cmp(r, mem, inc);
+    let bc = r.get_regpair(RegPair::BC);
+    if bc == 0 || found {
+        return true;
+    }
+    // add looping tstate
+    *op_len += 5;
+    r.MEMPTR = r.PC.wrapping_add(1);
+    false
+}
+
+fn io_block_repeat(r: &Regs, op_len: &mut usize) -> bool {
+    if r.B == 0 {
+        return true;
+    }
+    *op_len += 5;
+    false
 }
 
 pub fn init() -> State<'static> {
@@ -1492,13 +1525,47 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.MEMPTR = addr.wrapping_add(1);
         }
         Instruction::LDI => mem_block_copy(&mut s.r, &mut s.mem, 1),
+        Instruction::LDIR => {
+            mem_block_copy(&mut s.r, &mut s.mem, 1);
+            update_pc = mem_block_copy_repeat(&mut s.r, &mut op_len);
+        }
         Instruction::LDD => mem_block_copy(&mut s.r, &mut s.mem, -1),
-        Instruction::CPI => mem_block_cmp(&mut s.r, &mut s.mem, 1),
-        Instruction::CPD => mem_block_cmp(&mut s.r, &mut s.mem, -1),
+        Instruction::LDDR => {
+            mem_block_copy(&mut s.r, &mut s.mem, -1);
+            update_pc = mem_block_copy_repeat(&mut s.r, &mut op_len);
+        }
+        Instruction::CPI => {
+            mem_block_cmp(&mut s.r, &mut s.mem, 1);
+        }
+        Instruction::CPIR => {
+            update_pc = mem_block_cmp_repeat(&mut s.r, &mut s.mem, 1, &mut op_len);
+        }
+        Instruction::CPD => {
+            mem_block_cmp(&mut s.r, &mut s.mem, -1);
+        }
+        Instruction::CPDR => {
+            update_pc = mem_block_cmp_repeat(&mut s.r, &mut s.mem, -1, &mut op_len);
+        }
         Instruction::INI => input_block(s, 1),
+        Instruction::INIR => {
+            input_block(s, 1);
+            update_pc = io_block_repeat(&s.r, &mut op_len);
+        }
         Instruction::IND => input_block(s, -1),
+        Instruction::INDR => {
+            input_block(s, -1);
+            update_pc = io_block_repeat(&s.r, &mut op_len);
+        }
         Instruction::OUTI => output_block(s, 1),
+        Instruction::OTIR => {
+            output_block(s, 1);
+            update_pc = io_block_repeat(&s.r, &mut op_len);
+        }
         Instruction::OUTD => output_block(s, -1),
+        Instruction::OTDR => {
+            output_block(s, -1);
+            update_pc = io_block_repeat(&s.r, &mut op_len);
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     memptr_index(op, &mut s.r);
