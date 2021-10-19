@@ -860,11 +860,11 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         };
     }
     let start_f = s.r.F;
-    let mut ret = |r: &mut Regs, mem: &mem::Memory| {
+    let ret = |r: &mut Regs, mem: &mem::Memory, update_pc: &mut bool| {
         r.PC = mem.fetch_u16(r.SP);
         r.SP = r.SP.wrapping_add(2);
         r.MEMPTR = r.PC;
-        update_pc = false;
+        *update_pc = false;
     };
     match op.ins {
         Instruction::ADD => {
@@ -1227,7 +1227,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 }
             }
             if jump {
-                ret(&mut s.r, &s.mem);
+                ret(&mut s.r, &s.mem, &mut update_pc);
             }
         }
         Instruction::POP => {
@@ -1461,11 +1461,11 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.A = res;
         }
         Instruction::RETN => {
-            ret(&mut s.r, &s.mem);
+            ret(&mut s.r, &s.mem, &mut update_pc);
             s.r.IFF1 = s.r.IFF2;
         }
         Instruction::RETI => {
-            ret(&mut s.r, &s.mem);
+            ret(&mut s.r, &s.mem, &mut update_pc);
         }
         Instruction::IM => {
             let op1 = op.op1.ok_or("IM missing op1")?;
