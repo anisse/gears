@@ -725,9 +725,9 @@ fn daa(r: &mut Regs) {
     let cp = daa_cf(c, hi, lo).expect("DAA C' not found, should never happen");
     let hp = daa_hf(n, h, lo).expect("DAA H' not found, should never happen");
     if n == 0 {
-        r.A += diff;
+        r.A = r.A.wrapping_add(diff);
     } else {
-        r.A -= diff;
+        r.A = r.A.wrapping_sub(diff);
     }
     r.set_flag(Flag::C, cp);
     r.set_flag(Flag::H, hp);
