@@ -266,9 +266,9 @@ impl io::Device for ZxSpectrumIODevice {
 }
 
 #[test]
-fn run_instructions() {
     let mut cpu = cpu::init();
 
+fn fuse_tests() {
     let tests = parse_tests(
         include_str!("z80-tests/tests.in"),
         include_str!("z80-tests/tests.expected"),
