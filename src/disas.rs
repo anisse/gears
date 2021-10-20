@@ -188,6 +188,8 @@ pub enum Instruction {
     OTIR,
     OUTD,
     OTDR,
+    DI,
+    EI,
 }
 
 #[derive(PartialEq, Clone)]
@@ -771,6 +773,10 @@ fn disas_one_byte(ins: u8) -> Option<OpCode> {
                 ..nop
             })
         }
+        0xF3 => Some(OpCode {
+            ins: Instruction::DI,
+            ..nop
+        }),
         0xF9 => {
             // LD SP, HL
             Some(OpCode {
@@ -781,6 +787,10 @@ fn disas_one_byte(ins: u8) -> Option<OpCode> {
                 ..nop
             })
         }
+        0xFB => Some(OpCode {
+            ins: Instruction::EI,
+            ..nop
+        }),
         _ => None,
     }
 }

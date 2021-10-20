@@ -1566,6 +1566,14 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             output_block(s, -1);
             update_pc = io_block_repeat(&s.r, &mut op_len);
         }
+        Instruction::DI => {
+            s.r.IFF1 = false;
+            s.r.IFF2 = false;
+        }
+        Instruction::EI => {
+            s.r.IFF1 = true;
+            s.r.IFF2 = true;
+        }
         _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     memptr_index(op, &mut s.r);
