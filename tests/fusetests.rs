@@ -268,8 +268,8 @@ impl io::Device for ZxSpectrumIODevice {
 #[test]
 fn fuse_tests() {
     let tests = parse_tests(
-        include_str!("z80-tests/tests.in"),
-        include_str!("z80-tests/tests.expected"),
+        include_str!("fusetests/tests.in"),
+        include_str!("fusetests/tests.expected"),
     )
     .unwrap();
 
