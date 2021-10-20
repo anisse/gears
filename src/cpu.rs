@@ -1576,7 +1576,6 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.IFF1 = true;
             s.r.IFF2 = true;
         }
-        _ => return Err(format!("Unsupported opcode {:?}", op.ins)),
     }
     memptr_index(op, &mut s.r);
     if start_f != s.r.F {
