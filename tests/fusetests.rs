@@ -266,8 +266,6 @@ impl io::Device for ZxSpectrumIODevice {
 }
 
 #[test]
-    let mut cpu = cpu::init();
-
 fn fuse_tests() {
     let tests = parse_tests(
         include_str!("z80-tests/tests.in"),
@@ -291,6 +289,5 @@ fn fuse_tests() {
         dbg!(t);
         cpu::run(&mut state, t.tstate_to_run as usize).unwrap();
         assert_eq!(state, end_state, "test {}", t.desc);
-        //assert_eq!(state.mem, mem_result);
     }
 }
