@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 
 pub trait Device {
     // XXX: maybe use upper 8 bits of address bus ? we don't need it for now
