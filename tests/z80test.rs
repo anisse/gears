@@ -27,7 +27,7 @@ fn z80full() {
     state.r.PC = load_addr;
     let mut msg = String::new();
     loop {
-        cpu::run(&mut state, 1).unwrap();
+        cpu::run(&mut state, 1, false).unwrap();
 
         if state.r.PC == 0x0000 {
             println!();

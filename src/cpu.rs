@@ -1588,13 +1588,15 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
     Ok(op_len)
 }
 
-pub fn run(s: &mut State, tstates_len: usize) -> Result<(), String> {
+pub fn run(s: &mut State, tstates_len: usize, debug: bool) -> Result<(), String> {
     let mut tstates_len = tstates_len;
     while tstates_len > 0 {
         // TODO: split into m states, fetch etc
         let disas_target = s.mem.fetch_range_safe(s.r.PC, 4);
         if let Some(op) = disas::disas(disas_target) {
-            println!("{:04X}: {:?}", s.r.PC, op);
+            if debug {
+                println!("{:04X}: {:?}", s.r.PC, op);
+            }
             let op_len = run_op(s, &op)?;
             tstates_len = usize::saturating_sub(tstates_len, op_len);
         } else {
@@ -1612,7 +1614,7 @@ mod tests {
         s.r.A = 1;
         let default = Regs::default();
         s.mem = mem::Memory::from(vec![0x87]);
-        run(&mut s, 1).unwrap();
+        run(&mut s, 1, true).unwrap();
         assert_eq!(
             s.r,
             Regs {
@@ -1626,7 +1628,7 @@ mod tests {
         s.r = default;
         s.r.A = 64;
         s.mem.set_u8(0, 0x87); // same instruction
-        run(&mut s, 1).unwrap();
+        run(&mut s, 1, true).unwrap();
         assert_eq!(
             s.r,
             Regs {
@@ -1640,7 +1642,7 @@ mod tests {
         s.r = default;
         s.r.A = -1_i8 as u8;
         s.mem.set_u8(0, 0x87); // same instruction
-        run(&mut s, 1).unwrap();
+        run(&mut s, 1, true).unwrap();
         assert_eq!(
             s.r,
             Regs {

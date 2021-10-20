@@ -26,5 +26,5 @@ pub fn main() {
     let mut cpu = cpu::init();
     cpu.mem = mem::Memory::from(data);
     cpu.io = io::IO::new();
-    cpu::run(&mut cpu, 9999999999).unwrap();
+    cpu::run(&mut cpu, 9999999999, false).unwrap();
 }

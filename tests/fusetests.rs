@@ -287,7 +287,7 @@ fn fuse_tests() {
         state.io.register(0, 62464, &mut dev);
 
         dbg!(t);
-        cpu::run(&mut state, t.tstate_to_run as usize).unwrap();
+        cpu::run(&mut state, t.tstate_to_run as usize, true).unwrap();
         assert_eq!(state, end_state, "test {}", t.desc);
     }
 }
