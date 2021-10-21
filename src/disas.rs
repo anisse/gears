@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use std::{convert::TryInto, fmt};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -292,6 +293,43 @@ fn decode_operand_cond_cc(arg: u8) -> FlagCondition {
         6 => FlagCondition::P,
         7 => FlagCondition::M,
         _ => unreachable!(),
+    }
+}
+
+const CACHE_SIZE: usize = 256;
+#[derive(Debug, PartialEq, Clone)]
+pub struct DisasCache {
+    cache: [Option<Rc<OpCode>>; CACHE_SIZE],
+}
+
+impl DisasCache {
+    pub fn init() -> DisasCache {
+        const INIT: Option<Rc<OpCode>> = None;
+        let mut dc = DisasCache {
+            cache: [INIT; CACHE_SIZE],
+        };
+
+        for (i, c) in dc.cache.iter_mut().enumerate() {
+            let ins = [(i & 0xFF) as u8]; //, ((i >> 8) & 0xFF) as u8];
+            let opcode = disas(&ins);
+            if opcode == None {
+                continue;
+            }
+            if let Some(op) = opcode {
+                if op.length == 1 {
+                    *c = Some(Rc::new(op));
+                }
+            }
+        }
+        //dbg!(&dc.cache);
+        dc
+    }
+    pub fn disas(&self, ins: &[u8]) -> Option<Rc<OpCode>> {
+        let i = ins[0] as usize; // | (ins[1] as usize) << 8;
+        if let Some(ref o) = self.cache[i] {
+            return Some(Rc::clone(o));
+        }
+        disas(ins).map(Rc::new)
     }
 }
 

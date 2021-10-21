@@ -1603,6 +1603,29 @@ pub fn run(s: &mut State, tstates_len: usize, debug: bool) -> Result<(), String>
     }
     Ok(())
 }
+pub use disas::DisasCache;
+pub fn run_cached(
+    c: &disas::DisasCache,
+    s: &mut State,
+    tstates_len: usize,
+    debug: bool,
+) -> Result<(), String> {
+    let mut tstates_len = tstates_len;
+    while tstates_len > 0 {
+        // TODO: split into m states, fetch etc
+        let disas_target = s.mem.fetch_range_safe(s.r.PC, 4);
+        if let Some(op) = c.disas(disas_target) {
+            if debug {
+                println!("{:04X}: {:?}", s.r.PC, op);
+            }
+            let op_len = run_op(s, &op)?;
+            tstates_len = usize::saturating_sub(tstates_len, op_len);
+        } else {
+            return Err(format!("Unknown instruction(s)) {:02X?}", disas_target));
+        }
+    }
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use crate::cpu::*;

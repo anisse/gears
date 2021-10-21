@@ -8,6 +8,7 @@ use gears::{cpu, mem};
 #[ignore]
 fn z80full() {
     let prog = include_bytes!("z80test/z80full.tap");
+    let cache = gears::cpu::DisasCache::init();
 
     let mut state = cpu::init();
     state.mem = mem::Memory::init(64 * 1024); // This test suite is for machines with more RAM
@@ -27,7 +28,7 @@ fn z80full() {
     state.r.PC = load_addr;
     let mut msg = String::new();
     loop {
-        cpu::run(&mut state, 1, false).unwrap();
+        cpu::run_cached(&cache, &mut state, 1, false).unwrap();
 
         if state.r.PC == 0x0000 {
             println!();
