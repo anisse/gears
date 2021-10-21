@@ -735,8 +735,8 @@ fn daa(r: &mut Regs) {
     copy_f53_res(r.A, r);
 }
 fn copy_f53_res(res: u8, r: &mut Regs) {
-    r.set_flag(Flag::F5, res & (1 << 5) != 0);
-    r.set_flag(Flag::F3, res & (1 << 3) != 0);
+    r.set_flag(Flag::F5, res & F5 != 0);
+    r.set_flag(Flag::F3, res & F3 != 0);
 }
 
 fn set_bitops_flags(res: u8, r: &mut Regs) {
@@ -1208,8 +1208,8 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 copy_f53_res(s.r.A, &mut s.r);
             } else {
                 // OR instead
-                s.r.set_flag(Flag::F5, ((s.r.A & (1 << 5)) | (s.r.F & (1 << 5))) != 0);
-                s.r.set_flag(Flag::F3, ((s.r.A & (1 << 3)) | (s.r.F & (1 << 3))) != 0);
+                s.r.set_flag(Flag::F5, ((s.r.A & F5) | (s.r.F & F5)) != 0);
+                s.r.set_flag(Flag::F3, ((s.r.A & F3) | (s.r.F & F3)) != 0);
             }
         }
         Instruction::CCF => {
@@ -1220,8 +1220,8 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 copy_f53_res(s.r.A, &mut s.r);
             } else {
                 // OR instead
-                s.r.set_flag(Flag::F5, ((s.r.A & (1 << 5)) | (s.r.F & (1 << 5))) != 0);
-                s.r.set_flag(Flag::F3, ((s.r.A & (1 << 3)) | (s.r.F & (1 << 3))) != 0);
+                s.r.set_flag(Flag::F5, ((s.r.A & F5) | (s.r.F & F5)) != 0);
+                s.r.set_flag(Flag::F3, ((s.r.A & F3) | (s.r.F & F3)) != 0);
             }
         }
         Instruction::HALT => {
