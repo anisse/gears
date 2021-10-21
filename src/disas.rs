@@ -350,9 +350,6 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
     if ins.len() < 2 {
         return None;
     }
-    if let Some(opcode) = disas_dd_fd_prefix(ins) {
-        return Some(opcode);
-    }
     if let Some(opcode) = disas_two_bytes_mask(ins[0], ins[1]) {
         return Some(opcode);
     }
@@ -370,6 +367,11 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
     }
     if ins.len() < 4 {
         return None;
+    }
+    if let Some(opcode) = disas_dd_fd_prefix(ins) {
+        // TODO: dd and fd prefix length instructions can go from 2 to 4 bytes, we might miss
+        // instructions by disassembling only for 4 here
+        return Some(opcode);
     }
     let ins4 = ins[0..4]
         .try_into()
