@@ -1220,8 +1220,8 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 copy_f53_res(s.r.A, &mut s.r);
             } else {
                 // OR instead
-                s.r.set_flag(Flag::F5, (s.r.A & (1 << 5) | (s.r.F & (1 << 5))) != 0);
-                s.r.set_flag(Flag::F3, (s.r.A & (1 << 3) | (s.r.F & (1 << 3))) != 0);
+                s.r.set_flag(Flag::F5, ((s.r.A & (1 << 5)) | (s.r.F & (1 << 5))) != 0);
+                s.r.set_flag(Flag::F3, ((s.r.A & (1 << 3)) | (s.r.F & (1 << 3))) != 0);
             }
         }
         Instruction::HALT => {
@@ -1578,9 +1578,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         }
     }
     memptr_index(op, &mut s.r);
-    if start_f != s.r.F {
-        s.q.changed = true;
-    }
+    s.q.changed = start_f != s.r.F || op.ins == Instruction::SCF;
     if update_pc {
         s.r.PC += op.length as u16;
     }
