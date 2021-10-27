@@ -232,6 +232,9 @@ impl Regs {
             self.F &= !(1 << shift);
         }
     }
+    fn get_flag(&self, f: Flag) -> bool {
+        self.F & f as u8 != 0
+    }
 }
 
 fn flag(s: &str, f: u8) -> &str {
@@ -510,230 +513,28 @@ fn cond_valid(r: &Regs, fc: disas::FlagCondition) -> bool {
         disas::FlagCondition::M => r.F & S != 0,
     }
 }
-
-fn daa_diff(c: u8, h: u8, lo: u8, hi: u8) -> Option<u8> {
-    // Tables from Stefano Donati via Sean Young's Z80 Undocumented
-    let diff_table = [
-        vec![
-            // CF = 0
-            (
-                // high nibble
-                0..=9,
-                [
-                    // HF = 0
-                    (
-                        // low nibble
-                        0..=9,
-                        0_u8, // diff
-                    ),
-                    // HF = 1
-                    (
-                        // low nibble
-                        0..=9,
-                        6_u8, // diff
-                    ),
-                ],
-            ),
-            (
-                0..=8,
-                [
-                    // HF = 0
-                    (
-                        // low nibble
-                        0xa..=0xf,
-                        6_u8, // diff
-                    ),
-                    // HF = 1
-                    (
-                        // low nibble
-                        0xa..=0xf,
-                        6_u8, // diff
-                    ),
-                ],
-            ),
-            (
-                0xa..=0xf,
-                [
-                    // HF = 0
-                    (
-                        // low nibble
-                        0..=9,
-                        0x60_u8, // diff
-                    ),
-                    // HF = 1
-                    (
-                        // low nibble
-                        0..=9,
-                        0x66_u8, // diff
-                    ),
-                ],
-            ),
-            (
-                0x9..=0xf,
-                [
-                    // HF = 0
-                    (
-                        // low nibble
-                        0xa..=0xf,
-                        0x66_u8, // diff
-                    ),
-                    // HF = 1
-                    (
-                        // low nibble
-                        0xa..=0xf,
-                        0x66_u8, // diff
-                    ),
-                ],
-            ),
-        ],
-        vec![
-            // CF = 1
-            (
-                // high nibble
-                0..=0xf,
-                [
-                    // HF = 0
-                    (
-                        // low nibble
-                        0..=9,
-                        0x60_u8, // diff
-                    ),
-                    // HF = 1
-                    (
-                        // low nibble
-                        0..=9,
-                        0x66_u8, // diff
-                    ),
-                ],
-            ),
-            (
-                0..=0xf,
-                [
-                    // HF = 0
-                    (
-                        // low nibble
-                        0xa..=0xf,
-                        0x66_u8, // diff
-                    ),
-                    // HF = 1
-                    (
-                        // low nibble
-                        0xa..=0xf,
-                        0x66_u8, // diff
-                    ),
-                ],
-            ),
-        ],
-    ];
-    for i in diff_table[c as usize].iter() {
-        // c
-        if (*i).0.contains(&hi) {
-            // high nibble
-            // h
-            let arr = &i.1[h as usize];
-            if arr.0.contains(&lo) {
-                // low nibble
-                return Some(arr.1);
-            }
-        }
-    }
-    None
-}
-fn daa_cf(c: u8, hi: u8, lo: u8) -> Option<bool> {
-    if c != 0 {
-        return Some(true);
-    }
-    let table = [
-        (0..=9, 0..=9, false),
-        (0..=8, 0xa..=0xf, false),
-        (9..=0xf, 0xa..=0xf, true),
-        (0xa..=0xf, 0..=9, true),
-    ];
-    for i in table.iter() {
-        if i.0.contains(&hi) && i.1.contains(&lo) {
-            return Some(i.2);
-        }
-    }
-    None
-}
-
-fn daa_hf(n: u8, h: u8, lo: u8) -> Option<bool> {
-    struct HTable {
-        n: u8,
-        h: u8,
-        lo: std::ops::RangeInclusive<u8>,
-        hp: bool,
-    }
-    let table = [
-        HTable {
-            n: 0,
-            h: 0,
-            lo: 0..=9,
-            hp: false,
-        },
-        HTable {
-            n: 0,
-            h: 1,
-            lo: 0..=9,
-            hp: false,
-        },
-        HTable {
-            n: 0,
-            h: 0,
-            lo: 0xa..=0xf,
-            hp: true,
-        },
-        HTable {
-            n: 0,
-            h: 1,
-            lo: 0xa..=0xf,
-            hp: true,
-        },
-        HTable {
-            n: 1,
-            h: 0,
-            lo: 0..=0xf,
-            hp: false,
-        },
-        HTable {
-            n: 1,
-            h: 1,
-            lo: 6..=0xf,
-            hp: false,
-        },
-        HTable {
-            n: 1,
-            h: 1,
-            lo: 0..=5,
-            hp: true,
-        },
-    ];
-    for l in table.iter() {
-        if n == l.n && h == l.h && l.lo.contains(&lo) {
-            return Some(l.hp);
-        }
-    }
-    None
-}
 fn daa(r: &mut Regs) {
-    let c = r.F & C;
-    let h = (r.F & H) >> 4;
+    let c = r.get_flag(Flag::C);
+    let h = r.get_flag(Flag::H);
     let lo = r.A & 0xF;
-    let hi = (r.A >> 4) & 0xF;
-    let n = (r.F & N) >> 1;
-    let diff = daa_diff(c, h, lo, hi).expect("DAA diff not found, should never happen");
-    let cp = daa_cf(c, hi, lo).expect("DAA C' not found, should never happen");
-    let hp = daa_hf(n, h, lo).expect("DAA H' not found, should never happen");
-    if n == 0 {
+    let n = r.get_flag(Flag::N);
+    let diff_lo = lo > 9 || h;
+    let diff_hi = c || r.A > 0x99;
+    let diff = if diff_lo { 0x6 } else { 0 } + if diff_hi { 0x60 } else { 0 };
+    if !n {
         r.A = r.A.wrapping_add(diff);
     } else {
         r.A = r.A.wrapping_sub(diff);
     }
-    r.set_flag(Flag::C, cp);
+    r.set_flag(Flag::C, diff_hi);
+    let hp = (!n && lo > 9) || (n && h && lo < 6);
     r.set_flag(Flag::H, hp);
     r.set_flag(Flag::S, (r.A & 0x80) != 0);
     copy_f53_res(r.A, r);
+    r.set_flag(Flag::PV, r.A.count_ones() & 1 == 0);
+    r.set_flag(Flag::Z, r.A == 0);
 }
+
 fn copy_f53_res(res: u8, r: &mut Regs) {
     r.set_flag(Flag::F5, res & F5 != 0);
     r.set_flag(Flag::F3, res & F3 != 0);
