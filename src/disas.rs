@@ -1,5 +1,5 @@
+use std::fmt;
 use std::rc::Rc;
-use std::{convert::TryInto, fmt};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Reg8 {
@@ -43,7 +43,7 @@ impl RegI {
     }
 }
 impl fmt::Display for RegI {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             RegI::IX(d) => write!(f, "(IX{:+})", d),
             RegI::IY(d) => write!(f, "(IY{:+})", d),
@@ -103,7 +103,7 @@ impl Operand {
 }
 
 impl fmt::Display for Operand {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Operand::Imm8(x) => write!(f, "{:02X}", x),
             Operand::Imm16(x) => write!(f, "{:04X}", x),
@@ -205,7 +205,7 @@ pub struct OpCode {
 }
 
 impl fmt::Display for OpCode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let op1 = if let Some(x) = self.op1 {
             format!("{}", x)
         } else {
@@ -226,7 +226,7 @@ impl fmt::Display for OpCode {
 }
 
 impl fmt::Debug for OpCode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for i in self.data.iter() {
             write!(f, "{:02X} ", i)?
         }
@@ -309,8 +309,7 @@ impl DisasCache {
         };
 
         for (i, c) in dc.cache.iter_mut().enumerate() {
-            let ins = [(i & 0xFF) as u8]; //, ((i >> 8) & 0xFF) as u8];
-            let opcode = disas(&ins);
+            let opcode = disas(&[i as u8]);
             if opcode == None {
                 continue;
             }
@@ -337,204 +336,181 @@ pub fn disas(ins: &[u8]) -> Option<OpCode> {
     if ins.is_empty() {
         return None;
     }
-    if let Some(opcode) = disas_one_byte_shift3(ins[0]) {
-        return Some(opcode);
-    }
-    if let Some(opcode) = disas_one_byte_mask(ins[0]) {
-        return Some(opcode);
-    }
-    if let Some(opcode) = disas_one_byte(ins[0]) {
-        return Some(opcode);
-    }
-    if ins.len() < 2 {
-        return None;
-    }
-    if let Some(opcode) = disas_two_bytes_mask(ins[0], ins[1]) {
-        return Some(opcode);
-    }
-    if let Some(opcode) = disas_two_bytes(ins[0..2].try_into().expect("slice into fail")) {
-        return Some(opcode);
-    }
-    if ins.len() < 3 {
-        return None;
-    }
-    if let Some(opcode) = disas_three_bytes_mask(ins[0], ins[1], ins[2]) {
-        return Some(opcode);
-    }
-    if let Some(opcode) = disas_three_bytes(ins[0], ins[1], ins[2]) {
-        return Some(opcode);
-    }
-    if ins.len() < 4 {
-        return None;
-    }
-    if let Some(opcode) = disas_dd_fd_prefix(ins) {
-        // TODO: dd and fd prefix length instructions can go from 2 to 4 bytes, we might miss
-        // instructions by disassembling only for 4 here
-        return Some(opcode);
-    }
-    let ins4 = ins[0..4]
-        .try_into()
-        .expect("slice to array fail should not happen, size was checked");
-    if let Some(opcode) = disas_ddcb_fdcb_prefix(ins4) {
-        return Some(opcode);
-    }
-    if let Some(opcode) = disas_four_bytes_mask(ins4) {
-        return Some(opcode);
-    }
-    /* By default the CPU act as NOPs */
-    Some(OpCode {
-        data: vec![ins[0]],
+    let mut opcode = OpCode {
+        data: ins[..if ins.len() > 4 { 4 } else { ins.len() }].to_vec(),
         length: 1,
         ins: Instruction::NOP,
         op1: None,
         op2: None,
         op3: None,
-        tstates: vec![4],
-    })
+        tstates: Vec::new(),
+    };
+    if disas_ref(ins, &mut opcode) {
+        opcode.data.truncate(opcode.length as usize);
+        Some(opcode)
+    } else {
+        None
+    }
+}
+fn disas_ref(ins: &[u8], opcode: &mut OpCode) -> bool {
+    if ins.is_empty() {
+        return false;
+    }
+    if disas_one_byte_shift3(ins[0], opcode) {
+        return true;
+    }
+    if disas_one_byte_mask(ins[0], opcode) {
+        return true;
+    }
+    if disas_one_byte(ins[0], opcode) {
+        return true;
+    }
+    if ins.len() < 2 {
+        return false;
+    }
+    if disas_two_bytes_mask(ins[0], ins[1], opcode) {
+        return true;
+    }
+    if disas_two_bytes(&ins[..2], opcode) {
+        return true;
+    }
+    if ins.len() < 3 {
+        return false;
+    }
+    if disas_three_bytes_mask(ins, opcode) {
+        return true;
+    }
+    if disas_three_bytes(ins, opcode) {
+        return true;
+    }
+    if ins.len() < 4 {
+        return false;
+    }
+    if disas_dd_fd_prefix(ins, opcode) {
+        // TODO: dd and fd prefix length instructions can go from 2 to 4 bytes, we might miss
+        // instructions by disassembling only for 4 here
+        return true;
+    }
+    if disas_ddcb_fdcb_prefix(ins, opcode) {
+        return true;
+    }
+    if disas_four_bytes_mask(ins, opcode) {
+        return true;
+    }
+    /* By default the CPU act as NOPs */
+    opcode.length = 1;
+    opcode.ins = Instruction::NOP;
+    if opcode.tstates.is_empty() {
+        opcode.tstates.push(4);
+    }
+    true
 }
 
-fn disas_one_byte_shift3(ins: u8) -> Option<OpCode> {
+fn disas_one_byte_shift3(ins: u8, opcode: &mut OpCode) -> bool {
     let arg = ins & 0x7;
-    let add8 = OpCode {
-        data: vec![ins],
-        length: 1,
-        ins: Instruction::ADD,
-        op1: Some(Operand::Reg8(Reg8::A)),
-        op2: Some(decode_operand_reg_r_hladdr(arg)),
-        op3: None,
-        tstates: match arg {
-            0x6 => vec![4, 3],
-            _ => vec![4],
-        },
+    fn alu8_base(opcode: &mut OpCode, ins: Instruction, arg: u8) -> bool {
+        opcode.length = 1;
+        opcode.ins = ins;
+        opcode.tstates.extend_from_slice(match arg {
+            0x6 => &[4, 3],
+            _ => &[4],
+        });
+        true
+    }
+    let alu8 = |opcode: &mut OpCode, ins: Instruction| -> bool {
+        opcode.op1 = Some(Operand::Reg8(Reg8::A));
+        opcode.op2 = Some(decode_operand_reg_r_hladdr(arg));
+        alu8_base(opcode, ins, arg)
     };
-    let sub8 = OpCode {
-        op1: add8.op2,
-        op2: None,
-        ins: Instruction::SUB,
-        ..add8.clone()
+    let alu8a = |opcode: &mut OpCode, ins: Instruction| -> bool {
+        opcode.op1 = Some(decode_operand_reg_r_hladdr(arg));
+        alu8_base(opcode, ins, arg)
     };
     match ins >> 3 {
         0x10 => {
             // ADD a, r
             // ADD a, (HL)
-            Some(add8)
+            alu8(opcode, Instruction::ADD)
         }
         0x11 => {
             //ADC a, r
             //ADC a, (HL)
-            let opcode = OpCode {
-                ins: Instruction::ADC,
-                ..add8
-            };
-            Some(opcode)
+            alu8(opcode, Instruction::ADC)
         }
         0x12 => {
             // SUB A, r
             // SUB A, (HL)
-            Some(sub8)
+            alu8a(opcode, Instruction::SUB)
         }
         0x13 => {
             // SBC A, r
             // SBC A, (HL)
-            let opcode = OpCode {
-                ins: Instruction::SBC,
-                ..add8
-            };
-            Some(opcode)
+            alu8(opcode, Instruction::SBC)
         }
         0x14 => {
             // AND A, r
             // AND A, (HL)
-            let opcode = OpCode {
-                ins: Instruction::AND,
-                ..sub8
-            };
-            Some(opcode)
+            alu8a(opcode, Instruction::AND)
         }
         0x16 => {
             // OR A, r
             // OR A, (HL)
-            let opcode = OpCode {
-                ins: Instruction::OR,
-                ..sub8
-            };
-            Some(opcode)
+            alu8a(opcode, Instruction::OR)
         }
         0x15 => {
             // XOR A, r
             // XOR A, (HL)
-            let opcode = OpCode {
-                ins: Instruction::XOR,
-                ..sub8
-            };
-            Some(opcode)
+            alu8a(opcode, Instruction::XOR)
         }
         0x17 => {
-            // XOR A, r
-            // XOR A, (HL)
-            let opcode = OpCode {
-                ins: Instruction::CP,
-                ..sub8
-            };
-            Some(opcode)
+            // CP A, r
+            // CP A, (HL)
+            alu8a(opcode, Instruction::CP)
         }
-        _ => None,
+        _ => false,
     }
 }
-fn disas_one_byte_mask(ins: u8) -> Option<OpCode> {
+fn disas_one_byte_mask(ins: u8, opcode: &mut OpCode) -> bool {
     let reg = decode_operand_reg_ddss((ins >> 4) & 0x3);
-    let inc = OpCode {
-        data: vec![ins],
-        length: 1,
-        ins: Instruction::INC,
-        op1: Some(Operand::Reg16(reg)),
-        op2: None,
-        op3: None,
-        tstates: vec![6],
-    };
+    opcode.length = 1;
     match ins & 0xCF {
         0x03 => {
             // INC ss
-            return Some(inc);
+            opcode.ins = Instruction::INC;
+            opcode.op1 = Some(Operand::Reg16(reg));
+            opcode.tstates.push(6);
+            return true;
         }
         0x0B => {
             // DEC ss
-            return Some(OpCode {
-                ins: Instruction::DEC,
-                ..inc
-            });
+            opcode.ins = Instruction::DEC;
+            opcode.op1 = Some(Operand::Reg16(reg));
+            opcode.tstates.push(6);
+            return true;
         }
         0x09 => {
             // ADD HL, ss
-            return Some(OpCode {
-                data: vec![ins],
-                length: 1,
-                ins: Instruction::ADD,
-                op1: Some(Operand::Reg16(Reg16::HL)),
-                op2: Some(Operand::Reg16(reg)),
-                op3: None,
-                tstates: vec![4, 4, 3],
-            });
+            opcode.ins = Instruction::ADD;
+            opcode.op1 = Some(Operand::Reg16(Reg16::HL));
+            opcode.op2 = Some(Operand::Reg16(reg));
+            opcode.tstates.extend_from_slice(&[4, 4, 3]);
+            return true;
         }
         0xC1 => {
             // POP qq
             let reg = decode_operand_reg_qq((ins >> 4) & 0x3);
-            return Some(OpCode {
-                ins: Instruction::POP,
-                op1: Some(Operand::Reg16(reg)),
-                tstates: vec![4, 3, 3],
-                ..inc
-            });
+            opcode.ins = Instruction::POP;
+            opcode.op1 = Some(Operand::Reg16(reg));
+            opcode.tstates.extend_from_slice(&[4, 4, 3]);
+            return true;
         }
         0xC5 => {
-            // POP qq
+            // PUSH qq
             let reg = decode_operand_reg_qq((ins >> 4) & 0x3);
-            return Some(OpCode {
-                ins: Instruction::PUSH,
-                op1: Some(Operand::Reg16(reg)),
-                tstates: vec![5, 3, 3],
-                ..inc
-            });
+            opcode.ins = Instruction::PUSH;
+            opcode.op1 = Some(Operand::Reg16(reg));
+            opcode.tstates.extend_from_slice(&[4, 4, 3]);
+            return true;
         }
         _ => {}
     }
@@ -549,94 +525,68 @@ fn disas_one_byte_mask(ins: u8) -> Option<OpCode> {
             } else {
                 Instruction::DEC
             };
-            let tstates;
             let opraw = (ins >> 3) & 0x7;
             let op = decode_operand_reg_r_hladdr(opraw);
+            opcode.ins = typ;
+            opcode.op1 = Some(op);
             if opraw == 0x6 {
-                tstates = vec![4, 4, 3];
+                opcode.tstates.extend_from_slice(&[4, 4, 3]);
             } else {
-                tstates = vec![4];
+                opcode.tstates.push(4);
             }
-            let opcode = OpCode {
-                data: vec![ins],
-                length: 1,
-                ins: typ,
-                op1: Some(op),
-                op2: None,
-                op3: None,
-                tstates,
-            };
-            return Some(opcode);
+            return true;
         }
         0xC0 => {
             // RET cc
             let cond = decode_operand_cond_cc(ins >> 3 & 0x7);
-            return Some(OpCode {
-                ins: Instruction::RET,
-                op1: Some(Operand::FlagCondition(cond)),
-                tstates: vec![5, 3, 3], // warning: varies
-                ..inc
-            });
+            opcode.ins = Instruction::RET;
+            opcode.op1 = Some(Operand::FlagCondition(cond));
+            opcode.tstates.extend_from_slice(&[5, 3, 3]); // warning: varies
+            return true;
         }
         0xC7 => {
             // RST p
             let p =  ((ins >> 3) & 0x7) << 3;
-            return Some(OpCode {
-                ins: Instruction::RST,
-                op1: Some(Operand::Imm8(p)),
-                tstates: vec![5, 3, 3],
-                ..inc
-            });
+            opcode.ins = Instruction::RST;
+            opcode.op1 = Some(Operand::Imm8(p));
+            opcode.tstates.extend_from_slice(&[5, 3, 3]);
+            return true;
         }
         _ => {}
     }
     if ins >> 6 == 0x1 {
         // LD r, r'
-        // warning: decoding must be ater HALT, otherwise we'll have the non-existing instruction
         // LD (HL), (HL)
         let op1 = Some(decode_operand_reg_r_hladdr((ins >> 3) & 0x7));
         let op2 = Some(decode_operand_reg_r_hladdr(ins & 0x7));
         /* We detect HALT here as well so that caller does not depend on ordering of this function
          * with the other one */
         if op1 == Some(Operand::RegAddr(Reg16::HL)) && op1 == op2 {
-            return Some(OpCode {
-                ins: Instruction::HALT,
-                op1: None,
-                tstates: vec![4],
-                ..inc
-            });
+            opcode.ins = Instruction::HALT;
+            opcode.tstates.push(4);
+            return true;
         }
-        let tstates;
+        opcode.ins = Instruction::LD;
+        opcode.op1 = op1;
+        opcode.op2 = op2;
         if op1 == Some(Operand::RegAddr(Reg16::HL)) || op2 == Some(Operand::RegAddr(Reg16::HL)) {
-            tstates = vec![4, 3];
+            opcode.tstates.extend_from_slice(&[4, 3]);
         } else {
-            tstates = vec![4];
+            opcode.tstates.push(4);
         }
-        return Some(OpCode {
-            ins: Instruction::LD,
-            op1,
-            op2,
-            tstates,
-            ..inc
-        });
+        return true;
     }
-    None
+    false
 }
 
-fn disas_one_byte(ins: u8) -> Option<OpCode> {
-    let nop = OpCode {
-        data: vec![ins],
-        length: 1,
-        ins: Instruction::NOP,
-        op1: None,
-        op2: None,
-        op3: None,
-        tstates: vec![4],
-    };
+fn disas_one_byte(ins: u8, opcode: &mut OpCode) -> bool {
+    opcode.length = 1;
     match ins {
         0x00 => {
             // NOP
-            Some(nop)
+            opcode.ins = Instruction::NOP;
+            opcode.tstates.push(4);
+            true
         }
         0x02 | 0x12 => {
             // LD (BC), A
@@ -645,174 +595,142 @@ fn disas_one_byte(ins: u8) -> Option<OpCode> {
                 0x10 => Reg16::DE,
                 _ => Reg16::BC,
             };
-            Some(OpCode {
-                data: vec![ins],
-                length: 1,
-                ins: Instruction::LD,
-                op1: Some(Operand::RegAddr(reg)),
-                op2: Some(Operand::Reg8(Reg8::A)),
-                op3: None,
-                tstates: vec![4, 3],
-            })
+            opcode.ins = Instruction::LD;
+            opcode.op1 = Some(Operand::RegAddr(reg));
+            opcode.op2 = Some(Operand::Reg8(Reg8::A));
+            opcode.tstates.extend_from_slice(&[4, 3]);
+            true
         }
         0x07 => {
             // RLCA
-            Some(OpCode {
-                ins: Instruction::RLCA,
-                ..nop
-            })
+            opcode.ins = Instruction::RLCA;
+            opcode.tstates.push(4);
+            true
         }
         0x17 => {
             // RLA
-            Some(OpCode {
-                ins: Instruction::RLA,
-                ..nop
-            })
+            opcode.ins = Instruction::RLA;
+            opcode.tstates.push(4);
+            true
         }
         0x0F => {
             // RRCA
-            Some(OpCode {
-                ins: Instruction::RRCA,
-                ..nop
-            })
+            opcode.ins = Instruction::RRCA;
+            opcode.tstates.push(4);
+            true
         }
         0x1F => {
             // RRA
-            Some(OpCode {
-                ins: Instruction::RRA,
-                ..nop
-            })
+            opcode.ins = Instruction::RRA;
+            opcode.tstates.push(4);
+            true
         }
         0x08 | 0xEB | 0xE3 => {
             // EX AF, AF'
             // EX DE, HL
             // EX (SP), HL
-            let op1;
-            let op2;
-            let tstates;
+            opcode.ins = Instruction::EX;
             match ins {
                 0x08 => {
-                    op1 = Some(Operand::Reg16(Reg16::AF));
-                    op2 = Some(Operand::Reg16(Reg16::AFp));
-                    tstates = vec![4];
+                    opcode.op1 = Some(Operand::Reg16(Reg16::AF));
+                    opcode.op2 = Some(Operand::Reg16(Reg16::AFp));
+                    opcode.tstates.push(4);
                 }
                 0xEB => {
-                    op1 = Some(Operand::Reg16(Reg16::DE));
-                    op2 = Some(Operand::Reg16(Reg16::HL));
-                    tstates = vec![4];
+                    opcode.op1 = Some(Operand::Reg16(Reg16::DE));
+                    opcode.op2 = Some(Operand::Reg16(Reg16::HL));
+                    opcode.tstates.push(4);
                 }
                 0xE3 => {
-                    op1 = Some(Operand::RegAddr(Reg16::SP));
-                    op2 = Some(Operand::Reg16(Reg16::HL));
-                    tstates = vec![4, 3, 4, 3, 5];
+                    opcode.op1 = Some(Operand::RegAddr(Reg16::SP));
+                    opcode.op2 = Some(Operand::Reg16(Reg16::HL));
+                    opcode.tstates.extend_from_slice(&[4, 3, 4, 3, 5]);
                 }
                 _ => unreachable!(),
             }
-            Some(OpCode {
-                data: vec![ins],
-                length: 1,
-                ins: Instruction::EX,
-                op1,
-                op2,
-                op3: None,
-                tstates,
-            })
+            true
         }
         0x0A | 0x1A => {
             // LD A, (BC)
             // LD A, (DE)
-            let op2 = if ins == 0x0A {
+            opcode.ins = Instruction::LD;
+            opcode.op1 = Some(Operand::Reg8(Reg8::A));
+            opcode.op2 = if ins == 0x0A {
                 Some(Operand::RegAddr(Reg16::BC))
             } else {
                 Some(Operand::RegAddr(Reg16::DE))
             };
-            Some(OpCode {
-                data: vec![ins],
-                length: 1,
-                ins: Instruction::LD,
-                op1: Some(Operand::Reg8(Reg8::A)),
-                op2,
-                op3: None,
-                tstates: vec![4, 3],
-            })
+            opcode.tstates.extend_from_slice(&[4, 3]);
+            true
         }
         0x27 => {
             // DAA
-            Some(OpCode {
-                ins: Instruction::DAA,
-                ..nop
-            })
+            opcode.ins = Instruction::DAA;
+            opcode.tstates.push(4);
+            true
         }
         0x2F => {
             // CPL
-            Some(OpCode {
-                ins: Instruction::CPL,
-                ..nop
-            })
+            opcode.ins = Instruction::CPL;
+            opcode.tstates.push(4);
+            true
         }
         0x37 => {
             // SCF
-            Some(OpCode {
-                ins: Instruction::SCF,
-                ..nop
-            })
+            opcode.ins = Instruction::SCF;
+            opcode.tstates.push(4);
+            true
         }
         0x3F => {
             // CCF
-            Some(OpCode {
-                ins: Instruction::CCF,
-                ..nop
-            })
+            opcode.ins = Instruction::CCF;
+            opcode.tstates.push(4);
+            true
         }
         0x76 => {
             // HALT
-            Some(OpCode {
-                ins: Instruction::HALT,
-                ..nop
-            })
+            opcode.ins = Instruction::HALT;
+            opcode.tstates.push(4);
+            true
         }
         0xC9 => {
             //RET
-            Some(OpCode {
-                ins: Instruction::RET,
-                tstates: vec![4, 3, 3],
-                ..nop
-            })
+            opcode.ins = Instruction::RET;
+            opcode.tstates.extend_from_slice(&[4, 3, 3]);
+            true
         }
         0xD9 => {
             // EXX
-            Some(OpCode {
-                ins: Instruction::EXX,
-                ..nop
-            })
+            opcode.ins = Instruction::EXX;
+            opcode.tstates.push(4);
+            true
         }
         0xE9 => {
             // JP HL (no, not writing it JP (HL))
-            Some(OpCode {
-                ins: Instruction::JP,
-                op1: Some(Operand::Reg16(Reg16::HL)),
-                ..nop
-            })
+            opcode.ins = Instruction::JP;
+            opcode.op1 = Some(Operand::Reg16(Reg16::HL));
+            opcode.tstates.push(4);
+            true
         }
-        0xF3 => Some(OpCode {
-            ins: Instruction::DI,
-            ..nop
-        }),
+        0xF3 => {
+            opcode.ins = Instruction::DI;
+            opcode.tstates.push(4);
+            true
+        }
         0xF9 => {
             // LD SP, HL
-            Some(OpCode {
-                ins: Instruction::LD,
-                op1: Some(Operand::Reg16(Reg16::SP)),
-                op2: Some(Operand::Reg16(Reg16::HL)),
-                tstates: vec![6],
-                ..nop
-            })
+            opcode.ins = Instruction::LD;
+            opcode.op1 = Some(Operand::Reg16(Reg16::SP));
+            opcode.op2 = Some(Operand::Reg16(Reg16::HL));
+            opcode.tstates.push(6);
+            true
         }
-        0xFB => Some(OpCode {
-            ins: Instruction::EI,
-            ..nop
-        }),
-        _ => None,
+        0xFB => {
+            opcode.ins = Instruction::EI;
+            opcode.tstates.push(4);
+            true
+        }
+        _ => false,
     }
 }
 
@@ -877,7 +795,7 @@ fn replace_hl_op(op: &mut Operand, reg: Reg16) -> bool {
     }
 }
 
-fn disas_dd_fd_prefix(ins: &[u8]) -> Option<OpCode> {
+fn disas_dd_fd_prefix(ins: &[u8], opcode: &mut OpCode) -> bool {
     if (ins[0] == 0xDD || ins[0] == 0xFD) &&
         ins[1] != 0xCB /* DDCB */ &&
             ins[1] != 0xEB
@@ -889,11 +807,9 @@ fn disas_dd_fd_prefix(ins: &[u8]) -> Option<OpCode> {
             _ => unreachable!(),
         };
         // Disas by looking ahead and replacing an eventual HL
-        if let Some(mut opcode) = disas(&ins[1..ins.len()]) {
-            if replace_hl_addr(&mut opcode, reg, ins[2] as i8) {
+        if disas_ref(&ins[1..ins.len()], opcode) {
+            if replace_hl_addr(opcode, reg, ins[2] as i8) {
                 // update timings
-                opcode.data.insert(0, ins[0]);
-                opcode.data.insert(2, ins[2]);
                 opcode.length += 2;
                 opcode.tstates.insert(1, 4);
                 opcode.tstates.insert(2, 3);
@@ -901,88 +817,71 @@ fn disas_dd_fd_prefix(ins: &[u8]) -> Option<OpCode> {
                 /* Manual fix for LD (IX+d), n */
                 if let Some(Operand::Imm8(ref mut v)) = opcode.op2 {
                     *v = ins[3];
-                    opcode.data[3] = ins[3];
+                    //opcode.data[3] = ins[3];
                 }
-                return Some(opcode);
-            } else if replace_hl(&mut opcode, reg) {
+                return true;
+            } else if replace_hl(opcode, reg) {
                 // update timings
-                opcode.data.insert(0, ins[0]);
                 opcode.length += 1;
                 opcode.tstates.insert(1, 4);
-                return Some(opcode);
+                return true;
             }
         }
     }
-    None
+    false
 }
 
-fn disas_two_bytes_mask(ins1: u8, ins2: u8) -> Option<OpCode> {
+fn disas_two_bytes_mask(ins1: u8, ins2: u8, opcode: &mut OpCode) -> bool {
     match ins1 & 0xC7 {
         0x06 => {
             // LD r, n
             // LD (HL), n
-            let tstates;
             let opraw = (ins1 >> 3) & 0x7;
             let op = decode_operand_reg_r_hladdr(opraw);
+            opcode.length = 2;
+            opcode.ins = Instruction::LD;
+            opcode.op1 = Some(op);
+            opcode.op2 = Some(Operand::Imm8(ins2));
             if opraw == 0x6 {
-                tstates = vec![4, 3, 3];
+                opcode.tstates.extend_from_slice(&[4, 3, 3]);
             } else {
-                tstates = vec![4, 3];
+                opcode.tstates.extend_from_slice(&[4, 3]);
             }
-            let opcode = OpCode {
-                data: vec![ins1, ins2],
-                length: 2,
-                ins: Instruction::LD,
-                op1: Some(op),
-                op2: Some(Operand::Imm8(ins2)),
-                op3: None,
-                tstates,
-            };
-            Some(opcode)
+            true
         }
-        _ => None,
+        _ => false,
     }
 }
-fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
-    let sub8imm = OpCode {
-        data: vec![ins[0], ins[1]],
-        length: 2,
-        ins: Instruction::SUB,
-        op1: Some(Operand::Imm8(ins[1])),
-        op2: None,
-        op3: None,
-        tstates: vec![4, 3],
-    };
-    let add8imm = OpCode {
-        ins: Instruction::ADD,
-        op1: Some(Operand::Reg8(Reg8::A)),
-        op2: Some(Operand::Imm8(ins[1])),
-        ..sub8imm.clone()
-    };
+fn disas_two_bytes(ins: &[u8], opcode: &mut OpCode) -> bool {
+    fn alu8imm(data: &[u8], opcode: &mut OpCode, ins: Instruction) -> bool {
+        opcode.ins = ins;
+        opcode.op1 = Some(Operand::Imm8(data[1]));
+        opcode.tstates.extend_from_slice(&[4, 3]);
+        true
+    }
+    fn alu8aimm(data: &[u8], opcode: &mut OpCode, ins: Instruction) -> bool {
+        opcode.ins = ins;
+        opcode.op1 = Some(Operand::Reg8(Reg8::A));
+        opcode.op2 = Some(Operand::Imm8(data[1]));
+        opcode.tstates.extend_from_slice(&[4, 3]);
+        true
+    }
+
+    opcode.length = 2;
     match ins[0] {
         0x10 => {
             // DJNZ, e
-            return Some(OpCode {
-                data: vec![ins[0], ins[1]],
-                length: 2,
-                ins: Instruction::DJNZ,
-                op1: Some(Operand::RelAddr((ins[1] as i8) as i16 + 2)),
-                op2: None,
-                op3: None,
-                tstates: vec![5, 3, 5], // Warning: varies
-            });
+            opcode.ins = Instruction::DJNZ;
+            opcode.op1 = Some(Operand::RelAddr((ins[1] as i8) as i16 + 2));
+            opcode.tstates.extend_from_slice(&[5, 3, 5]); // Warning: varies
+            return true;
         }
         0x18 => {
             // JR e
-            return Some(OpCode {
-                data: vec![ins[0], ins[1]],
-                length: 2,
-                ins: Instruction::JR,
-                op1: Some(Operand::RelAddr((ins[1] as i8) as i16 + 2)),
-                op2: None,
-                op3: None,
-                tstates: vec![4, 3, 5], // Warning: varies
-            });
+            opcode.ins = Instruction::JR;
+            opcode.op1 = Some(Operand::RelAddr((ins[1] as i8) as i16 + 2));
+            opcode.tstates.extend_from_slice(&[4, 3, 5]); // Warning: varies
+            return true;
         }
         0x38 | 0x30 | 0x28 | 0x20 => {
             // JR C, e
@@ -996,359 +895,142 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
                 0x20 => FlagCondition::NZ,
                 _ => unreachable!(),
             };
-            return Some(OpCode {
-                data: vec![ins[0], ins[1]],
-                length: 2,
-                ins: Instruction::JR,
-                op1: Some(Operand::FlagCondition(cond)),
-                op2: Some(Operand::RelAddr((ins[1] as i8) as i16 + 2)),
-                op3: None,
-                tstates: vec![4, 3, 5], // Warning: varies
-            });
+            opcode.ins = Instruction::JR;
+            opcode.op1 = Some(Operand::FlagCondition(cond));
+            opcode.op2 = Some(Operand::RelAddr((ins[1] as i8) as i16 + 2));
+            opcode.tstates.extend_from_slice(&[4, 3, 5]); // Warning: varies
+            return true;
         }
-        0xC6 => {
-            // ADD A, n
-            return Some(add8imm);
-        }
-        0xCE => {
-            // ADC A, n
-            return Some(OpCode {
-                ins: Instruction::ADC,
-                ..add8imm
-            });
-        }
-        0xDE => {
-            // SBC A, n
-            return Some(OpCode {
-                ins: Instruction::SBC,
-                ..add8imm
-            });
-        }
+        0xC6 => return alu8aimm(ins, opcode, Instruction::ADD), // ADD A, n
+        0xCE => return alu8aimm(ins, opcode, Instruction::ADC), // ADC A, n
+        0xDE => return alu8aimm(ins, opcode, Instruction::SBC), // SBC A, n
         0xD3 => {
             // OUT (n), A
-            return Some(OpCode {
-                data: vec![ins[0], ins[1]],
-                length: 2,
-                ins: Instruction::OUT,
-                op1: Some(Operand::IOAddress(ins[1])),
-                op2: Some(Operand::Reg8(Reg8::A)),
-                op3: None,
-                tstates: vec![4, 3, 4],
-            });
+            opcode.ins = Instruction::OUT;
+            opcode.op1 = Some(Operand::IOAddress(ins[1]));
+            opcode.op2 = Some(Operand::Reg8(Reg8::A));
+            opcode.tstates.extend_from_slice(&[4, 3, 4]);
+            return true;
         }
         0xDB => {
             // IN A, (n)
-            return Some(OpCode {
-                data: vec![ins[0], ins[1]],
-                length: 2,
-                ins: Instruction::IN,
-                op1: Some(Operand::Reg8(Reg8::A)),
-                op2: Some(Operand::IOAddress(ins[1])),
-                op3: None,
-                tstates: vec![4, 3, 4],
-            });
+            opcode.ins = Instruction::IN;
+            opcode.op1 = Some(Operand::Reg8(Reg8::A));
+            opcode.op2 = Some(Operand::IOAddress(ins[1]));
+            opcode.tstates.extend_from_slice(&[4, 3, 4]);
+            return true;
         }
-        0xD6 => {
-            // SUB n
-            return Some(sub8imm);
-        }
-        0xE6 => {
-            // AND n
-            return Some(OpCode {
-                ins: Instruction::AND,
-                ..sub8imm
-            });
-        }
-        0xF6 => {
-            // OR n
-            return Some(OpCode {
-                ins: Instruction::OR,
-                ..sub8imm
-            });
-        }
-        0xEE => {
-            // XOR n
-            return Some(OpCode {
-                ins: Instruction::XOR,
-                ..sub8imm
-            });
-        }
-        0xFE => {
-            // CP n
-            return Some(OpCode {
-                ins: Instruction::CP,
-                ..sub8imm
-            });
-        }
+        0xD6 => return alu8imm(ins, opcode, Instruction::SUB), // SUB n
+        0xE6 => return alu8imm(ins, opcode, Instruction::AND), // AND n
+        0xF6 => return alu8imm(ins, opcode, Instruction::OR),  // OR n
+        0xEE => return alu8imm(ins, opcode, Instruction::XOR), // XOR n
+        0xFE => return alu8imm(ins, opcode, Instruction::CP),  // CP n
         _ => {}
     }
     // two bytes opcodes
     let insw = (ins[0] as u16) << 8 | ins[1] as u16;
-    let neg = OpCode {
-        data: vec![ins[0], ins[1]],
-        length: 2,
-        ins: Instruction::NEG,
-        op1: None,
-        op2: None,
-        op3: None,
-        tstates: vec![4, 4],
-    };
-    let ldia = OpCode {
-        ins: Instruction::LD,
-        op1: Some(Operand::Reg8(Reg8::I)),
-        op2: Some(Operand::Reg8(Reg8::A)),
-        tstates: vec![4, 5],
-        ..neg.clone()
-    };
-    let ldi = OpCode {
-        ins: Instruction::LDI,
-        tstates: vec![4, 4, 3, 5],
-        ..neg.clone()
-    };
-    let ini = OpCode {
-        ins: Instruction::INI,
-        tstates: vec![4, 5, 3, 4],
-        ..neg.clone()
-    };
+    fn ldria(opcode: &mut OpCode, r1: Reg8, r2: Reg8) -> bool {
+        opcode.ins = Instruction::LD;
+        opcode.op1 = Some(Operand::Reg8(r1));
+        opcode.op2 = Some(Operand::Reg8(r2));
+        opcode.tstates.extend_from_slice(&[4, 5]);
+        true
+    }
+    fn memblock(opcode: &mut OpCode, ins: Instruction) -> bool {
+        opcode.ins = ins;
+        // warning: tstates may vary
+        opcode.tstates.extend_from_slice(&[4, 4, 3, 5]);
+        true
+    }
+    fn ioblock(opcode: &mut OpCode, ins: Instruction) -> bool {
+        opcode.ins = ins;
+        // warning: tstates may vary
+        opcode.tstates.extend_from_slice(&[4, 5, 3, 4]);
+        true
+    }
+    fn im(opcode: &mut OpCode, num: u8) -> bool {
+        opcode.ins = Instruction::IM;
+        opcode.op1 = Some(Operand::Imm8(num));
+        opcode.tstates.extend_from_slice(&[4, 4]);
+        true
+    }
     match insw {
-        // NEG
-        0xED44 | 0xED4C | 0xED54 | 0xED5C | 0xED64 | 0xED6C | 0xED74 | 0xED7C => return Some(neg),
+        0xED44 | 0xED4C | 0xED54 | 0xED5C | 0xED64 | 0xED6C | 0xED74 | 0xED7C => {
+            // NEG
+            opcode.ins = Instruction::NEG;
+            opcode.tstates.extend_from_slice(&[4, 4]);
+            return true;
+        }
         0xED45 | 0xED55 | 0xED5D | 0xED65 | 0xED6D | 0xED75 | 0xED7D => {
             // RETN
-            return Some(OpCode {
-                ins: Instruction::RETN,
-                tstates: vec![4, 4, 3, 3],
-                ..neg
-            });
+            opcode.ins = Instruction::RETN;
+            opcode.tstates.extend_from_slice(&[4, 4, 3, 3]);
+            return true;
         }
         0xED4D => {
             //RETI
-            return Some(OpCode {
-                ins: Instruction::RETI,
-                tstates: vec![4, 4, 3, 3],
-                ..neg
-            });
+            opcode.ins = Instruction::RETI;
+            opcode.tstates.extend_from_slice(&[4, 4, 3, 3]);
+            return true;
         }
         // IM 0
         // IM 1
         // IM 2
-        0xED46 | 0xED4E | 0xED66 | 0xED6E => {
-            return Some(OpCode {
-                ins: Instruction::IM,
-                op1: Some(Operand::Imm8(0)),
-                ..neg
-            })
-        }
-        0xED56 | 0xED76 => {
-            return Some(OpCode {
-                ins: Instruction::IM,
-                op1: Some(Operand::Imm8(1)),
-                ..neg
-            })
-        }
-        0xED5E | 0xED7E => {
-            return Some(OpCode {
-                ins: Instruction::IM,
-                op1: Some(Operand::Imm8(2)),
-                ..neg
-            })
-        }
-        0xED47 => {
-            // LD I, A
-            return Some(ldia);
-        }
-        0xED4F => {
-            // LD R, A
-            return Some(OpCode {
-                op1: Some(Operand::Reg8(Reg8::R)),
-                ..ldia
-            });
-        }
-        0xED57 => {
-            // LD A, I
-            return Some(OpCode {
-                op1: Some(Operand::Reg8(Reg8::A)),
-                op2: Some(Operand::Reg8(Reg8::I)),
-                ..ldia
-            });
-        }
-        0xED5F => {
-            // LD A, R
-            return Some(OpCode {
-                op1: Some(Operand::Reg8(Reg8::A)),
-                op2: Some(Operand::Reg8(Reg8::R)),
-                ..ldia
-            });
-        }
+        0xED46 | 0xED4E | 0xED66 | 0xED6E => return im(opcode, 0),
+        0xED56 | 0xED76 => return im(opcode, 1),
+        0xED5E | 0xED7E => return im(opcode, 2),
+        0xED47 => return ldria(opcode, Reg8::I, Reg8::A), // LD I, A
+        0xED4F => return ldria(opcode, Reg8::R, Reg8::A), // LD R, A
+        0xED57 => return ldria(opcode, Reg8::A, Reg8::I), // LD A, I
+        0xED5F => return ldria(opcode, Reg8::A, Reg8::R), // LD A, R
         0xED67 => {
             // RRD
-            return Some(OpCode {
-                data: vec![ins[0], ins[1]],
-                length: 2,
-                ins: Instruction::RRD,
-                op1: None,
-                op2: None,
-                op3: None,
-                tstates: vec![4, 4, 3, 4, 3],
-            });
+            opcode.ins = Instruction::RRD;
+            opcode.tstates.extend_from_slice(&[4, 4, 3, 4, 3]);
+            return true;
         }
         0xED6F => {
             // RLD
-            return Some(OpCode {
-                data: vec![ins[0], ins[1]],
-                length: 2,
-                ins: Instruction::RLD,
-                op1: None,
-                op2: None,
-                op3: None,
-                tstates: vec![4, 4, 3, 4, 3],
-            });
+            opcode.ins = Instruction::RLD;
+            opcode.tstates.extend_from_slice(&[4, 4, 3, 4, 3]);
+            return true;
         }
-        0xEDA0 => {
-            // LDI
-            return Some(ldi);
-        }
-        0xEDB0 => {
-            // LDIR
-            return Some(OpCode {
-                ins: Instruction::LDIR,
-                // warning: tstates varies
-                ..ldi
-            });
-        }
-        0xEDA1 => {
-            // CPI
-            return Some(OpCode {
-                ins: Instruction::CPI,
-                ..ldi
-            });
-        }
-        0xEDB1 => {
-            // CPIR
-            return Some(OpCode {
-                ins: Instruction::CPIR,
-                // warning: tstates varies
-                ..ldi
-            });
-        }
-        0xEDA8 => {
-            // LDD
-            return Some(OpCode {
-                ins: Instruction::LDD,
-                ..ldi
-            });
-        }
-        0xEDB8 => {
-            // LDDR
-            return Some(OpCode {
-                ins: Instruction::LDDR,
-                // warning: tstates varies
-                ..ldi
-            });
-        }
-        0xEDA9 => {
-            // CPD
-            return Some(OpCode {
-                ins: Instruction::CPD,
-                ..ldi
-            });
-        }
-        0xEDB9 => {
-            // CPDR
-            return Some(OpCode {
-                ins: Instruction::CPDR,
-                // warning: tstates varies
-                ..ldi
-            });
-        }
-        0xEDA2 => {
-            // INI
-            return Some(OpCode {
-                ins: Instruction::INI,
-                ..ini
-            });
-        }
-        0xEDB2 => {
-            // INIR
-            return Some(OpCode {
-                ins: Instruction::INIR,
-                // warning: tstates varies
-                ..ini
-            });
-        }
-        0xEDAA => {
-            // IND
-            return Some(OpCode {
-                ins: Instruction::IND,
-                ..ini
-            });
-        }
-        0xEDBA => {
-            // INDR
-            return Some(OpCode {
-                ins: Instruction::INDR,
-                // warning: tstates varies
-                ..ini
-            });
-        }
-        0xEDA3 => {
-            // OUTI
-            return Some(OpCode {
-                ins: Instruction::OUTI,
-                ..ini
-            });
-        }
-        0xEDB3 => {
-            // OTIR
-            return Some(OpCode {
-                ins: Instruction::OTIR,
-                // warning: tstates varies
-                ..ini
-            });
-        }
-        0xEDAB => {
-            // OUTD
-            return Some(OpCode {
-                ins: Instruction::OUTD,
-                ..ini
-            });
-        }
-        0xEDBB => {
-            // OTDR
-            return Some(OpCode {
-                ins: Instruction::OTDR,
-                // warning: tstates varies
-                ..ini
-            });
-        }
+        0xEDA0 => return memblock(opcode, Instruction::LDI),
+        0xEDB0 => return memblock(opcode, Instruction::LDIR),
+        0xEDA1 => return memblock(opcode, Instruction::CPI),
+        0xEDB1 => return memblock(opcode, Instruction::CPIR),
+        0xEDA8 => return memblock(opcode, Instruction::LDD),
+        0xEDB8 => return memblock(opcode, Instruction::LDDR),
+        0xEDA9 => return memblock(opcode, Instruction::CPD),
+        0xEDB9 => return memblock(opcode, Instruction::CPDR),
+        0xEDA2 => return ioblock(opcode, Instruction::INI),
+        0xEDB2 => return ioblock(opcode, Instruction::INIR),
+        0xEDAA => return ioblock(opcode, Instruction::IND),
+        0xEDBA => return ioblock(opcode, Instruction::INDR),
+        0xEDA3 => return ioblock(opcode, Instruction::OUTI),
+        0xEDB3 => return ioblock(opcode, Instruction::OTIR),
+        0xEDAB => return ioblock(opcode, Instruction::OUTD),
+        0xEDBB => return ioblock(opcode, Instruction::OTDR),
         _ => {}
     }
     match insw & 0xFFCF {
         0xED42 => {
             // SBC HL, ss
             let reg = decode_operand_reg_ddss((ins[1] >> 4) & 0x3);
-            return Some(OpCode {
-                data: vec![ins[0], ins[1]],
-                length: 2,
-                ins: Instruction::SBC,
-                op1: Some(Operand::Reg16(Reg16::HL)),
-                op2: Some(Operand::Reg16(reg)),
-                op3: None,
-                tstates: vec![4, 4, 4, 3],
-            });
+            opcode.ins = Instruction::SBC;
+            opcode.op1 = Some(Operand::Reg16(Reg16::HL));
+            opcode.op2 = Some(Operand::Reg16(reg));
+            opcode.tstates.extend_from_slice(&[4, 4, 4, 3]);
+            return true;
         }
         0xED4A => {
             // ADC HL, ss
             let reg = decode_operand_reg_ddss((ins[1] >> 4) & 0x3);
-            return Some(OpCode {
-                data: vec![ins[0], ins[1]],
-                length: 2,
-                ins: Instruction::ADC,
-                op1: Some(Operand::Reg16(Reg16::HL)),
-                op2: Some(Operand::Reg16(reg)),
-                op3: None,
-                tstates: vec![4, 4, 4, 3],
-            });
+            opcode.ins = Instruction::ADC;
+            opcode.op1 = Some(Operand::Reg16(Reg16::HL));
+            opcode.op2 = Some(Operand::Reg16(reg));
+            opcode.tstates.extend_from_slice(&[4, 4, 4, 3]);
+            return true;
         }
         _ => {}
     }
@@ -1361,31 +1043,26 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
             //SLA r
             //SRA r
             //SRL r
-            let op1 = Some(decode_operand_reg_r_hladdr(ins[1] & 0x7));
-            let tstates = if op1 == Some(Operand::RegAddr(Reg16::HL)) {
-                vec![4, 4, 4, 3]
-            } else {
-                vec![4, 4]
+            opcode.op1 = Some(decode_operand_reg_r_hladdr(ins[1] & 0x7));
+            opcode
+                .tstates
+                .extend_from_slice(if opcode.op1 == Some(Operand::RegAddr(Reg16::HL)) {
+                    &[4, 4, 4, 3]
+                } else {
+                    &[4, 4]
+                });
+            opcode.ins = match insw & 0xFFF8 {
+                0xCB00 => Instruction::RLC,
+                0xCB08 => Instruction::RRC,
+                0xCB10 => Instruction::RL,
+                0xCB18 => Instruction::RR, // error in manual page 228 (pd 242)
+                0xCB20 => Instruction::SLA,
+                0xCB28 => Instruction::SRA,
+                0xCB30 => Instruction::SLL,
+                0xCB38 => Instruction::SRL,
+                _ => unreachable!(),
             };
-            return Some(OpCode {
-                data: vec![ins[0], ins[1]],
-                length: 2,
-                ins: match insw & 0xFFF8 {
-                    0xCB00 => Instruction::RLC,
-                    0xCB08 => Instruction::RRC,
-                    0xCB10 => Instruction::RL,
-                    0xCB18 => Instruction::RR, // error in manual page 228 (pd 242)
-                    0xCB20 => Instruction::SLA,
-                    0xCB28 => Instruction::SRA,
-                    0xCB30 => Instruction::SLL,
-                    0xCB38 => Instruction::SRL,
-                    _ => unreachable!(),
-                },
-                op1,
-                op2: None,
-                op3: None,
-                tstates,
-            });
+            return true;
         }
         _ => {}
     }
@@ -1394,186 +1071,135 @@ fn disas_two_bytes(ins: &[u8; 2]) -> Option<OpCode> {
             // BIT b, r
             // SET b, r
             // RES b, r
-            let op1 = Some(Operand::Imm8((ins[1] >> 3) & 0x7));
-            let op2 = Some(decode_operand_reg_r_hladdr(ins[1] & 0x7));
-            let tstates = if op1 == Some(Operand::RegAddr(Reg16::HL)) {
-                if insw & 0xFFC0 == 0xCB40 {
-                    vec![4, 4, 4]
-                } else {
-                    vec![4, 4, 4, 3]
-                }
-            } else {
-                vec![4, 4]
+            opcode.op1 = Some(Operand::Imm8((ins[1] >> 3) & 0x7));
+            opcode.op2 = Some(decode_operand_reg_r_hladdr(ins[1] & 0x7));
+            opcode.ins = match insw & 0xFFC0 {
+                0xCB40 => Instruction::BIT,
+                0xCBC0 => Instruction::SET,
+                0xCB80 => Instruction::RES,
+                _ => unreachable!(),
             };
-            return Some(OpCode {
-                data: vec![ins[0], ins[1]],
-                length: 2,
-                ins: match insw & 0xFFC0 {
-                    0xCB40 => Instruction::BIT,
-                    0xCBC0 => Instruction::SET,
-                    0xCB80 => Instruction::RES,
-                    _ => unreachable!(),
-                },
-                op1,
-                op2,
-                op3: None,
-                tstates,
-            });
+            opcode
+                .tstates
+                .extend_from_slice(if opcode.op1 == Some(Operand::RegAddr(Reg16::HL)) {
+                    if insw & 0xFFC0 == 0xCB40 {
+                        &[4, 4, 4]
+                    } else {
+                        &[4, 4, 4, 3]
+                    }
+                } else {
+                    &[4, 4]
+                });
+            return true;
         }
         _ => {}
     }
     match insw & 0xFFC7 {
         0xED40 => {
             // IN r, (C)
-            let op1 = Some(decode_operand_reg_r_in(ins[1] >> 3));
-            Some(OpCode {
-                data: vec![ins[0], ins[1]],
-                length: 2,
-                ins: Instruction::IN,
-                op1,
-                op2: Some(Operand::RegIOAddr(Reg8::C)),
-                op3: None,
-                tstates: vec![4, 4, 4],
-            })
+            opcode.ins = Instruction::IN;
+            opcode.op1 = Some(decode_operand_reg_r_in(ins[1] >> 3));
+            opcode.op2 = Some(Operand::RegIOAddr(Reg8::C));
+            opcode.tstates.extend_from_slice(&[4, 4, 4]);
+            true
         }
         0xED41 => {
             // OUT (C), r
-            let op2 = Some(decode_operand_reg_r_in(ins[1] >> 3));
-            Some(OpCode {
-                data: vec![ins[0], ins[1]],
-                length: 2,
-                ins: Instruction::OUT,
-                op1: Some(Operand::RegIOAddr(Reg8::C)),
-                op2,
-                op3: None,
-                tstates: vec![4, 4, 4],
-            })
+            opcode.ins = Instruction::OUT;
+            opcode.op1 = Some(Operand::RegIOAddr(Reg8::C));
+            opcode.op2 = Some(decode_operand_reg_r_in(ins[1] >> 3));
+            opcode.tstates.extend_from_slice(&[4, 4, 4]);
+            true
         }
-        _ => None,
+        _ => false,
     }
 }
 
-fn disas_three_bytes_mask(ins1: u8, ins2: u8, ins3: u8) -> Option<OpCode> {
+fn disas_three_bytes_mask(ins: &[u8], opcode: &mut OpCode) -> bool {
+    let ins1 = ins[0];
+    opcode.length = 3;
     if ins1 & 0xCF == 0x01 {
         // LD dd, nn
-        let arg = (ins3 as u16) << 8 | ins2 as u16;
+        let arg = (ins[2] as u16) << 8 | ins[1] as u16;
         let reg = decode_operand_reg_ddss((ins1 >> 4) & 0x3);
-        let opcode = OpCode {
-            data: vec![ins1, ins2, ins3],
-            length: 3,
-            ins: Instruction::LD,
-            op1: Some(Operand::Reg16(reg)),
-            op2: Some(Operand::Imm16(arg)),
-            op3: None,
-            tstates: vec![4, 3, 3], // error in datasheet page 99 ?
-        };
-        return Some(opcode);
-    };
+        opcode.ins = Instruction::LD;
+        opcode.op1 = Some(Operand::Reg16(reg));
+        opcode.op2 = Some(Operand::Imm16(arg));
+        opcode.tstates.extend_from_slice(&[4, 3, 3]); // error in datasheet page 99 ?
+        return true;
+    }
     match ins1 & 0xC7 {
         0xC2 => {
             // JP cc, nn
             let cond = decode_operand_cond_cc(ins1 >> 3 & 0x7);
-            Some(OpCode {
-                data: vec![ins1, ins2, ins3],
-                length: 3,
-                ins: Instruction::JP,
-                op1: Some(Operand::FlagCondition(cond)),
-                op2: Some(Operand::Imm16(ins2 as u16 | ((ins3 as u16) << 8))),
-                op3: None,
-                tstates: vec![4, 3, 3], // Warning: varies
-            })
+            opcode.ins = Instruction::JP;
+            opcode.op1 = Some(Operand::FlagCondition(cond));
+            opcode.op2 = Some(Operand::Imm16(ins[1] as u16 | ((ins[2] as u16) << 8)));
+            opcode.tstates.extend_from_slice(&[4, 3, 3]); // Warning: varies
+            true
         }
         0xC4 => {
             // CALL cc, nn
             let cond = decode_operand_cond_cc(ins1 >> 3 & 0x7);
-            Some(OpCode {
-                data: vec![ins1, ins2, ins3],
-                length: 3,
-                ins: Instruction::CALL,
-                op1: Some(Operand::FlagCondition(cond)),
-                op2: Some(Operand::Imm16(ins2 as u16 | ((ins3 as u16) << 8))),
-                op3: None,
-                tstates: vec![4, 3, 4, 3, 3], // Warning: varies
-            })
+            opcode.ins = Instruction::CALL;
+            opcode.op1 = Some(Operand::FlagCondition(cond));
+            opcode.op2 = Some(Operand::Imm16(ins[1] as u16 | ((ins[2] as u16) << 8)));
+            opcode.tstates.extend_from_slice(&[4, 3, 4, 3, 3]); // Warning: varies
+            true
         }
-        _ => None,
+        _ => false,
     }
 }
-fn disas_three_bytes(ins1: u8, ins2: u8, ins3: u8) -> Option<OpCode> {
-    match ins1 {
+fn disas_three_bytes(ins: &[u8], opcode: &mut OpCode) -> bool {
+    opcode.length = 3;
+    match ins[0] {
         0x22 => {
             // LD (nn), HL
-            Some(OpCode {
-                data: vec![ins1, ins2, ins3],
-                length: 3,
-                ins: Instruction::LD,
-                op1: Some(Operand::Address(ins2 as u16 | (ins3 as u16) << 8)),
-                op2: Some(Operand::Reg16(Reg16::HL)),
-                op3: None,
-                tstates: vec![4, 3, 3, 3, 3],
-            })
+            opcode.ins = Instruction::LD;
+            opcode.op1 = Some(Operand::Address(ins[1] as u16 | (ins[2] as u16) << 8));
+            opcode.op2 = Some(Operand::Reg16(Reg16::HL));
+            opcode.tstates.extend_from_slice(&[4, 3, 3, 3, 3]);
+            true
         }
         0x2A => {
             // LD HL, (nn)
-            Some(OpCode {
-                data: vec![ins1, ins2, ins3],
-                length: 3,
-                ins: Instruction::LD,
-                op1: Some(Operand::Reg16(Reg16::HL)),
-                op2: Some(Operand::Address(ins2 as u16 | (ins3 as u16) << 8)),
-                op3: None,
-                tstates: vec![4, 3, 3, 3, 3],
-            })
+            opcode.ins = Instruction::LD;
+            opcode.op1 = Some(Operand::Reg16(Reg16::HL));
+            opcode.op2 = Some(Operand::Address(ins[1] as u16 | (ins[2] as u16) << 8));
+            opcode.tstates.extend_from_slice(&[4, 3, 3, 3, 3]);
+            true
         }
         0x32 => {
             // LD (nn), A
-            Some(OpCode {
-                data: vec![ins1, ins2, ins3],
-                length: 3,
-                ins: Instruction::LD,
-                op1: Some(Operand::Address(ins2 as u16 | (ins3 as u16) << 8)),
-                op2: Some(Operand::Reg8(Reg8::A)),
-                op3: None,
-                tstates: vec![4, 3, 3, 3],
-            })
+            opcode.ins = Instruction::LD;
+            opcode.op1 = Some(Operand::Address(ins[1] as u16 | (ins[2] as u16) << 8));
+            opcode.op2 = Some(Operand::Reg8(Reg8::A));
+            opcode.tstates.extend_from_slice(&[4, 3, 3, 3]);
+            true
         }
         0x3A => {
             // LD A, (nn)
-            Some(OpCode {
-                data: vec![ins1, ins2, ins3],
-                length: 3,
-                ins: Instruction::LD,
-                op1: Some(Operand::Reg8(Reg8::A)),
-                op2: Some(Operand::Address(ins2 as u16 | (ins3 as u16) << 8)),
-                op3: None,
-                tstates: vec![4, 3, 3, 3],
-            })
+            opcode.ins = Instruction::LD;
+            opcode.op1 = Some(Operand::Reg8(Reg8::A));
+            opcode.op2 = Some(Operand::Address(ins[1] as u16 | (ins[2] as u16) << 8));
+            opcode.tstates.extend_from_slice(&[4, 3, 3, 3]);
+            true
         }
         0xC3 => {
             // JP nn
-            Some(OpCode {
-                data: vec![ins1, ins2, ins3],
-                length: 3,
-                ins: Instruction::JP,
-                op1: Some(Operand::Imm16(ins2 as u16 | ((ins3 as u16) << 8))),
-                op2: None,
-                op3: None,
-                tstates: vec![4, 3, 3], // Warning: varies
-            })
+            opcode.ins = Instruction::JP;
+            opcode.op1 = Some(Operand::Imm16(ins[1] as u16 | ((ins[2] as u16) << 8)));
+            opcode.tstates.extend_from_slice(&[4, 3, 3]); // Warning: varies
+            true
         }
         0xCD => {
             // CALL nn
-            Some(OpCode {
-                data: vec![ins1, ins2, ins3],
-                length: 3,
-                ins: Instruction::CALL,
-                op1: Some(Operand::Imm16(ins2 as u16 | ((ins3 as u16) << 8))),
-                op2: None,
-                op3: None,
-                tstates: vec![4, 3, 4, 3, 3], // Warning: varies
-            })
+            opcode.ins = Instruction::CALL;
+            opcode.op1 = Some(Operand::Imm16(ins[1] as u16 | ((ins[2] as u16) << 8)));
+            opcode.tstates.extend_from_slice(&[4, 3, 4, 3, 3]); // Warning: varies
+            true
         }
-        _ => None,
+        _ => false,
     }
 }
 
@@ -1584,9 +1210,9 @@ fn decode_operand_reg_ddcb(arg: u8) -> Option<Operand> {
     Some(Operand::Reg8(decode_operand_reg_r(arg)))
 }
 
-fn disas_ddcb_fdcb_prefix(ins: &[u8; 4]) -> Option<OpCode> {
+fn disas_ddcb_fdcb_prefix(ins: &[u8], opcode: &mut OpCode) -> bool {
     if (ins[0] != 0xDD && ins[0] != 0xFD) || ins[1] != 0xCB {
-        return None;
+        return false;
     }
     let opidx = Some(Operand::RegI(match ins[0] {
         0xDD => RegI::IX(ins[2] as i8),
@@ -1594,106 +1220,83 @@ fn disas_ddcb_fdcb_prefix(ins: &[u8; 4]) -> Option<OpCode> {
         _ => unreachable!(),
     }));
     let opcp = decode_operand_reg_ddcb(ins[3]);
-    let rlc = OpCode {
-        data: (*ins).try_into().expect("cannot convert ins array to vec"),
-        length: 4,
-        ins: Instruction::RLC,
-        op1: opidx,
-        op2: opcp,
-        op3: None,
-        tstates: vec![4, 4, 3, 5, 4, 3],
+    opcode.length = 4;
+    let mut bitshift = |ins: Instruction| -> bool {
+        opcode.ins = ins;
+        opcode.op1 = opidx;
+        opcode.op2 = opcp;
+        opcode.tstates.extend_from_slice(&[4, 4, 3, 5, 4, 3]);
+        true
     };
     match ins[3] & 0xF8 {
         // RLC (IX+d), r
-        0x00 => Some(rlc),
+        0x00 => bitshift(Instruction::RLC),
         // RRC (IX+d), r
-        0x08 => Some(OpCode {
-            ins: Instruction::RRC,
-            ..rlc
-        }),
+        0x08 => bitshift(Instruction::RRC),
         // RL (IX+d), r
-        0x10 => Some(OpCode {
-            ins: Instruction::RL,
-            ..rlc
-        }),
+        0x10 => bitshift(Instruction::RL),
         // RR (IX+d), r
-        0x18 => Some(OpCode {
-            ins: Instruction::RR,
-            ..rlc
-        }),
+        0x18 => bitshift(Instruction::RR),
         // SLA (IX+d), r
-        0x20 => Some(OpCode {
-            ins: Instruction::SLA,
-            ..rlc
-        }),
+        0x20 => bitshift(Instruction::SLA),
         // SRA (IX+d), r
-        0x28 => Some(OpCode {
-            ins: Instruction::SRA,
-            ..rlc
-        }),
+        0x28 => bitshift(Instruction::SRA),
         // SLL (IX+d), r
-        0x30 => Some(OpCode {
-            ins: Instruction::SLL,
-            ..rlc
-        }),
+        0x30 => bitshift(Instruction::SLL),
         // SRL (IX+d), r
-        0x38 => Some(OpCode {
-            ins: Instruction::SRL,
-            ..rlc
-        }),
+        0x38 => bitshift(Instruction::SRL),
         // BIT n, (IX+d)
-        0x40 | 0x48 | 0x50 | 0x58 | 0x60 | 0x68 | 0x70 | 0x78 => Some(OpCode {
-            ins: Instruction::BIT,
-            op1: Some(Operand::Imm8((ins[3] >> 3) & 0x7)),
-            op2: opidx,
-            tstates: vec![4, 4, 3, 5, 4],
-            ..rlc
-        }),
+        0x40 | 0x48 | 0x50 | 0x58 | 0x60 | 0x68 | 0x70 | 0x78 => {
+            opcode.ins = Instruction::BIT;
+            opcode.op1 = Some(Operand::Imm8((ins[3] >> 3) & 0x7));
+            opcode.op2 = opidx;
+            opcode.tstates.extend_from_slice(&[4, 4, 3, 5, 4]);
+            true
+        }
         // RES n, (IX+d), r
-        0x80 | 0x88 | 0x90 | 0x98 | 0xA0 | 0xA8 | 0xB0 | 0xB8 => Some(OpCode {
-            ins: Instruction::RES,
-            op1: Some(Operand::Imm8((ins[3] >> 3) & 0x7)),
-            op2: opidx,
-            op3: opcp,
-            ..rlc
-        }),
+        0x80 | 0x88 | 0x90 | 0x98 | 0xA0 | 0xA8 | 0xB0 | 0xB8 => {
+            opcode.ins = Instruction::RES;
+            opcode.op1 = Some(Operand::Imm8((ins[3] >> 3) & 0x7));
+            opcode.op2 = opidx;
+            opcode.op3 = opcp;
+            opcode.tstates.extend_from_slice(&[4, 4, 3, 5, 4, 3]);
+            true
+        }
         // SET n, (IX+d), r
-        0xC0 | 0xC8 | 0xD0 | 0xD8 | 0xE0 | 0xE8 | 0xF0 | 0xF8 => Some(OpCode {
-            ins: Instruction::SET,
-            op1: Some(Operand::Imm8((ins[3] >> 3) & 0x7)),
-            op2: opidx,
-            op3: opcp,
-            ..rlc
-        }),
-        _ => None,
+        0xC0 | 0xC8 | 0xD0 | 0xD8 | 0xE0 | 0xE8 | 0xF0 | 0xF8 => {
+            opcode.ins = Instruction::SET;
+            opcode.op1 = Some(Operand::Imm8((ins[3] >> 3) & 0x7));
+            opcode.op2 = opidx;
+            opcode.op3 = opcp;
+            opcode.tstates.extend_from_slice(&[4, 4, 3, 5, 4, 3]);
+            true
+        }
+        _ => false,
     }
 }
-fn disas_four_bytes_mask(ins: &[u8; 4]) -> Option<OpCode> {
+fn disas_four_bytes_mask(ins: &[u8], opcode: &mut OpCode) -> bool {
     let insw = (ins[0] as u16) << 8 | ins[1] as u16;
     let reg = decode_operand_reg_ddss((ins[1] >> 4) & 0x3);
     let nn = (ins[3] as u16) << 8 | ins[2] as u16;
+    opcode.length = 4;
     match insw & 0xFFCF {
         // LD (nn), dd
-        0xED43 => Some(OpCode {
-            data: ins.to_vec(),
-            length: 4,
-            ins: Instruction::LD,
-            op1: Some(Operand::Address(nn)),
-            op2: Some(Operand::Reg16(reg)),
-            op3: None,
-            tstates: vec![4, 4, 3, 3, 3, 3],
-        }),
+        0xED43 => {
+            opcode.ins = Instruction::LD;
+            opcode.op1 = Some(Operand::Address(nn));
+            opcode.op2 = Some(Operand::Reg16(reg));
+            opcode.tstates.extend_from_slice(&[4, 4, 3, 3, 3, 3]);
+            true
+        }
         // LD dd, (nn)
-        0xED4B => Some(OpCode {
-            data: ins.to_vec(),
-            length: 4,
-            ins: Instruction::LD,
-            op1: Some(Operand::Reg16(reg)),
-            op2: Some(Operand::Address(nn)),
-            op3: None,
-            tstates: vec![4, 4, 3, 3, 3, 3],
-        }),
-        _ => None,
+        0xED4B => {
+            opcode.ins = Instruction::LD;
+            opcode.op1 = Some(Operand::Reg16(reg));
+            opcode.op2 = Some(Operand::Address(nn));
+            opcode.tstates.extend_from_slice(&[4, 4, 3, 3, 3, 3]);
+            true
+        }
+        _ => false,
     }
 }
 
