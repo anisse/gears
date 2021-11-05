@@ -438,10 +438,7 @@ fn set_conditions_sub8_base(r: &mut Regs, a: i8, b: i8, c: i8) -> u8 {
     r.set_flag(Flag::S, res < 0);
     r.set_flag(Flag::Z, res == 0);
     r.set_flag(Flag::H, (a ^ b ^ res) & 0x10 != 0);
-    r.set_flag(
-        Flag::PV,
-        (a != 0 || b == i8::MIN) && a.signum() != b.signum() && a.signum() != res.signum(),
-    );
+    r.set_flag(Flag::PV, (a < 0) != (b < 0) && (res < 0) != (a < 0));
     r.set_flag(Flag::N, true);
     copy_f53_res(res as u8, r);
 
@@ -479,10 +476,7 @@ fn set_conditions_add8_base(r: &mut Regs, a: i8, b: i8, c: i8) -> u8 {
     r.set_flag(Flag::S, res < 0);
     r.set_flag(Flag::Z, res == 0);
     r.set_flag(Flag::H, (a ^ b ^ res) & 0x10 != 0);
-    r.set_flag(
-        Flag::PV,
-        a.signum() == b.signum() && a.signum() != res.signum(),
-    );
+    r.set_flag(Flag::PV, (a < 0) == (b < 0) && (res < 0) != (a < 0));
     r.set_flag(Flag::N, false);
     copy_f53_res(res as u8, r);
 
@@ -494,10 +488,7 @@ fn set_conditions_adc_16(r: &mut Regs, a: i16, b: i16) -> u16 {
     let res = set_conditions_add_16(r, a, b, c as i16) as i16;
     r.set_flag(Flag::S, res < 0);
     r.set_flag(Flag::Z, res == 0);
-    r.set_flag(
-        Flag::PV,
-        a.signum() == b.signum() && a.signum() != res.signum(),
-    );
+    r.set_flag(Flag::PV, (a < 0) == (b < 0) && (res < 0) != (a < 0));
     res as u16
 }
 fn set_conditions_add_16(r: &mut Regs, a: i16, b: i16, c: i16) -> u16 {
@@ -522,10 +513,7 @@ fn set_conditions_sbc_16(r: &mut Regs, a: i16, b: i16) -> u16 {
     r.set_flag(Flag::S, res < 0);
     r.set_flag(Flag::Z, res == 0);
     r.set_flag(Flag::H, (a ^ b ^ res) & 0x1000 != 0);
-    r.set_flag(
-        Flag::PV,
-        (a != 0 || b == i16::MIN) && a.signum() != b.signum() && a.signum() != res.signum(),
-    );
+    r.set_flag(Flag::PV, (a < 0) != (b < 0) && (res < 0) != (a < 0));
     r.set_flag(Flag::N, true);
     copy_f53_res((res >> 8) as u8, r);
 
@@ -1510,5 +1498,111 @@ mod tests {
                 ..default
             },
         )
+    }
+    #[test]
+    fn run_adc() {
+        let mut s = init();
+        s.r.A = 1;
+        //7FFF BBCC DDEE 4411 DD88 FD77 C000
+        s.r.set_regpair(RegPair::AF, 0x7FFF);
+        s.r.set_regpair(RegPair::BC, 0xBBCC);
+        s.r.set_regpair(RegPair::DE, 0xDDEE);
+        s.r.set_regpair(RegPair::HL, 0x4411);
+
+        let default = s.r;
+        dbg!(&default);
+        s.mem = mem::Memory::from(vec![0xCE, 0x00]);
+        run(&mut s, 1, true).unwrap();
+        assert_eq!(
+            s.r,
+            Regs {
+                A: 0x80,
+                F: 0x94,
+                PC: 2,
+                R: 1,
+                ..default
+            },
+        );
+
+        s.r = default;
+        //FFFF BBCC DDEE 4411 DD88 FD77 C000
+        s.r.set_regpair(RegPair::AF, 0xFFFF);
+        dbg!(&s.r);
+        s.mem = mem::Memory::from(vec![0xCE, 0x80]);
+        run(&mut s, 1, true).unwrap();
+        assert_eq!(
+            s.r,
+            Regs {
+                A: 0x80,
+                F: 0x91,
+                PC: 2,
+                R: 1,
+                ..default
+            },
+        );
+
+        s.r = default;
+        //7FFF BBCC DDEE 4411 DD88 FD77 C000
+        dbg!(&s.r);
+        s.mem = mem::Memory::from(vec![0xCE, 0x80]);
+        run(&mut s, 1, true).unwrap();
+        assert_eq!(
+            s.r,
+            Regs {
+                A: 0,
+                F: 0x51,
+                PC: 2,
+                R: 1,
+                ..default
+            },
+        );
+        s.r = default;
+        //00FF BBCC DDEE 4411 DD88 FD77 C000
+        s.r.set_regpair(RegPair::AF, 0x00FF);
+        dbg!(&s.r);
+        s.mem = mem::Memory::from(vec![0xCE, 0x00]);
+        run(&mut s, 1, true).unwrap();
+        assert_eq!(
+            s.r,
+            Regs {
+                A: 0x01,
+                F: 0x00,
+                PC: 2,
+                R: 1,
+                ..default
+            },
+        );
+        s.r = default;
+        //FFFF BBCC DDEE 4411 DD88 FD77 C000
+        s.r.set_regpair(RegPair::AF, 0xFFFF);
+        dbg!(&s.r);
+        s.mem = mem::Memory::from(vec![0xCE, 0x01]);
+        run(&mut s, 1, true).unwrap();
+        assert_eq!(
+            s.r,
+            Regs {
+                A: 0x01,
+                F: 0x11,
+                PC: 2,
+                R: 1,
+                ..default
+            },
+        );
+        s.r = default;
+        //55FF BBCC DDEE 4411 DD88 FD77 C000
+        s.r.set_regpair(RegPair::AF, 0x55FF);
+        dbg!(&s.r);
+        s.mem = mem::Memory::from(vec![0xCE, 0x80]);
+        run(&mut s, 1, true).unwrap();
+        assert_eq!(
+            s.r,
+            Regs {
+                A: 0xD6,
+                F: 0x80,
+                PC: 2,
+                R: 1,
+                ..default
+            },
+        );
     }
 }
