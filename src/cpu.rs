@@ -72,7 +72,7 @@ impl PartialEq for FChanged {
     }
 }
 
-#[derive(Default, PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy)]
 #[allow(non_snake_case)]
 pub struct Regs {
     pub A: u8,
@@ -234,6 +234,41 @@ impl Regs {
     }
     fn get_flag(&self, f: Flag) -> bool {
         self.F & f as u8 != 0
+    }
+}
+
+impl Default for Regs {
+    fn default() -> Self {
+        Regs {
+            A: 0xFF,
+            F: 0xFF,
+            B: 0,
+            C: 0,
+            D: 0,
+            E: 0,
+            H: 0,
+            L: 0,
+            Ap: 0,
+            Fp: 0,
+            Bp: 0,
+            Cp: 0,
+            Dp: 0,
+            Ep: 0,
+            Hp: 0,
+            Lp: 0,
+            I: 0,
+            R: 0,
+            IXh: 0,
+            IXl: 0,
+            IYh: 0,
+            IYl: 0,
+            SP: 0xFFFF,
+            PC: 0,
+            MEMPTR: 0,
+            IM: 0,
+            IFF1: false,
+            IFF2: false,
+        }
     }
 }
 
