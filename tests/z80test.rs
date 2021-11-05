@@ -29,6 +29,20 @@ fn z80full() {
     let mut msg = String::new();
     loop {
         cpu::run_cached(&cache, &mut state, 1, false).unwrap();
+        /*
+        println!(
+            "{:04X}: {:04X} | {:04X} {:04X} {:04X} {:04X} {:04X} {:04X} {:04X}",
+            state.r.PC,
+            state.mem.fetch_u16(state.r.PC),
+            state.r.get_regpair(cpu::RegPair::AF),
+            state.r.get_regpair(cpu::RegPair::BC),
+            state.r.get_regpair(cpu::RegPair::DE),
+            state.r.get_regpair(cpu::RegPair::HL),
+            state.r.get_regpair(cpu::RegPair::IX),
+            state.r.get_regpair(cpu::RegPair::IY),
+            state.r.get_regpair(cpu::RegPair::SP),
+        );
+        */
 
         if state.r.PC == 0x0000 {
             println!();
