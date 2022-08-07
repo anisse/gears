@@ -10,6 +10,8 @@ pub trait Device {
 struct Entry<'a> {
     start: u16,
     end: u16,
+    /// ignored bits
+    ignore_mask: u16,
     dev: &'a dyn Device,
 }
 #[derive(Clone)]
@@ -21,14 +23,19 @@ impl<'a> IO<'a> {
     pub fn new() -> Self {
         IO { devs: Vec::new() }
     }
-    pub fn register(&mut self, start: u16, end: u16, dev: &'a mut dyn Device) {
-        self.devs.push(Entry { start, end, dev });
+    pub fn register(&mut self, start: u16, end: u16, ignore_mask: u16, dev: &'a dyn Device) {
+        self.devs.push(Entry {
+            start,
+            end,
+            ignore_mask,
+            dev,
+        });
     }
     pub fn out(&self, addr: u16, val: u8) -> Result<(), String> {
         let dev = self
             .devs
             .iter()
-            .find(|&x| addr >= x.start && addr <= x.end)
+            .find(|&x| addr & !x.ignore_mask >= x.start && addr & !x.ignore_mask <= x.end)
             .ok_or("Out address not found")?;
         dev.dev.out(addr, val)
     }
@@ -36,7 +43,7 @@ impl<'a> IO<'a> {
         let dev = self
             .devs
             .iter()
-            .find(|&x| addr >= x.start && addr <= x.end)
+            .find(|&x| addr & !x.ignore_mask >= x.start && addr & !x.ignore_mask <= x.end)
             .ok_or("In address not found")?;
         dev.dev.input(addr)
     }

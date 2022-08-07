@@ -284,7 +284,7 @@ fn fuse_tests() {
         state.io = io::IO::default();
         end_state.io = io::IO::default();
         let mut dev = ZxSpectrumIODevice {};
-        state.io.register(0, 62464, &mut dev);
+        state.io.register(0, 62464, 0, &mut dev);
 
         dbg!(t);
         cpu::run(&mut state, t.tstate_to_run as usize, true).unwrap();
