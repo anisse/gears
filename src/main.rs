@@ -2,11 +2,26 @@ mod cpu;
 mod disas;
 mod io;
 mod mem;
+mod vdp;
 
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
+
+struct DebugIO {}
+impl io::Device for DebugIO {
+    fn out(&self, addr: u16, val: u8) -> Result<(), String> {
+        println!("Unknown I/O write: @{:04X} {:02X} ", addr, val);
+        panic!();
+        Ok(())
+    }
+    fn input(&self, addr: u16) -> Result<u8, String> {
+        println!("Unknown I/O read: @{:04X}, sending 0", addr);
+        panic!();
+        Ok(0)
+    }
+}
 
 pub fn main() {
     let args: Vec<String> = env::args().collect();
@@ -26,5 +41,12 @@ pub fn main() {
     let mut cpu = cpu::init();
     cpu.mem = mem::Memory::from(data);
     cpu.io = io::IO::new();
-    cpu::run(&mut cpu, 9999999999, false).unwrap();
+    let dbg_io = DebugIO {};
+    let vdp = vdp::VDP::default();
+    cpu.io.register(0x7E, 0x7E, 0xFF00, &vdp);
+    cpu.io.register(0, 0, 0xFFFF, &dbg_io);
+    loop {
+        vdp.step();
+        cpu::run(&mut cpu, 227, true).unwrap();
+    }
 }
