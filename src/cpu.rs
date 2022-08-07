@@ -828,7 +828,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 match op1 {
                     Operand::Address(addr) => {
                         // MEMPTR_low = (addr + 1) & #FF,  MEMPTR_hi = A
-                        s.r.MEMPTR = (addr + 1) & 0xFF | ((s.r.A as u16) << 8);
+                        s.r.MEMPTR = (addr.overflowing_add(1).0) & 0xFF | ((s.r.A as u16) << 8);
                     }
                     Operand::RegAddr(x) => {
                         if x == disas::Reg16::BC || x == disas::Reg16::DE {
