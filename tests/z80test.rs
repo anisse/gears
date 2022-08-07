@@ -25,6 +25,18 @@ fn z80full() {
     state.mem.set_u8(0x10, 0xC9); // RET
     state.mem.set_u8(0x1601, 0xC9); // RET
 
+    let run_single_test = false;
+    let single_test = 10;
+    if run_single_test {
+        state.mem.set_u16(0x802b, single_test); // ld bc, 0 to ld bc, test
+        let mut test_start = state.mem.fetch_u16(0x802e);
+        println!("Test table {:x}", test_start);
+        test_start += single_test * 2;
+        println!("Test table {:x}", test_start);
+        state.mem.set_u16(0x802e, test_start); // Move start
+        state.mem.set_u16(test_start + 2, 0); // NUL terminate test
+    }
+
     state.r.PC = load_addr;
     let mut msg = String::new();
     loop {

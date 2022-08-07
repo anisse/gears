@@ -1418,6 +1418,7 @@ pub fn run(s: &mut State, tstates_len: usize, debug: bool) -> Result<(), String>
         if let Some(op) = disas::disas(disas_target) {
             if debug {
                 println!("{:04X}: {:?}", s.r.PC, op);
+                //println!("{}", s.r);
             }
             let op_len = run_op(s, &op)?;
             tstates_len = usize::saturating_sub(tstates_len, op_len);
