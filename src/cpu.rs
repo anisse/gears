@@ -1255,7 +1255,10 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 if op2 != Operand::Reg8(disas::Reg8::A) {
                     return Err("Op2 should be A".to_string());
                 }
-                let val = s.r.A;
+                let val = match op.op3 {
+                    Some(Operand::IgnoreIO) => 0,
+                    _ => s.r.A,
+                };
                 let addr = addr as u16 | ((s.r.A as u16) << 8);
                 // TODO: stop ignoring errors
                 s.io.out(addr, val).ok();
@@ -1292,7 +1295,9 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 let addr = s.r.get_regpair(RegPair::BC);
                 s.r.MEMPTR = addr.wrapping_add(1);
                 if let Ok(val) = s.io.input(addr) {
-                    set_op8(s, op1, val);
+                    if op.op3 != Some(Operand::IgnoreIO) {
+                        set_op8(s, op1, val);
+                    }
                     //flags
                     set_bitops_flags(val, &mut s.r);
                     s.r.set_flag(Flag::H, false);

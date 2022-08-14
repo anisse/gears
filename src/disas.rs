@@ -76,6 +76,7 @@ pub enum Operand {
     RegAddr(Reg16),  //register indirect addressing
     RegIOAddr(Reg8), //register indirect addressing
     FlagCondition(FlagCondition),
+    IgnoreIO,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -98,6 +99,7 @@ impl Operand {
             Operand::RegAddr(_) => None,
             Operand::RegIOAddr(_) => None,
             Operand::FlagCondition(_) => None,
+            Operand::IgnoreIO => None,
         }
     }
 }
@@ -116,6 +118,7 @@ impl fmt::Display for Operand {
             Operand::RegAddr(x) => write!(f, "({:?})", x),
             Operand::RegIOAddr(x) => write!(f, "({:?})", x),
             Operand::FlagCondition(x) => write!(f, "{:?}", x),
+            Operand::IgnoreIO => write!(f, "ignored"),
         }
     }
 }
@@ -1100,6 +1103,9 @@ fn disas_two_bytes(ins: &[u8], opcode: &mut OpCode) -> bool {
             opcode.ins = Instruction::IN;
             opcode.op1 = Some(decode_operand_reg_r_in(ins[1] >> 3));
             opcode.op2 = Some(Operand::RegIOAddr(Reg8::C));
+            if insw == 0xED70 {
+                opcode.op3 = Some(Operand::IgnoreIO);
+            }
             opcode.tstates.extend_from_slice(&[4, 4, 4]);
             true
         }
@@ -1108,6 +1114,9 @@ fn disas_two_bytes(ins: &[u8], opcode: &mut OpCode) -> bool {
             opcode.ins = Instruction::OUT;
             opcode.op1 = Some(Operand::RegIOAddr(Reg8::C));
             opcode.op2 = Some(decode_operand_reg_r_in(ins[1] >> 3));
+            if insw == 0xED71 {
+                opcode.op3 = Some(Operand::IgnoreIO);
+            }
             opcode.tstates.extend_from_slice(&[4, 4, 4]);
             true
         }
