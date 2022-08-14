@@ -22,7 +22,7 @@ struct VDPState {
     dest: Option<WriteDest>,
     vram: Vec<u8>,
     cram: Vec<u8>,
-    write_data: Option<u8>,
+    cmd_byte1: Option<u8>,
 }
 
 #[derive(Debug)]
@@ -40,9 +40,9 @@ impl VDP {
         let vcounter = self.state.borrow().v_counter.overflowing_add(1).0;
         self.state.borrow_mut().v_counter = vcounter;
     }
-    fn write_data(&self, val: u8) -> Result<(), String> {
+    fn write_cmd(&self, val: u8) -> Result<(), String> {
         let mut state = self.state.borrow_mut();
-        match state.write_data.take() {
+        match state.cmd_byte1.take() {
             Some(data) => match val & 0xC0 {
                 0x80 => {
                     // This is a register write
@@ -54,7 +54,8 @@ impl VDP {
                     state.reg[reg as usize] = data;
                 }
                 0x00 | 0x40 => {
-                    // TODO: differentiate read and write setup ?
+                    // TODO: differentiate read and write setup ? This is only useful for timings
+                    // after setup
                     // VRAM address setup
                     state.addr = data as u16 | ((val as u16) << 8);
                     state.dest = Some(WriteDest::Vram);
@@ -76,20 +77,38 @@ impl VDP {
                     )
                 }
             },
-            None => state.write_data = Some(val),
+            None => state.cmd_byte1 = Some(val),
         }
         Ok(())
     }
-    fn reset_status_write(&self) {
+    fn reset_byte1(&self) {
         let mut state = self.state.borrow_mut();
-        state.write_data.take();
+        state.cmd_byte1.take();
+    }
+
+    fn write_ram(&self, val: u8) -> Result<(), String> {
+        self.reset_byte1();
+        let mut state = self.state.borrow_mut();
+        match state.dest {
+            Some(WriteDest::Vram) => {
+                let addr = state.addr as usize;
+                state.vram[addr] = val;
+                state.addr += 1;
+            }
+            Some(WriteDest::Cram) => {
+                state.addr += 1;
+            }
+            None => return Err("No VDP write dest".to_string()),
+        }
+        Ok(())
     }
 }
 
 impl io::Device for VDP {
     fn out(&self, addr: u16, val: u8) -> Result<(), String> {
         match addr & 0xFF {
-            0xBF => self.write_data(val),
+            0xBF => self.write_cmd(val),
+            0xBE => self.write_ram(val),
             _ => {
                 dbg!("unknown VDP output address", addr);
                 panic!();
@@ -105,8 +124,13 @@ impl io::Device for VDP {
             }
             0xBF => {
                 let st = self.state.borrow().status;
-                self.reset_status_write();
+                self.reset_byte1();
                 Ok(st)
+            }
+            0xBE => {
+                self.reset_byte1();
+                panic!("Unsupported input on BE");
+                Ok(0)
             }
             _ => {
                 dbg!("unknown VDP input address", addr);
@@ -132,7 +156,7 @@ impl VDPState {
             vram: vec![0; 16 * 1024],
             cram: vec![0; 32 * 2],
             status: 0,
-            write_data: None,
+            cmd_byte1: None,
         }
     }
 }
