@@ -44,6 +44,7 @@ pub fn main() {
     let dbg_io = DebugIO {};
     let vdp = vdp::VDP::default();
     cpu.io.register(0x7E, 0x7E, 0xFF00, &vdp);
+    cpu.io.register(0xBF, 0xBF, 0xFF00, &vdp);
     cpu.io.register(0, 0, 0xFFFF, &dbg_io);
     loop {
         vdp.step();
