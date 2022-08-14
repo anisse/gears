@@ -606,26 +606,26 @@ fn set_conditions_io_block(r: &mut Regs, val: u8, lc: u8) {
     r.set_flag(Flag::N, (val & 0x80) != 0);
 }
 
-fn input_block(s: &mut State, inc: i8) {
+fn input_block(s: &mut State, inc: i8) -> Result<(), String> {
     let hl = s.r.get_regpair(RegPair::HL);
     let addr = s.r.get_regpair(RegPair::BC);
     set_conditions_io_block_base(&mut s.r);
-    if let Ok(val) = s.io.input(addr) {
-        s.mem.set_u8(hl, val);
-        let c = s.r.C.wrapping_add(inc as u8);
-        set_conditions_io_block(&mut s.r, val, c);
-    }
+    let val = s.io.input(addr)?;
+    s.mem.set_u8(hl, val);
+    let c = s.r.C.wrapping_add(inc as u8);
+    set_conditions_io_block(&mut s.r, val, c);
+
     s.r.set_regpair(RegPair::HL, hl.wrapping_add(inc as u16));
     // MEMPTR = BC_before_decrementing_B +/- 1
     s.r.MEMPTR = addr.wrapping_add(inc as u16);
+    Ok(())
 }
 
-fn output_block(s: &mut State, inc: i8) {
+fn output_block(s: &mut State, inc: i8) -> Result<(), String> {
     let hl = s.r.get_regpair(RegPair::HL);
     let val = s.mem.fetch_u8(hl);
     let addr = s.r.get_regpair(RegPair::BC);
-    // TODO: stop ignoring errors ?
-    s.io.out(addr, val).ok();
+    s.io.out(addr, val)?;
     set_conditions_io_block_base(&mut s.r);
     s.r.set_regpair(RegPair::HL, hl.wrapping_add(inc as u16));
     let l = s.r.L;
@@ -633,6 +633,7 @@ fn output_block(s: &mut State, inc: i8) {
     // MEMPTR = BC_after_decrementing_B +/- 1
     let bc = s.r.get_regpair(RegPair::BC);
     s.r.MEMPTR = bc.wrapping_add(inc as u16);
+    Ok(())
 }
 
 fn mem_block_copy(r: &mut Regs, mem: &mut mem::Memory, inc: i8) {
@@ -1260,16 +1261,14 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                     _ => s.r.A,
                 };
                 let addr = addr as u16 | ((s.r.A as u16) << 8);
-                // TODO: stop ignoring errors
-                s.io.out(addr, val).ok();
+                s.io.out(addr, val)?;
                 // MEMPTR_low = (port + 1) & #FF,  MEMPTR_hi = A
                 let low = addr.wrapping_add(1) as u16;
                 s.r.MEMPTR = low & 0xFF | ((val as u16) << 8);
             } else if Operand::RegIOAddr(disas::Reg8::C) == op1 {
                 let val = get_op8(s, op2);
                 let addr = s.r.get_regpair(RegPair::BC);
-                // TODO: stop ignoring errors
-                s.io.out(addr, val).ok();
+                s.io.out(addr, val)?;
 
                 // MEMPTR = BC + 1
                 s.r.MEMPTR = addr.wrapping_add(1);
@@ -1286,22 +1285,19 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 let low = addr.wrapping_add(1) as u16;
                 let addr = addr as u16 | ((s.r.A as u16) << 8);
                 s.r.MEMPTR = low & 0xFF | ((s.r.A as u16) << 8);
-                // TODO: stop ignoring errors
-                if let Ok(val) = s.io.input(addr) {
-                    set_op8(s, op1, val);
-                }
+                let val = s.io.input(addr)?;
+                set_op8(s, op1, val);
             } else if Operand::RegIOAddr(disas::Reg8::C) == op2 {
                 // MEMPTR = BC + 1
                 let addr = s.r.get_regpair(RegPair::BC);
                 s.r.MEMPTR = addr.wrapping_add(1);
-                if let Ok(val) = s.io.input(addr) {
-                    if op.op3 != Some(Operand::IgnoreIO) {
-                        set_op8(s, op1, val);
-                    }
-                    //flags
-                    set_bitops_flags(val, &mut s.r);
-                    s.r.set_flag(Flag::H, false);
+                let val = s.io.input(addr)?;
+                if op.op3 != Some(Operand::IgnoreIO) {
+                    set_op8(s, op1, val);
                 }
+                //flags
+                set_bitops_flags(val, &mut s.r);
+                s.r.set_flag(Flag::H, false);
             }
         }
         Instruction::EXX => {
@@ -1377,24 +1373,24 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         Instruction::CPDR => {
             update_pc = mem_block_cmp_repeat(&mut s.r, &mut s.mem, -1, &mut op_len);
         }
-        Instruction::INI => input_block(s, 1),
+        Instruction::INI => input_block(s, 1)?,
         Instruction::INIR => {
-            input_block(s, 1);
+            input_block(s, 1)?;
             update_pc = io_block_repeat(&s.r, &mut op_len);
         }
-        Instruction::IND => input_block(s, -1),
+        Instruction::IND => input_block(s, -1)?,
         Instruction::INDR => {
-            input_block(s, -1);
+            input_block(s, -1)?;
             update_pc = io_block_repeat(&s.r, &mut op_len);
         }
-        Instruction::OUTI => output_block(s, 1),
+        Instruction::OUTI => output_block(s, 1)?,
         Instruction::OTIR => {
-            output_block(s, 1);
+            output_block(s, 1)?;
             update_pc = io_block_repeat(&s.r, &mut op_len);
         }
-        Instruction::OUTD => output_block(s, -1),
+        Instruction::OUTD => output_block(s, -1)?,
         Instruction::OTDR => {
-            output_block(s, -1);
+            output_block(s, -1)?;
             update_pc = io_block_repeat(&s.r, &mut op_len);
         }
         Instruction::DI => {

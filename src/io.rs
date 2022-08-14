@@ -36,7 +36,7 @@ impl<'a> IO<'a> {
             .devs
             .iter()
             .find(|&x| addr & !x.ignore_mask >= x.start && addr & !x.ignore_mask <= x.end)
-            .ok_or("Out address not found")?;
+            .ok_or(format!("Out address {:04X} to unknown device", addr))?;
         dev.dev.out(addr, val)
     }
     pub fn input(&self, addr: u16) -> Result<u8, String> {
@@ -44,7 +44,7 @@ impl<'a> IO<'a> {
             .devs
             .iter()
             .find(|&x| addr & !x.ignore_mask >= x.start && addr & !x.ignore_mask <= x.end)
-            .ok_or("In address not found")?;
+            .ok_or(format!("In address {:04X} to unknown device", addr))?;
         dev.dev.input(addr)
     }
 }

@@ -1,4 +1,4 @@
-use gears::{cpu, mem};
+use gears::{cpu, io, mem};
 
 // Heavily inspired by iz80's test
 // https://github.com/ivanizag/iz80/blob/396dc918fc46a85e200f154d5728f9733671870f/tests/zexall.rs
@@ -21,6 +21,8 @@ fn zex(prog: &[u8]) {
 
     let mut state = cpu::init();
     state.mem = mem::Memory::init(64 * 1024); // This test suite is for machines with more RAM
+    let dev = ZxSpectrumIODevice {};
+    state.io.register(0, 0xFFFF, 0, &dev);
 
     let load_addr = 0x100;
 
@@ -82,4 +84,15 @@ fn zex(prog: &[u8]) {
         }
     }
     assert_eq!(msg.matches("OK").count(), 67);
+}
+
+struct ZxSpectrumIODevice {}
+
+impl io::Device for ZxSpectrumIODevice {
+    fn out(&self, _: u16, _: u8) -> std::result::Result<(), std::string::String> {
+        Ok(())
+    }
+    fn input(&self, addr: u16) -> std::result::Result<u8, std::string::String> {
+        Ok((addr >> 8) as u8)
+    }
 }
