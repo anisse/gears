@@ -16,7 +16,8 @@ impl Memory {
         self.mem[addr as usize]
     }
     pub fn fetch_u16(&self, addr: u16) -> u16 {
-        self.mem[addr as usize] as u16 | ((self.mem[addr as usize + 1] as u16) << 8)
+        self.mem[addr as usize] as u16
+            | ((self.mem[addr.overflowing_add(1).0 as usize] as u16) << 8)
     }
 
     pub fn fetch_range_safe(&self, addr: u16, len: u16) -> &[u8] {
