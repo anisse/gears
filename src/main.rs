@@ -48,6 +48,6 @@ pub fn main() {
     cpu.io.register(0, 0, 0xFFFF, &dbg_io);
     loop {
         vdp.step();
-        cpu::run(&mut cpu, 227, true).unwrap();
+        cpu::run(&mut cpu, 227, false).unwrap();
     }
 }
