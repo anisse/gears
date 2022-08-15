@@ -23,6 +23,7 @@ struct VDPState {
     vram: Vec<u8>,
     cram: Vec<u8>,
     cmd_byte1: Option<u8>,
+    cram_byte1: Option<u8>,
 }
 
 #[derive(Debug)]
@@ -91,6 +92,7 @@ impl VDP {
         let mut state = self.state.borrow_mut();
         let addr = state.addr as usize;
         let dest = state.dest;
+        let cram_byte1 = state.cram_byte1;
         let ram = match dest {
             Some(WriteDest::Vram) => &mut state.vram,
             Some(WriteDest::Cram) => &mut state.cram,
@@ -104,8 +106,22 @@ impl VDP {
                 ram.len()
             ));
         }
-        ram[addr] = val;
-        state.addr += 1;
+        match dest {
+            Some(WriteDest::Vram) => {
+                ram[addr] = val;
+                state.addr = (state.addr + 1) & 0x3FF;
+            }
+            Some(WriteDest::Cram) => {
+                if addr & 1 == 0 {
+                    state.cram_byte1 = Some(val);
+                } else {
+                    ram[addr - 1] = cram_byte1.unwrap();
+                    ram[addr] = val & 0x0F;
+                    state.addr = (state.addr + 1) & 0x3F;
+                }
+            }
+            None => unreachable!(),
+        }
         Ok(())
     }
 }
@@ -158,6 +174,7 @@ impl Default for VDPState {
             cram: vec![0; 32 * 2],
             status: 0,
             cmd_byte1: None,
+            cram_byte1: None,
         }
     }
 }
