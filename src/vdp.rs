@@ -152,8 +152,8 @@ impl Default for VDP {
         Self::new()
     }
 }
-impl VDPState {
-    fn default() -> VDPState {
+impl Default for VDPState {
+    fn default() -> Self {
         VDPState {
             reg: [0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 1],
             v_counter: 0,
@@ -165,4 +165,14 @@ impl VDPState {
             cmd_byte1: None,
         }
     }
+}
+
+#[cfg(test)]
+#[test]
+fn run_step() {
+    use crate::io::Device;
+
+    let vdp = VDP::default();
+    vdp.step();
+    assert_eq!(vdp.input(0x7E), Ok(1_u8),);
 }
