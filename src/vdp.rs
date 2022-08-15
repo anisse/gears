@@ -50,7 +50,7 @@ impl VDP {
                     if reg > 10 {
                         panic!("Unexpected high VDP register {:02X}", reg)
                     }
-                    dbg!("Writing to vdp reg", reg, data);
+                    //dbg!("Writing to vdp reg", reg, data);
                     state.reg[reg as usize] = data;
                 }
                 0x00 | 0x40 => {
@@ -59,7 +59,7 @@ impl VDP {
                     // VRAM address setup
                     state.addr = data as u16 | ((val as u16 & 0x3F) << 8);
                     state.dest = Some(WriteDest::Vram);
-                    dbg!("setup vram address", state.addr);
+                    //dbg!("setup vram address", state.addr);
                 }
                 0xC0 => {
                     // cram address setup
@@ -67,7 +67,7 @@ impl VDP {
                     assert!(data < 64);
                     state.addr = data as u16;
                     state.dest = Some(WriteDest::Cram);
-                    dbg!("setup cram address", state.addr);
+                    //dbg!("setup cram address", state.addr);
                 }
                 _ => {
                     panic!(
