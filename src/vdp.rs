@@ -115,11 +115,10 @@ impl io::Device for VDP {
         match addr & 0xFF {
             0xBF => self.write_cmd(val),
             0xBE => self.write_ram(val),
-            _ => {
-                dbg!("unknown VDP output address", addr);
-                panic!();
-                Ok(())
-            }
+            _ => Err(format!(
+                "unknown VDP output address @{:04X} ({:02X} ",
+                addr, val
+            )),
         }
     }
     fn input(&self, addr: u16) -> Result<u8, String> {
@@ -138,11 +137,7 @@ impl io::Device for VDP {
                 panic!("Unsupported input on BE");
                 Ok(0)
             }
-            _ => {
-                dbg!("unknown VDP input address", addr);
-                panic!();
-                Ok(0)
-            }
+            _ => Err(format!("unknown VDP input address @{:04X}", addr)),
         }
     }
 }
