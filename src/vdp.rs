@@ -8,7 +8,7 @@ enum StatusFlag {
     C = 1 << 5,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 enum WriteDest {
     Vram,
     Cram,
@@ -57,7 +57,7 @@ impl VDP {
                     // TODO: differentiate read and write setup ? This is only useful for timings
                     // after setup
                     // VRAM address setup
-                    state.addr = data as u16 | ((val as u16) << 8);
+                    state.addr = data as u16 | ((val as u16 & 0x3F) << 8);
                     state.dest = Some(WriteDest::Vram);
                     dbg!("setup vram address", state.addr);
                 }
@@ -89,17 +89,23 @@ impl VDP {
     fn write_ram(&self, val: u8) -> Result<(), String> {
         self.reset_byte1();
         let mut state = self.state.borrow_mut();
-        match state.dest {
-            Some(WriteDest::Vram) => {
-                let addr = state.addr as usize;
-                state.vram[addr] = val;
-                state.addr += 1;
-            }
-            Some(WriteDest::Cram) => {
-                state.addr += 1;
-            }
+        let addr = state.addr as usize;
+        let dest = state.dest;
+        let ram = match dest {
+            Some(WriteDest::Vram) => &mut state.vram,
+            Some(WriteDest::Cram) => &mut state.cram,
             None => return Err("No VDP write dest".to_string()),
+        };
+        if addr > ram.len() {
+            return Err(format!(
+                "VDP access to {:?} address too high: {:04X} / {:04X}",
+                dest,
+                addr,
+                ram.len()
+            ));
         }
+        ram[addr] = val;
+        state.addr += 1;
         Ok(())
     }
 }
