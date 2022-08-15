@@ -1,6 +1,7 @@
 mod cpu;
 mod disas;
 mod io;
+mod joystick;
 mod mem;
 mod system;
 mod vdp;
@@ -45,9 +46,11 @@ pub fn main() {
     let dbg_io = DebugIO {};
     let vdp = vdp::VDP::default();
     let sys = system::System::default();
+    let joy = joystick::Joystick::default();
     cpu.io.register(0x7E, 0x7E, 0xFF00, &vdp);
     cpu.io.register(0xBE, 0xBF, 0xFF01, &vdp);
     cpu.io.register(0, 0, 0xFF00, &sys);
+    cpu.io.register(0xDC, 0xDD, 0xFF00, &joy);
     cpu.io.register(0, 0, 0xFFFF, &dbg_io);
     loop {
         vdp.step();
