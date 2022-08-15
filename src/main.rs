@@ -2,6 +2,7 @@ mod cpu;
 mod disas;
 mod io;
 mod mem;
+mod system;
 mod vdp;
 
 use std::env;
@@ -43,8 +44,10 @@ pub fn main() {
     cpu.io = io::IO::new();
     let dbg_io = DebugIO {};
     let vdp = vdp::VDP::default();
+    let sys = system::System::default();
     cpu.io.register(0x7E, 0x7E, 0xFF00, &vdp);
     cpu.io.register(0xBE, 0xBF, 0xFF01, &vdp);
+    cpu.io.register(0, 0, 0xFF00, &sys);
     cpu.io.register(0, 0, 0xFFFF, &dbg_io);
     loop {
         vdp.step();
