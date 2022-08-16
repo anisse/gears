@@ -11,7 +11,7 @@ fn z80full() {
     let cache = gears::cpu::DisasCache::init();
 
     let mut state = cpu::init();
-    state.mem = mem::Memory::init(64 * 1024); // This test suite is for machines with more RAM
+    state.mem = mem::Memory::init(mem::Mapper::ZX64K, None); // This test suite is for machines with more RAM
     let dev = ZxSpectrumIODevice {};
     state.io.register(0, 0xFFFF, 0, &dev);
 

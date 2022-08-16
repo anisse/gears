@@ -41,7 +41,7 @@ pub fn main() {
     }
 
     let mut cpu = cpu::init();
-    cpu.mem = mem::Memory::from(data);
+    cpu.mem = mem::Memory::init(mem::Mapper::SegaGG, Some(&data));
     cpu.io = io::IO::new();
     let dbg_io = DebugIO {};
     let vdp = vdp::VDP::default();
@@ -54,6 +54,6 @@ pub fn main() {
     cpu.io.register(0, 0, 0xFFFF, &dbg_io);
     loop {
         vdp.step();
-        cpu::run(&mut cpu, 227, false).unwrap();
+        cpu::run(&mut cpu, 227, true).unwrap();
     }
 }
