@@ -28,17 +28,19 @@ struct MemValues {
 struct Test {
     //tests.in
     desc: String,
-    start_state: cpu::State<'static>,
+    start_regs: cpu::Regs,
+    start_halted: bool,
     tstate_to_run: u16,
     memory_values: Vec<MemValues>,
     //tests.expected
-    end_state: cpu::State<'static>,
+    end_regs: cpu::Regs,
+    end_halted: bool,
     events: Vec<Event>,
     tstate_ran: u16,
     changed_mem_values: Vec<MemValues>,
 }
 
-fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> {
+fn parse_cpu_regs(input: Vec<&str>, r: &mut cpu::Regs, halted: &mut bool) -> Result<u16, String> {
     let regs: Vec<&str> = input[0].split(' ').collect();
     for (i, (name, reg)) in vec![
         ("AF", RegPair::AF),
@@ -59,13 +61,13 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
             Ok(x) => x,
             Err(_) => return Err(format!("bad {} at line {}: {}", name, input[0], regs[i])),
         };
-        st.r.set_regpair(*reg, val);
+        r.set_regpair(*reg, val);
     }
 
     for (i, (name, reg)) in vec![
-        ("SP", &mut st.r.SP),
-        ("PC", &mut st.r.PC),
-        ("MEMPTR", &mut st.r.MEMPTR),
+        ("SP", &mut r.SP),
+        ("PC", &mut r.PC),
+        ("MEMPTR", &mut r.MEMPTR),
     ]
     .into_iter()
     .enumerate()
@@ -85,9 +87,9 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
 
     let regs: Vec<&str> = input[1].split_ascii_whitespace().collect();
     for (name, reg, offset) in vec![
-        ("I", &mut st.r.I, 0),
-        ("R", &mut st.r.R, 1),
-        ("Int Mode", &mut st.r.IM, 4),
+        ("I", &mut r.I, 0),
+        ("R", &mut r.R, 1),
+        ("Int Mode", &mut r.IM, 4),
     ]
     .into_iter()
     {
@@ -102,9 +104,9 @@ fn parse_cpu_regs(input: Vec<&str>, st: &mut cpu::State) -> Result<u16, String> 
         };
     }
     for (name, reg, offset) in vec![
-        ("IFF1", &mut st.r.IFF1, 2),
-        ("IFF2", &mut st.r.IFF2, 3),
-        ("halted ", &mut st.halted, 5),
+        ("IFF1", &mut r.IFF1, 2),
+        ("IFF2", &mut r.IFF2, 3),
+        ("halted ", halted, 5),
     ]
     .into_iter()
     {
@@ -172,8 +174,12 @@ fn parse_tests(input: &str, expected: &str) -> Option<Vec<Test>> {
             panic!("Mismatch test desc {} vs {}", lines[0], res[0])
         }
         t.desc = lines[0].to_string();
-        let len = parse_cpu_regs(lines[1..=2].to_vec(), &mut t.start_state)
-            .unwrap_or_else(|s| panic!("test {} ({}): {}", t.desc, i, s));
+        let len = parse_cpu_regs(
+            lines[1..=2].to_vec(),
+            &mut t.start_regs,
+            &mut t.start_halted,
+        )
+        .unwrap_or_else(|s| panic!("test {} ({}): {}", t.desc, i, s));
         t.tstate_to_run = len;
         parse_memory_values(lines[3..lines.len()].to_vec(), &mut t.memory_values)
             .unwrap_or_else(|e| panic!("test {} ({}): {}", t.desc, i, e));
@@ -227,7 +233,7 @@ fn parse_tests(input: &str, expected: &str) -> Option<Vec<Test>> {
             .cloned()
             .collect();
 
-        let len = parse_cpu_regs(cpuval, &mut t.end_state)
+        let len = parse_cpu_regs(cpuval, &mut t.end_regs, &mut t.end_halted)
             .unwrap_or_else(|e| panic!("test res {} ({}): end state {}", t.desc, i, e));
         t.tstate_ran = len;
 
@@ -274,10 +280,14 @@ fn fuse_tests() {
     .unwrap();
 
     for t in tests.iter() {
-        let mut state = t.start_state.clone();
+        let mut state = cpu::State::default();
+        state.r = t.start_regs.clone();
+        state.halted = t.start_halted;
         let mut data = mem::Memory::init(mem::Mapper::ZX64K, None); // This test suite is for machines with more RAM
         setup_memory(&t.memory_values, &mut data);
-        let mut end_state = t.end_state.clone();
+        let mut end_state = cpu::State::default();
+        end_state.r = t.end_regs.clone();
+        end_state.halted = t.end_halted;
         end_state.mem = data.clone();
         setup_memory(&t.changed_mem_values, &mut end_state.mem);
         state.mem = data;
