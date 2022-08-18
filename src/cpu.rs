@@ -988,6 +988,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             s.r.B = s.r.B.wrapping_sub(1);
             if s.r.B != 0 {
                 s.r.PC = (s.r.PC as i32 + jump as i32) as u16;
+                s.r.MEMPTR = s.r.PC;
                 update_pc = false;
             } else {
                 op_len = 8 // [5, 3]
