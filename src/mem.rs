@@ -65,12 +65,12 @@ impl Memory {
     pub fn fetch_u8(&self, addr: u16) -> u8 {
         match self.map[addr as usize >> 13] {
             Dest::ROM { start } => self.rom[((addr & !0xC000) + start) as usize],
-            Dest::RAM { start } => self.ram[((addr & !0xC000).overflowing_add(start).0) as usize],
+            Dest::RAM { start } => self.ram[((addr & !0xC000).wrapping_add(start)) as usize],
             Dest::Panic => panic!("Unmapped memory read: @{:04X}", addr),
         }
     }
     pub fn fetch_u16(&self, addr: u16) -> u16 {
-        self.fetch_u8(addr) as u16 | ((self.fetch_u8(addr.overflowing_add(1).0) as u16) << 8)
+        self.fetch_u8(addr) as u16 | ((self.fetch_u8(addr.wrapping_add(1)) as u16) << 8)
     }
 
     pub fn fetch_range_safe(&self, addr: u16, len: u16) -> &[u8] {
@@ -90,15 +90,13 @@ impl Memory {
     pub fn set_u8(&mut self, addr: u16, val: u8) {
         match self.map[addr as usize >> 13] {
             Dest::ROM { start: _ } => panic!("Write to ROM address: {:04X}", addr),
-            Dest::RAM { start } => {
-                self.ram[((addr & !0xC000).overflowing_add(start).0) as usize] = val
-            }
+            Dest::RAM { start } => self.ram[((addr & !0xC000).wrapping_add(start)) as usize] = val,
             Dest::Panic => panic!("Unmapped memory write: @{:04X}: {:02X}", addr, val),
         }
     }
     pub fn set_u16(&mut self, addr: u16, val: u16) {
         self.set_u8(addr, (val & 0xFF) as u8);
-        self.set_u8(addr.overflowing_add(1).0, ((val >> 8) & 0xFF) as u8);
+        self.set_u8(addr.wrapping_add(1), ((val >> 8) & 0xFF) as u8);
     }
 }
 
