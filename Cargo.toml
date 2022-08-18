@@ -8,5 +8,14 @@ edition = "2018"
 
 [dependencies]
 
+[dev-dependencies.criterion]
+version = "0.3"
+default-features = false
+features = ["cargo_bench_support"]
+
+[[bench]]
+name = "mem"
+harness = false
+
 [profile.release]
 debug=true
