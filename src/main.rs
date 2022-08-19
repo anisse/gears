@@ -41,7 +41,10 @@ pub fn main() {
     }
 
     let mut cpu = cpu::init();
-    cpu.mem = mem::Memory::init(mem::Mapper::SegaGG, Some(&data));
+    cpu.mem = mem::Memory::init(mem::Mapper::SegaGG {
+        rom: data,
+        backup_ram: None,
+    });
     cpu.io = io::IO::new();
     let dbg_io = DebugIO {};
     let vdp = vdp::VDP::default();

@@ -283,7 +283,7 @@ fn fuse_tests() {
         let mut state = cpu::State::default();
         state.r = t.start_regs.clone();
         state.halted = t.start_halted;
-        let mut data = mem::Memory::init(mem::Mapper::ZX64K, None); // This test suite is for machines with more RAM
+        let mut data = mem::Memory::init(mem::Mapper::ZX64K); // This test suite is for machines with more RAM
         setup_memory(&t.memory_values, &mut data);
         let mut end_state = cpu::State::default();
         end_state.r = t.end_regs.clone();
