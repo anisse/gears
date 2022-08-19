@@ -25,6 +25,19 @@ impl io::Device for DebugIO {
     }
 }
 
+struct PSGorVDP<'a> {
+    vdp: &'a vdp::VDP,
+}
+impl io::Device for PSGorVDP<'_> {
+    fn out(&self, addr: u16, val: u8) -> Result<(), String> {
+        println!("Ignored PSG write. @{:04X} {:02X}", addr, val);
+        Ok(())
+    }
+    fn input(&self, addr: u16) -> Result<u8, String> {
+        self.vdp.input(addr)
+    }
+}
+
 pub fn main() {
     let args: Vec<String> = env::args().collect();
     let file = args.get(1).expect("needs an argument");
@@ -50,10 +63,12 @@ pub fn main() {
     let vdp = vdp::VDP::default();
     let sys = system::System::default();
     let joy = joystick::Joystick::default();
+    let psg = PSGorVDP { vdp: &vdp };
     cpu.io.register(0x7E, 0x7E, 0xFF00, &vdp);
     cpu.io.register(0xBE, 0xBF, 0xFF01, &vdp);
     cpu.io.register(0, 0, 0xFF00, &sys);
     cpu.io.register(0xDC, 0xDD, 0xFF00, &joy);
+    cpu.io.register(0x7F, 0x7F, 0xFF00, &psg);
     cpu.io.register(0, 0, 0xFFFF, &dbg_io);
     loop {
         vdp.step();
