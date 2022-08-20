@@ -25,13 +25,23 @@ impl io::Device for DebugIO {
     }
 }
 
+struct PSG {}
+impl io::Device for PSG {
+    fn out(&self, addr: u16, val: u8) -> Result<(), String> {
+        println!("Ignored PSG write. @{:04X} {:02X}", addr, val);
+        Ok(())
+    }
+    fn input(&self, addr: u16) -> Result<u8, String> {
+        panic!("Unsupported PSG read @{:04X}", addr);
+    }
+}
 struct PSGorVDP<'a> {
+    psg: &'a PSG,
     vdp: &'a vdp::VDP,
 }
 impl io::Device for PSGorVDP<'_> {
     fn out(&self, addr: u16, val: u8) -> Result<(), String> {
-        println!("Ignored PSG write. @{:04X} {:02X}", addr, val);
-        Ok(())
+        self.psg.out(addr, val)
     }
     fn input(&self, addr: u16) -> Result<u8, String> {
         self.vdp.input(addr)
@@ -63,15 +73,21 @@ pub fn main() {
     let vdp = vdp::VDP::default();
     let sys = system::System::default();
     let joy = joystick::Joystick::default();
-    let psg = PSGorVDP { vdp: &vdp };
+    let psg = PSG {};
+    let pov = PSGorVDP {
+        psg: &psg,
+        vdp: &vdp,
+    };
     cpu.io.register(0x7E, 0x7E, 0xFF00, &vdp);
     cpu.io.register(0xBE, 0xBF, 0xFF01, &vdp);
     cpu.io.register(0, 0, 0xFF00, &sys);
     cpu.io.register(0xDC, 0xDD, 0xFF00, &joy);
-    cpu.io.register(0x7F, 0x7F, 0xFF00, &psg);
+    cpu.io.register(0x7F, 0x7F, 0xFF00, &pov);
+    cpu.io.register(0x06, 0x06, 0xFF00, &psg);
     cpu.io.register(0, 0, 0xFFFF, &dbg_io);
     loop {
         if vdp.step() {
+            println!("VDP sent an interrupt ! cpu IM: {:?} {:?}", cpu.r.IM, cpu.r);
             cpu::interrupt_mode_1(&mut cpu).unwrap();
         } else {
             cpu::run(&mut cpu, 227, true).unwrap();
