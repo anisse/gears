@@ -131,7 +131,14 @@ impl Memory {
 
     pub fn set_u8(&mut self, addr: u16, val: u8) {
         match self.map[addr as usize >> 13] {
-            Dest::ROM { .. } => panic!("Write to ROM address: {:04X}", addr),
+            Dest::ROM { .. } => {
+                println!(
+                    "Ignoring write to ROM address: @{:04X} = {:02X} (old:{:02X})",
+                    addr,
+                    val,
+                    self.fetch_u8(addr)
+                );
+            }
             Dest::RAM { start } => {
                 if addr >= 0xFFFC {
                     if let Mapper::SegaGG { .. } = self.mapper {
