@@ -37,9 +37,13 @@ impl VDP {
             state: RefCell::new(VDPState::default()),
         }
     }
-    pub fn step(&self) {
-        let vcounter = self.state.borrow().v_counter.overflowing_add(1).0;
-        self.state.borrow_mut().v_counter = vcounter;
+    pub fn step(&self) -> bool {
+        let mut state = self.state.borrow_mut();
+        state.v_counter = state.v_counter.wrapping_add(1);
+        if state.v_counter == 0xC0 {
+            return true;
+        }
+        false
     }
     fn write_cmd(&self, val: u8) -> Result<(), String> {
         let mut state = self.state.borrow_mut();

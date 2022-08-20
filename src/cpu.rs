@@ -114,6 +114,7 @@ pub struct State<'a> {
     pub halted: bool,
     pub mem: mem::Memory,
     pub io: io::IO<'a>,
+    pending_interrupt: bool,
 }
 
 impl Regs {
@@ -707,8 +708,13 @@ pub fn init() -> State<'static> {
     State::default()
 }
 
-pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
+pub fn run_op(s: &mut State, mut op: &disas::OpCode) -> Result<usize, String> {
     let mut update_pc = true;
+    if s.pending_interrupt && s.r.IFF1 {
+        println!("Processing interrupt");
+        s.pending_interrupt = false;
+        return run_op(s, &interrupt_op(0x38));
+    }
     let mut op_len: usize = op.tstates.iter().sum::<u8>() as usize;
     s.r.R = (((s.r.R & 0x7F) + 1) & 0x7F) | (s.r.R & 0x80);
     if op.length > 1 {
@@ -1410,6 +1416,26 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
     }
 
     Ok(op_len)
+}
+
+fn interrupt_op(vector: u8) -> disas::OpCode {
+    disas::OpCode {
+        data: Vec::new(),
+        length: 0,
+        ins: Instruction::RST,
+        op1: Some(Operand::Imm8(vector)),
+        op2: None,
+        op3: None,
+        tstates: vec![4, 5, 3, 3],
+    }
+}
+pub fn interrupt_mode_1(s: &mut State) -> Result<usize, String> {
+    if s.r.IFF1 {
+        run_op(s, &interrupt_op(0x38))
+    } else {
+        s.pending_interrupt = true;
+        Ok(0)
+    }
 }
 
 pub fn run(s: &mut State, tstates_len: usize, debug: bool) -> Result<(), String> {

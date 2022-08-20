@@ -71,7 +71,10 @@ pub fn main() {
     cpu.io.register(0x7F, 0x7F, 0xFF00, &psg);
     cpu.io.register(0, 0, 0xFFFF, &dbg_io);
     loop {
-        vdp.step();
-        cpu::run(&mut cpu, 227, true).unwrap();
+        if vdp.step() {
+            cpu::interrupt_mode_1(&mut cpu).unwrap();
+        } else {
+            cpu::run(&mut cpu, 227, true).unwrap();
+        }
     }
 }
