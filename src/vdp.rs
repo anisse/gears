@@ -128,6 +128,30 @@ impl VDP {
         }
         Ok(())
     }
+    fn read_ram(&self) -> Result<u8, String> {
+        self.reset_byte1();
+        let mut state = self.state.borrow_mut();
+        let addr = state.addr as usize;
+        let dest = state.dest;
+        match dest {
+            Some(WriteDest::Vram) => {}
+            Some(WriteDest::Cram) => {
+                return Err("Reading from Color RAM is not supported".to_string())
+            }
+            None => return Err("No VDP write dest".to_string()),
+        };
+        if addr > state.vram.len() {
+            return Err(format!(
+                "VDP access to {:?} address too high: {:04X} / {:04X}",
+                dest,
+                addr,
+                state.vram.len()
+            ));
+        }
+        let val = state.vram[addr];
+        state.addr = (state.addr + 1) & 0x3FF;
+        Ok(val)
+    }
 }
 
 impl io::Device for VDP {
@@ -152,11 +176,7 @@ impl io::Device for VDP {
                 self.reset_byte1();
                 Ok(st)
             }
-            0xBE => {
-                self.reset_byte1();
-                panic!("Unsupported input on BE");
-                Ok(0)
-            }
+            0xBE => self.read_ram(),
             _ => Err(format!("unknown VDP input address @{:04X}", addr)),
         }
     }
