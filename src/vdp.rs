@@ -169,8 +169,9 @@ impl VDP {
     fn read_status(&self) -> Result<u8, String> {
         self.reset_byte1();
         let mut state = self.state.borrow_mut();
-        state.status &= !ST_I;
-        Ok(state.status)
+        let st = state.status;
+        state.status = 0; // clear all three flags
+        Ok(st)
     }
 }
 
