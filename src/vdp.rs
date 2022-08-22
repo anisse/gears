@@ -7,6 +7,20 @@ enum StatusFlag {
     S9 = 1 << 6,
     C = 1 << 5,
 }
+const ST_I: u8 = StatusFlag::I as u8;
+
+enum Reg0Flag {
+    MVS = 1 << 7,
+    IE1 = 1 << 4,
+    EC = 1 << 3,
+}
+
+enum Reg1Flag {
+    BLANK = 1 << 6,
+    IE = 1 << 5,
+    SIZE = 1 << 1,
+}
+const REG1_IE: u8 = Reg1Flag::IE as u8;
 
 #[derive(Debug, Clone, Copy)]
 enum WriteDest {
@@ -24,7 +38,6 @@ struct VDPState {
     cram: Vec<u8>,
     cmd_byte1: Option<u8>,
     cram_byte1: Option<u8>,
-    interrupt: bool,
 }
 
 #[derive(Debug)]
@@ -42,9 +55,9 @@ impl VDP {
         let mut state = self.state.borrow_mut();
         state.v_counter = state.v_counter.wrapping_add(1);
         if state.v_counter == 0xC0 {
-            state.interrupt = true;
+            state.status |= ST_I;
         }
-        return state.interrupt;
+        return state.status & ST_I != 0 && state.reg[1] & REG1_IE != 0;
     }
     fn write_cmd(&self, val: u8) -> Result<(), String> {
         let mut state = self.state.borrow_mut();
@@ -153,6 +166,12 @@ impl VDP {
         state.addr = (state.addr + 1) & 0x3FF;
         Ok(val)
     }
+    fn read_status(&self) -> Result<u8, String> {
+        self.reset_byte1();
+        let mut state = self.state.borrow_mut();
+        state.status &= !ST_I;
+        Ok(state.status)
+    }
 }
 
 impl io::Device for VDP {
@@ -172,12 +191,7 @@ impl io::Device for VDP {
                 let vcounter = self.state.borrow().v_counter;
                 Ok(vcounter)
             }
-            0xBF => {
-                self.state.borrow_mut().interrupt = false;
-                let st = self.state.borrow().status;
-                self.reset_byte1();
-                Ok(st)
-            }
+            0xBF => self.read_status(),
             0xBE => self.read_ram(),
             _ => Err(format!("unknown VDP input address @{:04X}", addr)),
         }
@@ -201,7 +215,6 @@ impl Default for VDPState {
             status: 0,
             cmd_byte1: None,
             cram_byte1: None,
-            interrupt: false,
         }
     }
 }
