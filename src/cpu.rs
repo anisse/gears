@@ -708,11 +708,13 @@ pub fn init() -> State<'static> {
     State::default()
 }
 
-pub fn run_op(s: &mut State, mut op: &disas::OpCode) -> Result<usize, String> {
+pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
     let mut update_pc = true;
     if s.pending_interrupt && s.r.IFF1 {
         println!("Processing interrupt");
         s.pending_interrupt = false;
+        s.r.IFF1 = false;
+        s.r.IFF2 = false;
         return run_op(s, &interrupt_op(0x38));
     }
     let mut op_len: usize = op.tstates.iter().sum::<u8>() as usize;
@@ -1431,6 +1433,8 @@ fn interrupt_op(vector: u8) -> disas::OpCode {
 }
 pub fn interrupt_mode_1(s: &mut State) -> Result<usize, String> {
     if s.r.IFF1 {
+        s.r.IFF1 = false;
+        s.r.IFF2 = false;
         run_op(s, &interrupt_op(0x38))
     } else {
         s.pending_interrupt = true;

@@ -87,10 +87,9 @@ pub fn main() {
     cpu.io.register(0, 0, 0xFFFF, &dbg_io);
     loop {
         if vdp.step() {
-            println!("VDP sent an interrupt ! cpu IM: {:?} {:?}", cpu.r.IM, cpu.r);
+            //println!("VDP sent an interrupt !");
             cpu::interrupt_mode_1(&mut cpu).unwrap();
-        } else {
-            cpu::run(&mut cpu, 227, true).unwrap();
         }
+        cpu::run(&mut cpu, 227, false).unwrap();
     }
 }
