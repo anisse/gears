@@ -20,7 +20,18 @@ enum Reg1Flag {
     IE = 1 << 5,
     SIZE = 1 << 1,
 }
+const REG1_BLANK: u8 = Reg1Flag::BLANK as u8;
 const REG1_IE: u8 = Reg1Flag::IE as u8;
+
+enum PatternNameFlag {
+    RVH = 1 << 1,
+    RVV = 1 << 2,
+    CPT = 1 << 3,
+    PRI = 1 << 4,
+}
+
+const PNAME_RVH: u8 = PatternNameFlag::RVH as u8;
+const PNAME_RVV: u8 = PatternNameFlag::RVV as u8;
 
 #[derive(Debug, Clone, Copy)]
 enum WriteDest {
@@ -51,11 +62,81 @@ impl VDP {
             state: RefCell::new(VDPState::default()),
         }
     }
+
+    fn debug_screen_state(state: &VDPState) {
+        let pattern_base = ((state.reg[2] as usize) & 0x0E) << 10;
+        let sprite_base = ((state.reg[5] as usize) & 0x7E) << 7;
+
+        println!("Scroll screen: Pat name @{:04X}", pattern_base);
+        let mut chars = [false; 448];
+        for i in (0_usize..0x700).step_by(2) {
+            let b1 = state.vram[pattern_base + i + 1];
+            let character = state.vram[pattern_base + i] as u16 | (b1 as u16 & 0x1 << 8);
+            let rvh = b1 & PatternNameFlag::RVH as u8 != 0;
+            let rvv = b1 & PatternNameFlag::RVV as u8 != 0;
+            let palette1 = b1 & PatternNameFlag::CPT as u8 != 0;
+            if i > 96 && i < 672 {
+                chars[character as usize] = true;
+            }
+            if character != 0 && false {
+                println!(
+                    "Pattern {:03X}: character {:03X} revh {} revv {} pallette1 {}",
+                    i / 2,
+                    character,
+                    rvh,
+                    rvv,
+                    palette1,
+                );
+            }
+        }
+        println!("Sprites attribute @{:04X}", sprite_base);
+        for i in (0_usize..64) {
+            let v = state.vram[sprite_base + i];
+            let h = state.vram[sprite_base + 0x80 + i];
+            let ch = state.vram[sprite_base + 0x80 + i * 2 + 1];
+            chars[ch as usize] = true;
+            if ch != 0 {
+                println!("Sprite {}: {}x{} char {}", i, h, v, ch);
+            }
+        }
+        println!("Characters @0x0000");
+        for i in (0_usize..448) {
+            if chars[i] {
+                use std::io::Write;
+                let mut f = std::fs::File::create(format!("./char-{:02X}.ppm", i)).unwrap();
+                println!("Character {}", i);
+                write!(f, "P3\n").unwrap();
+                write!(f, "8 8\n").unwrap();
+                for pix in 0..64 {
+                    let addr: usize = i * 32 + (pix >> 3) * 4;
+                    let offset = 8 - (pix & 0x7);
+                    let code = (((state.vram[addr + 3] >> offset) & 1) << 3)
+                        | (((state.vram[addr + 2] >> offset) & 1) << 2)
+                        | (((state.vram[addr + 1] >> offset) & 1) << 1)
+                        | (((state.vram[addr + 0] >> offset) & 1) << 0);
+                    /*
+                    if code != 0 {
+                        println!("@{:04X} : {}", addr, code);
+                    }
+                    */
+                    let color_r = (state.cram[code as usize * 2]) & 0xF;
+                    let color_g = (state.cram[code as usize * 2] >> 4) & 0xF;
+                    let color_b = (state.cram[code as usize * 2 + 1]) & 0xF;
+                    write!(f, "{} {} {}\n", color_r * 16, color_g * 16, color_b * 16).unwrap();
+                }
+            }
+        }
+
+        //println!("Color RAM: {:?}", state.cram);
+    }
     pub fn step(&self) -> bool {
         let mut state = self.state.borrow_mut();
         state.v_counter = state.v_counter.wrapping_add(1);
         if state.v_counter == 0xC0 {
             state.status |= ST_I;
+            if state.reg[1] & REG1_BLANK != 0 {
+                Self::debug_screen_state(&state);
+            }
         }
         return state.status & ST_I != 0 && state.reg[1] & REG1_IE != 0;
     }
