@@ -86,7 +86,7 @@ impl VDP {
                     assert!(data < 64);
                     state.addr = data as u16;
                     state.dest = Some(WriteDest::Cram);
-                    //dbg!("setup cram address", state.addr);
+                    //println!("setup cram address: {:02X}", data);
                 }
                 _ => {
                     panic!(
@@ -131,12 +131,14 @@ impl VDP {
             }
             Some(WriteDest::Cram) => {
                 if addr & 1 == 0 {
+                    //println!("Upper CRAM byte set: {:02X}", val);
                     state.cram_byte1 = Some(val);
                 } else {
                     ram[addr - 1] = cram_byte1.unwrap();
                     ram[addr] = val & 0x0F;
-                    state.addr = (state.addr + 1) & 0x3F;
+                    //println!("Written to CRAM: {:02X}{:02X}", ram[addr], ram[addr - 1]);
                 }
+                state.addr = (state.addr + 1) & 0x3F;
             }
             None => unreachable!(),
         }
