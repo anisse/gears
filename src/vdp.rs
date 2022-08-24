@@ -2,36 +2,43 @@ use std::cell::RefCell;
 
 use crate::io;
 
-enum StatusFlag {
-    I = 1 << 7,
-    S9 = 1 << 6,
-    C = 1 << 5,
-}
-const ST_I: u8 = StatusFlag::I as u8;
-
-enum Reg0Flag {
-    MVS = 1 << 7,
-    IE1 = 1 << 4,
-    EC = 1 << 3,
-}
-
-enum Reg1Flag {
-    BLANK = 1 << 6,
-    IE = 1 << 5,
-    SIZE = 1 << 1,
-}
-const REG1_BLANK: u8 = Reg1Flag::BLANK as u8;
-const REG1_IE: u8 = Reg1Flag::IE as u8;
-
-enum PatternNameFlag {
-    RVH = 1 << 1,
-    RVV = 1 << 2,
-    CPT = 1 << 3,
-    PRI = 1 << 4,
+macro_rules! flag {
+    ($enum_name:ident, $($name:ident => $num:literal,)+) =>{
+        #[allow(non_camel_case_types, dead_code)]
+        enum $enum_name {
+            $($name = 1 << $num ,)+
+        }
+        $(
+            #[allow(dead_code)]
+            const $name :u8 = $enum_name::$name as u8;
+        )+
+    };
 }
 
-const PNAME_RVH: u8 = PatternNameFlag::RVH as u8;
-const PNAME_RVV: u8 = PatternNameFlag::RVV as u8;
+flag!(Status,
+    ST_I => 7,
+    ST_S9 => 6,
+    ST_C => 5,
+);
+
+flag!(Reg0,
+    REG0_MVS => 7,
+    REG0_IE1 => 4,
+    REG0_EC => 3,
+);
+
+flag!(Reg1,
+    REG1_BLANK => 6,
+    REG1_IE => 5,
+    REG1_SIZE => 1,
+);
+
+flag!(PatternName,
+    PNAME_RVH => 1,
+    PNAME_RVV => 2,
+    PNAME_CPT => 3,
+    PNAME_PRI => 4,
+);
 
 #[derive(Debug, Clone, Copy)]
 enum WriteDest {
@@ -72,9 +79,9 @@ impl VDP {
         for i in (0_usize..0x700).step_by(2) {
             let b1 = state.vram[pattern_base + i + 1];
             let character = state.vram[pattern_base + i] as u16 | (b1 as u16 & 0x1 << 8);
-            let rvh = b1 & PatternNameFlag::RVH as u8 != 0;
-            let rvv = b1 & PatternNameFlag::RVV as u8 != 0;
-            let palette1 = b1 & PatternNameFlag::CPT as u8 != 0;
+            let rvh = b1 & PNAME_RVH != 0;
+            let rvv = b1 & PNAME_RVV != 0;
+            let palette1 = b1 & PNAME_CPT != 0;
             if i > 96 && i < 672 {
                 chars[character as usize] = true;
             }
@@ -90,7 +97,7 @@ impl VDP {
             }
         }
         println!("Sprites attribute @{:04X}", sprite_base);
-        for i in (0_usize..64) {
+        for i in 0_usize..64 {
             let v = state.vram[sprite_base + i];
             let h = state.vram[sprite_base + 0x80 + i];
             let ch = state.vram[sprite_base + 0x80 + i * 2 + 1];
@@ -100,7 +107,7 @@ impl VDP {
             }
         }
         println!("Characters @0x0000");
-        for i in (0_usize..448) {
+        for i in 0_usize..448 {
             if chars[i] {
                 use std::io::Write;
                 let mut f = std::fs::File::create(format!("./char-{:02X}.ppm", i)).unwrap();
