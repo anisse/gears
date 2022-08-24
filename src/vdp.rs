@@ -70,6 +70,15 @@ impl VDP {
         }
     }
 
+    fn serialize_ppm(filename: String, width: usize, height: usize, data: &[u8]) {
+        let mut f = std::fs::File::create(filename).unwrap();
+        use std::io::Write;
+        write!(f, "P3\n").unwrap();
+        write!(f, "{} {}\n", width, height).unwrap();
+        for b in data.windows(3) {
+            write!(f, "{} {} {}\n", b[0], b[1], b[2]).unwrap();
+        }
+    }
     fn debug_screen_state(state: &VDPState) {
         let pattern_base = ((state.reg[2] as usize) & 0x0E) << 10;
         let sprite_base = ((state.reg[5] as usize) & 0x7E) << 7;
@@ -109,11 +118,8 @@ impl VDP {
         println!("Characters @0x0000");
         for i in 0_usize..448 {
             if chars[i] {
-                use std::io::Write;
-                let mut f = std::fs::File::create(format!("./char-{:02X}.ppm", i)).unwrap();
                 println!("Character {}", i);
-                write!(f, "P3\n").unwrap();
-                write!(f, "8 8\n").unwrap();
+                let mut data = vec![0_u8; 64 * 3];
                 for pix in 0..64 {
                     let addr: usize = i * 32 + (pix >> 3) * 4;
                     let offset = 8 - (pix & 0x7);
@@ -129,8 +135,11 @@ impl VDP {
                     let color_r = (state.cram[code as usize * 2]) & 0xF;
                     let color_g = (state.cram[code as usize * 2] >> 4) & 0xF;
                     let color_b = (state.cram[code as usize * 2 + 1]) & 0xF;
-                    write!(f, "{} {} {}\n", color_r * 16, color_g * 16, color_b * 16).unwrap();
+                    data[pix * 3] = color_r * 16;
+                    data[pix * 3 + 1] = color_g * 16;
+                    data[pix * 3 + 2] = color_b * 16;
                 }
+                Self::serialize_ppm(format!("./char-{:02X}.ppm", i), 8, 8, &data);
             }
         }
 
