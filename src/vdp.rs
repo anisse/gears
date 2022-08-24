@@ -79,6 +79,30 @@ impl VDP {
             write!(f, "{} {} {}\n", b[0], b[1], b[2]).unwrap();
         }
     }
+    fn character(state: &VDPState, i: usize) -> Vec<u8> {
+        assert!(i < 448);
+        let mut data = vec![0_u8; 64 * 3];
+        for pix in 0..64 {
+            let addr: usize = i * 32 + (pix >> 3) * 4;
+            let offset = 8 - (pix & 0x7);
+            let code = (((state.vram[addr + 3] >> offset) & 1) << 3)
+                | (((state.vram[addr + 2] >> offset) & 1) << 2)
+                | (((state.vram[addr + 1] >> offset) & 1) << 1)
+                | (((state.vram[addr + 0] >> offset) & 1) << 0);
+            /*
+            if code != 0 {
+                println!("@{:04X} : {}", addr, code);
+            }
+            */
+            let color_r = (state.cram[code as usize * 2]) & 0xF;
+            let color_g = (state.cram[code as usize * 2] >> 4) & 0xF;
+            let color_b = (state.cram[code as usize * 2 + 1]) & 0xF;
+            data[pix * 3] = color_r * 16;
+            data[pix * 3 + 1] = color_g * 16;
+            data[pix * 3 + 2] = color_b * 16;
+        }
+        data
+    }
     fn debug_screen_state(state: &VDPState) {
         let pattern_base = ((state.reg[2] as usize) & 0x0E) << 10;
         let sprite_base = ((state.reg[5] as usize) & 0x7E) << 7;
@@ -119,26 +143,7 @@ impl VDP {
         for i in 0_usize..448 {
             if chars[i] {
                 println!("Character {}", i);
-                let mut data = vec![0_u8; 64 * 3];
-                for pix in 0..64 {
-                    let addr: usize = i * 32 + (pix >> 3) * 4;
-                    let offset = 8 - (pix & 0x7);
-                    let code = (((state.vram[addr + 3] >> offset) & 1) << 3)
-                        | (((state.vram[addr + 2] >> offset) & 1) << 2)
-                        | (((state.vram[addr + 1] >> offset) & 1) << 1)
-                        | (((state.vram[addr + 0] >> offset) & 1) << 0);
-                    /*
-                    if code != 0 {
-                        println!("@{:04X} : {}", addr, code);
-                    }
-                    */
-                    let color_r = (state.cram[code as usize * 2]) & 0xF;
-                    let color_g = (state.cram[code as usize * 2] >> 4) & 0xF;
-                    let color_b = (state.cram[code as usize * 2 + 1]) & 0xF;
-                    data[pix * 3] = color_r * 16;
-                    data[pix * 3 + 1] = color_g * 16;
-                    data[pix * 3 + 2] = color_b * 16;
-                }
+                let data = Self::character(state, i);
                 Self::serialize_ppm(format!("./char-{:02X}.ppm", i), 8, 8, &data);
             }
         }
