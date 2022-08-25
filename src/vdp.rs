@@ -71,19 +71,43 @@ impl VDP {
     }
 
     fn serialize_ppm(filename: String, width: usize, height: usize, data: &[u8]) {
-        let mut f = std::fs::File::create(filename).unwrap();
-        use std::io::Write;
-        write!(f, "P3\n").unwrap();
-        write!(f, "{} {}\n", width, height).unwrap();
-        for b in data.windows(3) {
-            write!(f, "{} {} {}\n", b[0], b[1], b[2]).unwrap();
+        {
+            let mut f = std::fs::File::create("temp.ppm").unwrap();
+            use std::io::Write;
+            write!(f, "P3\n").unwrap();
+            write!(f, "{} {}\n", width, height).unwrap();
+            write!(f, "15\n").unwrap();
+            for (i, _) in data.iter().enumerate().step_by(3) {
+                write!(f, "{} {} {}\n", data[i], data[i + 1], data[i + 2]).unwrap();
+            }
         }
+        std::fs::rename("temp.ppm", filename).unwrap();
     }
-    fn character(state: &VDPState, i: usize) -> Vec<u8> {
-        assert!(i < 448);
-        let mut data = vec![0_u8; 64 * 3];
+    fn character(
+        state: &VDPState,
+        sprite: bool,
+        i: usize,
+        dest: &mut [u8],
+        x: usize,
+        y: usize,
+        line_length: usize,
+    ) {
+        let base = match sprite {
+            false => {
+                assert!(i < 448);
+                0
+            }
+            true => {
+                assert!(i < 256);
+                ((state.reg[6] as usize) & 0x4) << 10
+            }
+        };
+        let pallette_base = match sprite {
+            false => 0,
+            true => 32,
+        };
         for pix in 0..64 {
-            let addr: usize = i * 32 + (pix >> 3) * 4;
+            let addr: usize = base + i * 32 + (pix >> 3) * 4;
             let offset = 8 - (pix & 0x7);
             let code = (((state.vram[addr + 3] >> offset) & 1) << 3)
                 | (((state.vram[addr + 2] >> offset) & 1) << 2)
@@ -94,24 +118,28 @@ impl VDP {
                 println!("@{:04X} : {}", addr, code);
             }
             */
-            let color_r = (state.cram[code as usize * 2]) & 0xF;
-            let color_g = (state.cram[code as usize * 2] >> 4) & 0xF;
-            let color_b = (state.cram[code as usize * 2 + 1]) & 0xF;
-            data[pix * 3] = color_r * 16;
-            data[pix * 3 + 1] = color_g * 16;
-            data[pix * 3 + 2] = color_b * 16;
+            let color_r = (state.cram[pallette_base + code as usize * 2]) & 0xF;
+            let color_g = (state.cram[pallette_base + code as usize * 2] >> 4) & 0xF;
+            let color_b = (state.cram[pallette_base + code as usize * 2 + 1]) & 0xF;
+
+            let line = pix / 8;
+            let col = pix % 8;
+            dest[(y + line) * (line_length * 8 * 3) + (x + col) * 3] = color_r;
+            dest[(y + line) * (line_length * 8 * 3) + (x + col) * 3 + 1] = color_g;
+            dest[(y + line) * (line_length * 8 * 3) + (x + col) * 3 + 2] = color_b;
         }
-        data
     }
     fn debug_screen_state(state: &VDPState) {
         let pattern_base = ((state.reg[2] as usize) & 0x0E) << 10;
         let sprite_base = ((state.reg[5] as usize) & 0x7E) << 7;
 
+        println!("Double size sprites: {}", state.reg[1] & REG1_SIZE != 0);
         println!("Scroll screen: Pat name @{:04X}", pattern_base);
+        let mut bg = vec![0_u8; 32 * 28 * 8 * 8 * 3];
         let mut chars = [false; 448];
         for i in (0_usize..0x700).step_by(2) {
             let b1 = state.vram[pattern_base + i + 1];
-            let character = state.vram[pattern_base + i] as u16 | (b1 as u16 & 0x1 << 8);
+            let character = state.vram[pattern_base + i] as u16 | ((b1 as u16 & 0x1) << 8);
             let rvh = b1 & PNAME_RVH != 0;
             let rvv = b1 & PNAME_RVV != 0;
             let palette1 = b1 & PNAME_CPT != 0;
@@ -128,27 +156,62 @@ impl VDP {
                     palette1,
                 );
             }
+            let x = (i / 2) & 31; // col
+            let y = i >> 6; // row
+            Self::character(state, false, character as usize, &mut bg, x * 8, y * 8, 32);
         }
         println!("Sprites attribute @{:04X}", sprite_base);
         for i in 0_usize..64 {
             let v = state.vram[sprite_base + i];
-            let h = state.vram[sprite_base + 0x80 + i];
-            let ch = state.vram[sprite_base + 0x80 + i * 2 + 1];
-            chars[ch as usize] = true;
-            if ch != 0 {
-                println!("Sprite {}: {}x{} char {}", i, h, v, ch);
+            let h = state.vram[sprite_base + 0x80 + i * 2];
+            let ch = state.vram[sprite_base + 0x80 + i * 2 + 1] as usize;
+            chars[ch] = true;
+            if h == 0xD0 {
+                break;
+            }
+            //if ch != 0 {
+            println!("Sprite {}: {}x{} char {}", i, h, v, ch);
+            //}
+            if h < (248) && v < (220) {
+                if state.reg[1] & REG1_SIZE != 0 {
+                    // double size
+                    Self::character(
+                        state,
+                        true,
+                        ch & (!0x1),
+                        &mut bg,
+                        h as usize,
+                        v as usize,
+                        32,
+                    );
+                    Self::character(
+                        state,
+                        true,
+                        ch | 0x1,
+                        &mut bg,
+                        h as usize,
+                        v as usize + 1,
+                        32,
+                    );
+                } else {
+                    Self::character(state, true, ch, &mut bg, h as usize, v as usize, 32);
+                }
             }
         }
         println!("Characters @0x0000");
         for i in 0_usize..448 {
             if chars[i] {
-                println!("Character {}", i);
-                let data = Self::character(state, i);
+                //println!("Character {}", i);
+                /*
+                let mut data = vec![0; 8 * 8 * 3];
+                Self::character(state, false, i, &mut data, 0, 0, 1);
                 Self::serialize_ppm(format!("./char-{:02X}.ppm", i), 8, 8, &data);
+                */
             }
         }
+        Self::serialize_ppm("bg.ppm".to_string(), 32 * 8, 28 * 8, &bg);
 
-        //println!("Color RAM: {:?}", state.cram);
+        println!("Color RAM: {:?}", state.cram);
     }
     pub fn step(&self) -> bool {
         let mut state = self.state.borrow_mut();
@@ -158,6 +221,9 @@ impl VDP {
             if state.reg[1] & REG1_BLANK != 0 {
                 Self::debug_screen_state(&state);
             }
+        }
+        if state.reg[0] & REG0_IE1 != 0 {
+            println!("Down counter interrupt should be enabled");
         }
         return state.status & ST_I != 0 && state.reg[1] & REG1_IE != 0;
     }
