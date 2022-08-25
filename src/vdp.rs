@@ -229,7 +229,7 @@ impl VDP {
         match dest {
             Some(WriteDest::Vram) => {
                 ram[addr] = val;
-                state.addr = (state.addr + 1) & 0x3FF;
+                state.addr = (state.addr + 1) & 0x3FFF;
             }
             Some(WriteDest::Cram) => {
                 if addr & 1 == 0 {
