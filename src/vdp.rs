@@ -108,7 +108,7 @@ impl VDP {
         };
         for pix in 0..64 {
             let addr: usize = base + i * 32 + (pix >> 3) * 4;
-            let offset = 8 - (pix & 0x7);
+            let offset = 0x7 - (pix & 0x7);
             let code = (((state.vram[addr + 3] >> offset) & 1) << 3)
                 | (((state.vram[addr + 2] >> offset) & 1) << 2)
                 | (((state.vram[addr + 1] >> offset) & 1) << 1)
@@ -122,8 +122,8 @@ impl VDP {
             let color_g = (state.cram[pallette_base + code as usize * 2] >> 4) & 0xF;
             let color_b = (state.cram[pallette_base + code as usize * 2 + 1]) & 0xF;
 
-            let line = pix / 8;
-            let col = pix % 8;
+            let line = pix >> 3;
+            let col = pix & 0x7;
             dest[(y + line) * (line_length * 8 * 3) + (x + col) * 3] = color_r;
             dest[(y + line) * (line_length * 8 * 3) + (x + col) * 3 + 1] = color_g;
             dest[(y + line) * (line_length * 8 * 3) + (x + col) * 3 + 2] = color_b;
