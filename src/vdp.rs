@@ -99,7 +99,7 @@ impl VDP {
             }
             true => {
                 assert!(i < 256);
-                ((state.reg[6] as usize) & 0x4) << 10
+                ((state.reg[6] as usize) & 0x4) << 11
             }
         };
         let pallette_base = match sprite {
