@@ -113,6 +113,10 @@ impl VDP {
                 | (((state.vram[addr + 2] >> offset) & 1) << 2)
                 | (((state.vram[addr + 1] >> offset) & 1) << 1)
                 | (((state.vram[addr + 0] >> offset) & 1) << 0);
+            if sprite && code == 0 {
+                //transparent
+                continue;
+            }
             /*
             if code != 0 {
                 println!("@{:04X} : {}", addr, code);
