@@ -194,7 +194,7 @@ impl VDP {
                         ch | 0x1,
                         &mut bg,
                         h as usize,
-                        v as usize + 1,
+                        v as usize + 8,
                         32,
                     );
                 } else {
