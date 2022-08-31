@@ -176,7 +176,7 @@ impl VDP {
             //if ch != 0 {
             println!("Sprite {}: {}x{} char {}", i, h, v, ch);
             //}
-            if h < (248) && v < (220) {
+            if h < 248 && v < 220 {
                 if state.reg[1] & REG1_SIZE != 0 {
                     // double size
                     Self::character(
