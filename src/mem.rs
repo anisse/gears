@@ -165,6 +165,7 @@ impl Memory {
         let d2 = Dest::ROM {
             start: ((val as u32) << 14) + 0x2000,
         };
+        //println!("setting bank {} to dest {:?}", num, &d1);
         self.map[num * 2] = d1;
         self.map[num * 2 + 1] = d2;
     }

@@ -28,7 +28,7 @@ impl io::Device for DebugIO {
 struct PSG {}
 impl io::Device for PSG {
     fn out(&self, addr: u16, val: u8) -> Result<(), String> {
-        println!("Ignored PSG write. @{:04X} {:02X}", addr, val);
+        //println!("Ignored PSG write. @{:04X} {:02X}", addr, val);
         Ok(())
     }
     fn input(&self, addr: u16) -> Result<u8, String> {
