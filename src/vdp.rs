@@ -139,7 +139,7 @@ impl VDP {
 
         println!("Double size sprites: {}", state.reg[1] & REG1_SIZE != 0);
         println!("Scroll screen: Pat name @{:04X}", pattern_base);
-        let mut bg = vec![0_u8; 32 * 28 * 8 * 8 * 3];
+        let mut bg = vec![0x0F_u8; 32 * 28 * 8 * 8 * 3];
         let mut chars = [false; 448];
         for i in (0_usize..0x700).step_by(2) {
             let b1 = state.vram[pattern_base + i + 1];
@@ -170,7 +170,7 @@ impl VDP {
             let h = state.vram[sprite_base + 0x80 + i * 2];
             let ch = state.vram[sprite_base + 0x80 + i * 2 + 1] as usize;
             chars[ch] = true;
-            if h == 0xD0 {
+            if h == 0xE0 {
                 break;
             }
             //if ch != 0 {
