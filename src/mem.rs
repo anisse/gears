@@ -172,7 +172,9 @@ impl Memory {
     fn rom_banking(&mut self, addr: u16, val: u8) {
         match addr {
             0xFFFC => {
+                /* BANK CONTROL REGISTER */
                 if val & 0x08 != 0 {
+                    /* Select Backup RAM */
                     if let Mapper::SegaGG { backup_ram, .. } = &mut self.mapper {
                         if backup_ram.is_none() {
                             backup_ram.replace(vec![0; 8192]);
@@ -192,6 +194,7 @@ impl Memory {
                 }
             }
             0xFFFD => {
+                /* BANK REGISTER 0 */
                 if val != 0 {
                     panic!(
                         "Unimplemented mapping of slot 0 (first 1K preserved interrupt vectors)"
@@ -199,9 +202,11 @@ impl Memory {
                 }
                 self.set_bank(0, val);
             }
-            0xFFFE => self.set_bank(1, val),
+            0xFFFE => self.set_bank(1, val), /* BANK REGISTER 1 */
             0xFFFF => {
+                /* BANK REGISTER 2 */
                 if self.ram[0x1FFC] & 0x08 != 0 {
+                    /* Backup RAM overrides this */
                     return;
                 }
                 self.set_bank(2, val);
