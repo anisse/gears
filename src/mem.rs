@@ -28,7 +28,7 @@ pub struct Memory {
 // TODO: mem errors
 impl Memory {
     pub fn init(mapper: Mapper) -> Memory {
-        let mut mem = match mapper {
+        match mapper {
             Mapper::ZX64K => Memory {
                 ram: vec![0; 0x10000],
                 mapper: match mapper {
@@ -50,26 +50,17 @@ impl Memory {
                 ram: vec![0; 8192],
                 mapper,
                 map: [
-                    Dest::Panic,
-                    Dest::Panic,
-                    Dest::Panic,
-                    Dest::Panic,
-                    Dest::Panic,
-                    Dest::Panic,
+                    Dest::ROM { start: 0x0000 },
+                    Dest::ROM { start: 0x2000 },
+                    Dest::ROM { start: 0x4000 },
+                    Dest::ROM { start: 0x6000 },
+                    Dest::ROM { start: 0x8000 },
+                    Dest::ROM { start: 0xA000 },
                     Dest::RAM { start: 0x0 },
                     Dest::RAM { start: 0x0 },
                 ],
             },
-        };
-        if let Mapper::SegaGG { .. } = mem.mapper {
-            mem.map[0] = Dest::ROM { start: 0x0000 };
-            mem.map[1] = Dest::ROM { start: 0x2000 };
-            mem.map[2] = Dest::ROM { start: 0x4000 };
-            mem.map[3] = Dest::ROM { start: 0x6000 };
-            mem.map[4] = Dest::ROM { start: 0x8000 };
-            mem.map[5] = Dest::ROM { start: 0xA000 };
-        } // addititional mappings will be done at runtime
-        mem
+        }
     }
     pub fn fetch_u8(&self, addr: u16) -> u8 {
         match self.map[addr as usize >> 13] {
