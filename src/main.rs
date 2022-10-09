@@ -16,19 +16,19 @@ impl io::Device for DebugIO {
     fn out(&self, addr: u16, val: u8) -> Result<(), String> {
         println!("Unknown I/O write: @{:04X} {:02X} ", addr, val);
         panic!();
-        Ok(())
+        //Ok(())
     }
     fn input(&self, addr: u16) -> Result<u8, String> {
         println!("Unknown I/O read: @{:04X}, sending 0", addr);
         panic!();
-        Ok(0)
+        //Ok(0)
     }
 }
 
 struct PSG {}
 impl io::Device for PSG {
-    fn out(&self, addr: u16, val: u8) -> Result<(), String> {
-        //println!("Ignored PSG write. @{:04X} {:02X}", addr, val);
+    fn out(&self, _addr: u16, _val: u8) -> Result<(), String> {
+        //println!("Ignored PSG write. @{:04X} {:02X}", _addr, _val);
         Ok(())
     }
     fn input(&self, addr: u16) -> Result<u8, String> {
