@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use gears::cpu::RegPair;
 use gears::{cpu, io, mem};
 
@@ -293,8 +295,8 @@ fn fuse_tests() {
         state.mem = data;
         state.io = io::IO::default();
         end_state.io = io::IO::default();
-        let dev = ZxSpectrumIODevice {};
-        state.io.register(0, 0xFFFF, 0, &dev);
+        let dev = Rc::new(ZxSpectrumIODevice {});
+        state.io.register(0, 0xFFFF, 0, dev);
 
         dbg!(t);
         cpu::run(&mut state, t.tstate_to_run as usize, true).unwrap();

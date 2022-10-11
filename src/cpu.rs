@@ -108,12 +108,12 @@ pub struct Regs {
 
 #[derive(Default, Debug, PartialEq, Clone)]
 #[allow(non_snake_case)]
-pub struct State<'a> {
+pub struct State {
     pub r: Regs,
     q: FChanged,
     pub halted: bool,
     pub mem: mem::Memory,
-    pub io: io::IO<'a>,
+    pub io: io::IO,
     pending_interrupt: bool,
 }
 
@@ -704,7 +704,7 @@ fn io_block_repeat(r: &Regs, op_len: &mut usize) -> bool {
     false
 }
 
-pub fn init() -> State<'static> {
+pub fn init() -> State {
     State::default()
 }
 

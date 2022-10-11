@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, rc::Rc};
 
 pub trait Device {
     // XXX: maybe use upper 8 bits of address bus ? we don't need it for now
@@ -7,23 +7,23 @@ pub trait Device {
 }
 
 #[derive(Clone)]
-struct Entry<'a> {
+struct Entry {
     start: u16,
     end: u16,
     /// ignored bits
     ignore_mask: u16,
-    dev: &'a dyn Device,
+    dev: Rc<dyn Device>,
 }
 #[derive(Clone)]
-pub struct IO<'a> {
-    devs: Vec<Entry<'a>>,
+pub struct IO {
+    devs: Vec<Entry>,
 }
 
-impl<'a> IO<'a> {
+impl IO {
     pub fn new() -> Self {
         IO { devs: Vec::new() }
     }
-    pub fn register(&mut self, start: u16, end: u16, ignore_mask: u16, dev: &'a dyn Device) {
+    pub fn register(&mut self, start: u16, end: u16, ignore_mask: u16, dev: Rc<dyn Device>) {
         self.devs.push(Entry {
             start,
             end,
@@ -49,20 +49,20 @@ impl<'a> IO<'a> {
     }
 }
 
-impl<'a> PartialEq for IO<'a> {
+impl PartialEq for IO {
     fn eq(&self, _: &Self) -> bool {
         // Nothing to compare here
         true
     }
 }
 
-impl<'a> Default for IO<'a> {
+impl<'a> Default for IO {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> Debug for IO<'a> {
+impl<'a> Debug for IO {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         f.write_str("")
     }

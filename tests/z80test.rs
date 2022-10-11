@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use gears::{cpu, io, mem};
 
 // Heavily inspired by iz80's test
@@ -12,8 +14,8 @@ fn z80full() {
 
     let mut state = cpu::init();
     state.mem = mem::Memory::init(mem::Mapper::ZX64K); // This test suite is for machines with more RAM
-    let dev = ZxSpectrumIODevice {};
-    state.io.register(0, 0xFFFF, 0, &dev);
+    let dev = Rc::new(ZxSpectrumIODevice {});
+    state.io.register(0, 0xFFFF, 0, dev);
 
     let skip = 0x5B; // do not parse .tap header
     let load_addr = 0x8000;

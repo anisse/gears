@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::cpu;
 use crate::io;
 use crate::joystick;
@@ -30,8 +32,8 @@ impl io::Device for PSG {
     }
 }
 struct PSGorVDP {
-    psg: PSG,
-    vdp: vdp::VDP,
+    psg: Rc<PSG>,
+    vdp: Rc<vdp::VDP>,
 }
 impl io::Device for PSGorVDP {
     fn out(&self, addr: u16, val: u8) -> Result<(), String> {
@@ -42,51 +44,81 @@ impl io::Device for PSGorVDP {
     }
 }
 
-pub struct Emulator<'a> {
-    cpu: cpu::State<'a>,
+pub struct Emulator {
+    cpu: cpu::State,
+    devs: Devices,
 }
 
-pub struct Devices {
-    dbg_io: DebugIO,
-    sys: system::System,
-    joy: joystick::Joystick,
-    pov: PSGorVDP,
+struct Devices {
+    dbg_io: Rc<DebugIO>,
+    sys: Rc<system::System>,
+    joy: Rc<joystick::Joystick>,
+    pov: Rc<PSGorVDP>,
 }
 impl Devices {
     pub fn new() -> Self {
         Self {
-            dbg_io: DebugIO {},
-            sys: system::System::default(),
-            joy: joystick::Joystick::default(),
-            pov: PSGorVDP {
-                psg: PSG {},
-                vdp: vdp::VDP::default(),
-            },
+            dbg_io: Rc::new(DebugIO {}),
+            sys: Rc::new(system::System::default()),
+            joy: Rc::new(joystick::Joystick::default()),
+            pov: Rc::new(PSGorVDP {
+                psg: Rc::new(PSG {}),
+                vdp: Rc::new(vdp::VDP::default()),
+            }),
         }
     }
 }
-impl<'a> Emulator<'a> {
-    pub fn init(rom: Vec<u8>, devs: &'a Devices) -> Self {
-        let mut emu = Self { cpu: cpu::init() };
+impl Emulator {
+    pub fn init(rom: Vec<u8>) -> Self {
+        let mut emu = Self {
+            cpu: cpu::init(),
+            devs: Devices::new(),
+        };
         emu.cpu.mem = mem::Memory::init(mem::Mapper::SegaGG {
             rom,
             backup_ram: None,
         });
         emu.cpu.io = io::IO::new();
-        emu.register(devs);
+        emu.register();
         emu
     }
-    fn register(&mut self, devices: &'a Devices) {
-        self.cpu.io.register(0x7E, 0x7E, 0xFF00, &devices.pov.vdp);
-        self.cpu.io.register(0xBE, 0xBF, 0xFF01, &devices.pov.vdp);
-        self.cpu.io.register(0, 0, 0xFF00, &devices.sys);
-        self.cpu.io.register(0xDC, 0xDD, 0xFF00, &devices.joy);
-        self.cpu.io.register(0x7F, 0x7F, 0xFF00, &devices.pov);
-        self.cpu.io.register(0x06, 0x06, 0xFF00, &devices.pov.psg);
-        self.cpu.io.register(0, 0, 0xFFFF, &devices.dbg_io);
+    fn register(&mut self) {
+        let vdp: Rc<dyn io::Device> = Rc::clone(&self.devs.pov.vdp) as Rc<dyn io::Device>;
+        self.cpu.io.register(0x7E, 0x7E, 0xFF00, Rc::clone(&vdp));
+        self.cpu.io.register(0xBE, 0xBF, 0xFF01, vdp);
+        self.cpu.io.register(
+            0,
+            0,
+            0xFF00,
+            Rc::clone(&self.devs.sys) as Rc<dyn io::Device>,
+        );
+        self.cpu.io.register(
+            0xDC,
+            0xDD,
+            0xFF00,
+            Rc::clone(&self.devs.joy) as Rc<dyn io::Device>,
+        );
+        self.cpu.io.register(
+            0x7F,
+            0x7F,
+            0xFF00,
+            Rc::clone(&self.devs.pov) as Rc<dyn io::Device>,
+        );
+        self.cpu.io.register(
+            0x06,
+            0x06,
+            0xFF00,
+            Rc::clone(&self.devs.pov.psg) as Rc<dyn io::Device>,
+        );
+        self.cpu.io.register(
+            0,
+            0,
+            0xFFFF,
+            Rc::clone(&self.devs.dbg_io) as Rc<dyn io::Device>,
+        );
     }
-    pub fn step(&mut self, devices: &Devices) {
-        if devices.pov.vdp.step() {
+    pub fn step(&mut self) {
+        if self.devs.pov.vdp.step() {
             //println!("VDP sent an interrupt !");
             cpu::interrupt_mode_1(&mut self.cpu).unwrap();
         }

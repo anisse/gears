@@ -27,9 +27,8 @@ pub fn main() {
         panic!("Could not read {}: {}", path.display(), why);
     }
 
-    let devs = emu::Devices::new();
-    let mut emu = emu::Emulator::init(data, &devs);
+    let mut emu = emu::Emulator::init(data);
     loop {
-        emu.step(&devs);
+        emu.step();
     }
 }
