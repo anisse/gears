@@ -459,6 +459,7 @@ dependencies = [
 name = "gears-ui"
 version = "0.1.0"
 dependencies = [
+ "gears",
  "pixels",
  "winit",
 ]

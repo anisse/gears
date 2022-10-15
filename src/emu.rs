@@ -117,11 +117,16 @@ impl Emulator {
             Rc::clone(&self.devs.dbg_io) as Rc<dyn io::Device>,
         );
     }
-    pub fn step(&mut self) {
-        if self.devs.pov.vdp.step() {
+    pub fn step(&mut self, pixels: &mut [u8]) -> bool {
+        let (int, render) = self.devs.pov.vdp.step(pixels);
+        if let vdp::VDPInt::InterruptGenerated = int {
             //println!("VDP sent an interrupt !");
             cpu::interrupt_mode_1(&mut self.cpu).unwrap();
         }
         cpu::run(&mut self.cpu, 227, false).unwrap();
+        if let vdp::VDPDisplay::ScreenDone = render {
+            return true;
+        }
+        false
     }
 }

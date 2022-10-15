@@ -62,6 +62,17 @@ struct VDPState {
 pub struct VDP {
     state: RefCell<VDPState>,
 }
+#[derive(Debug)]
+pub enum VDPInt {
+    NoInterrupt,
+    InterruptGenerated,
+}
+
+#[derive(Debug)]
+pub enum VDPDisplay {
+    NoDisplay,
+    ScreenDone,
+}
 
 impl VDP {
     pub fn new() -> Self {
@@ -70,7 +81,7 @@ impl VDP {
         }
     }
 
-    fn serialize_ppm(filename: String, width: usize, height: usize, data: &[u8]) {
+    fn _serialize_ppm(filename: String, width: usize, height: usize, data: &[u8]) {
         {
             let mut f = std::fs::File::create("temp.ppm").unwrap();
             use std::io::Write;
@@ -128,18 +139,19 @@ impl VDP {
 
             let line = pix >> 3;
             let col = pix & 0x7;
-            dest[(y + line) * (line_length * 8 * 3) + (x + col) * 3] = color_r;
-            dest[(y + line) * (line_length * 8 * 3) + (x + col) * 3 + 1] = color_g;
-            dest[(y + line) * (line_length * 8 * 3) + (x + col) * 3 + 2] = color_b;
+            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4] = color_r << 4;
+            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4 + 1] = color_g << 4;
+            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4 + 2] = color_b << 4;
+            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4 + 3] = 0xFF;
         }
     }
-    fn debug_screen_state(state: &VDPState) {
+    fn render_screen(state: &VDPState, pixels: &mut [u8]) {
         let pattern_base = ((state.reg[2] as usize) & 0x0E) << 10;
         let sprite_base = ((state.reg[5] as usize) & 0x7E) << 7;
 
         println!("Double size sprites: {}", state.reg[1] & REG1_SIZE != 0);
         println!("Scroll screen: Pat name @{:04X}", pattern_base);
-        let mut bg = vec![0x0F_u8; 32 * 28 * 8 * 8 * 3];
+        //let mut bg = vec![0x0F_u8; 32 * 28 * 8 * 8 * 3];
         let mut chars = [false; 448];
         for i in (0_usize..0x700).step_by(2) {
             let b1 = state.vram[pattern_base + i + 1];
@@ -162,7 +174,7 @@ impl VDP {
             }
             let x = (i / 2) & 31; // col
             let y = i >> 6; // row
-            Self::character(state, false, character as usize, &mut bg, x * 8, y * 8, 32);
+            Self::character(state, false, character as usize, pixels, x * 8, y * 8, 32);
         }
         println!("Sprites attribute @{:04X}", sprite_base);
         for i in 0_usize..64 {
@@ -179,26 +191,18 @@ impl VDP {
             if h < 248 && v < 220 {
                 if state.reg[1] & REG1_SIZE != 0 {
                     // double size
-                    Self::character(
-                        state,
-                        true,
-                        ch & (!0x1),
-                        &mut bg,
-                        h as usize,
-                        v as usize,
-                        32,
-                    );
+                    Self::character(state, true, ch & (!0x1), pixels, h as usize, v as usize, 32);
                     Self::character(
                         state,
                         true,
                         ch | 0x1,
-                        &mut bg,
+                        pixels,
                         h as usize,
                         v as usize + 8,
                         32,
                     );
                 } else {
-                    Self::character(state, true, ch, &mut bg, h as usize, v as usize, 32);
+                    Self::character(state, true, ch, pixels, h as usize, v as usize, 32);
                 }
             }
         }
@@ -213,23 +217,30 @@ impl VDP {
                 */
             }
         }
-        Self::serialize_ppm("bg.ppm".to_string(), 32 * 8, 28 * 8, &bg);
+        //Self::serialize_ppm("bg.ppm".to_string(), 32 * 8, 28 * 8, &bg);
 
         println!("Color RAM: {:?}", state.cram);
     }
-    pub fn step(&self) -> bool {
+    pub fn step(&self, pixels: &mut [u8]) -> (VDPInt, VDPDisplay) {
         let mut state = self.state.borrow_mut();
         state.v_counter = state.v_counter.wrapping_add(1);
+        let mut rendered = VDPDisplay::NoDisplay;
         if state.v_counter == 0xC0 {
             state.status |= ST_I;
             if state.reg[1] & REG1_BLANK != 0 {
-                Self::debug_screen_state(&state);
+                Self::render_screen(&state, pixels);
+                rendered = VDPDisplay::ScreenDone;
             }
         }
         if state.reg[0] & REG0_IE1 != 0 {
             println!("Down counter interrupt should be enabled");
         }
-        return state.status & ST_I != 0 && state.reg[1] & REG1_IE != 0;
+        let interrupt = if state.status & ST_I != 0 && state.reg[1] & REG1_IE != 0 {
+            VDPInt::InterruptGenerated
+        } else {
+            VDPInt::NoInterrupt
+        };
+        (interrupt, rendered)
     }
     fn write_cmd(&self, val: u8) -> Result<(), String> {
         let mut state = self.state.borrow_mut();
@@ -400,6 +411,7 @@ fn run_step() {
     use crate::io::Device;
 
     let vdp = VDP::default();
-    vdp.step();
+    let mut pixels = vec![0; 32 * 8 * 28 * 8 * 4];
+    vdp.step(&mut pixels);
     assert_eq!(vdp.input(0x7E), Ok(1_u8),);
 }

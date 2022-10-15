@@ -28,7 +28,8 @@ pub fn main() {
     }
 
     let mut emu = emu::Emulator::init(data);
+    let mut pixels = vec![0; 32 * 8 * 28 * 8 * 4];
     loop {
-        emu.step();
+        emu.step(&mut pixels);
     }
 }
