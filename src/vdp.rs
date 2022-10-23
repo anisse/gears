@@ -74,6 +74,245 @@ pub enum VDPDisplay {
     ScreenDone,
 }
 
+impl VDPState {
+    fn character(
+        &self,
+        sprite: bool,
+        i: usize,
+        dest: &mut [u8],
+        x: usize,
+        y: usize,
+        line_length: usize,
+    ) {
+        let base = match sprite {
+            false => {
+                assert!(i < 448);
+                0
+            }
+            true => {
+                assert!(i < 256);
+                ((self.reg[6] as usize) & 0x4) << 11
+            }
+        };
+        let pallette_base = match sprite {
+            false => 0,
+            true => 32,
+        };
+        if sprite {
+            println!("i{}: @{:04X} : {} {}x{}", i, base, pallette_base, x, y);
+        }
+        for pix in 0..64 {
+            let addr: usize = base + i * 32 + (pix >> 3) * 4;
+            let offset = 0x7 - (pix & 0x7);
+            let code = (((self.vram[addr + 3] >> offset) & 1) << 3)
+                | (((self.vram[addr + 2] >> offset) & 1) << 2)
+                | (((self.vram[addr + 1] >> offset) & 1) << 1)
+                | (((self.vram[addr + 0] >> offset) & 1) << 0);
+            if sprite && (i | 0x1) == 39 {
+                println!("@{:04X} : {}", addr, code);
+            }
+            if sprite && code == 0 {
+                //transparent
+                continue;
+            }
+            /*
+            if code != 0 {
+                println!("@{:04X} : {}", addr, code);
+            }
+            */
+            let color_r = (self.cram[pallette_base + code as usize * 2]) & 0xF;
+            let color_g = (self.cram[pallette_base + code as usize * 2] >> 4) & 0xF;
+            let color_b = (self.cram[pallette_base + code as usize * 2 + 1]) & 0xF;
+
+            let line = pix >> 3;
+            let col = pix & 0x7;
+            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4] = color_r << 4;
+            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4 + 1] = color_g << 4;
+            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4 + 2] = color_b << 4;
+            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4 + 3] = 0xFF;
+        }
+    }
+    fn render_screen(&self, pixels: &mut [u8]) {
+        let pattern_base = ((self.reg[2] as usize) & 0x0E) << 10;
+        let sprite_base = ((self.reg[5] as usize) & 0x7E) << 7;
+
+        println!("Double size sprites: {}", self.reg[1] & REG1_SIZE != 0);
+        println!("Scroll screen: Pat name @{:04X}", pattern_base);
+        //let mut bg = vec![0x0F_u8; 32 * 28 * 8 * 8 * 3];
+        let mut chars = [false; 448];
+        for i in (0_usize..0x700).step_by(2) {
+            let b1 = self.vram[pattern_base + i + 1];
+            let character = self.vram[pattern_base + i] as u16 | ((b1 as u16 & 0x1) << 8);
+            let rvh = b1 & PNAME_RVH != 0;
+            let rvv = b1 & PNAME_RVV != 0;
+            let palette1 = b1 & PNAME_CPT != 0;
+            if i > 96 && i < 672 {
+                chars[character as usize] = true;
+            }
+            if character != 0 && false {
+                println!(
+                    "Pattern {:03X}: character {:03X} revh {} revv {} pallette1 {}",
+                    i / 2,
+                    character,
+                    rvh,
+                    rvv,
+                    palette1,
+                );
+            }
+            let x = (i / 2) & 31; // col
+            let y = i >> 6; // row
+            self.character(false, character as usize, pixels, x * 8, y * 8, 32);
+        }
+        println!("Sprites attribute @{:04X}", sprite_base);
+        for i in 0_usize..64 {
+            let v = self.vram[sprite_base + i];
+            let h = self.vram[sprite_base + 0x80 + i * 2];
+            let ch = self.vram[sprite_base + 0x80 + i * 2 + 1] as usize;
+            chars[ch] = true;
+            if h == 0xE0 {
+                break;
+            }
+            //if ch != 0 {
+            println!("Sprite {}: {}x{} char {}", i, h, v, ch);
+            //}
+            if h < 248 && v < 220 {
+                if self.reg[1] & REG1_SIZE != 0 {
+                    println!("Sprite {}: {}x{} char {}", i, h, v, ch);
+                    // double size
+                    self.character(true, ch & (!0x1), pixels, h as usize, v as usize, 32);
+                    self.character(true, ch | 0x1, pixels, h as usize, v as usize + 8, 32);
+                } else {
+                    self.character(true, ch, pixels, h as usize, v as usize, 32);
+                }
+            }
+        }
+        println!("Characters @0x0000");
+        for i in 0_usize..448 {
+            if chars[i] {
+                //println!("Character {}", i);
+                /*
+                let mut data = vec![0; 8 * 8 * 3];
+                Self::character(self, false, i, &mut data, 0, 0, 1);
+                Self::serialize_ppm(format!("./char-{:02X}.ppm", i), 8, 8, &data);
+                */
+            }
+        }
+        //Self::serialize_ppm("bg.ppm".to_string(), 32 * 8, 28 * 8, &bg);
+
+        println!("Color RAM: {:?}", self.cram);
+    }
+    fn write_cmd(&mut self, val: u8) -> Result<(), String> {
+        match self.cmd_byte1.take() {
+            Some(data) => match val & 0xC0 {
+                0x80 => {
+                    // This is a register write
+                    let reg = val & !0x80;
+                    if reg > 10 {
+                        panic!("Unexpected high VDP register {:02X}", reg)
+                    }
+                    //dbg!("Writing to vdp reg", reg, data);
+                    self.reg[reg as usize] = data;
+                }
+                0x00 | 0x40 => {
+                    // TODO: differentiate read and write setup ? This is only useful for timings
+                    // after setup
+                    // VRAM address setup
+                    self.addr = data as u16 | ((val as u16 & 0x3F) << 8);
+                    self.dest = Some(WriteDest::Vram);
+                    //dbg!("setup vram address", self.addr);
+                }
+                0xC0 => {
+                    // cram address setup
+                    assert_eq!(val, 0xC0);
+                    assert!(data < 64);
+                    self.addr = data as u16;
+                    self.dest = Some(WriteDest::Cram);
+                    //println!("setup cram address: {:02X}", data);
+                }
+                _ => {
+                    panic!(
+                        "Unexpected high bits in VDP register selection: {:02X} ({:02X})",
+                        val,
+                        val & 0xC0
+                    )
+                }
+            },
+            None => self.cmd_byte1 = Some(val),
+        }
+        Ok(())
+    }
+    fn reset_byte1(&mut self) {
+        self.cmd_byte1.take();
+    }
+
+    fn write_ram(&mut self, val: u8) -> Result<(), String> {
+        self.reset_byte1();
+        let addr = self.addr as usize;
+        let dest = self.dest;
+        let cram_byte1 = self.cram_byte1;
+        let ram = match dest {
+            Some(WriteDest::Vram) => &mut self.vram,
+            Some(WriteDest::Cram) => &mut self.cram,
+            None => return Err("No VDP write dest".to_string()),
+        };
+        if addr > ram.len() {
+            return Err(format!(
+                "VDP access to {:?} address too high: {:04X} / {:04X}",
+                dest,
+                addr,
+                ram.len()
+            ));
+        }
+        match dest {
+            Some(WriteDest::Vram) => {
+                ram[addr] = val;
+                self.addr = (self.addr + 1) & 0x3FFF;
+            }
+            Some(WriteDest::Cram) => {
+                if addr & 1 == 0 {
+                    //println!("Upper CRAM byte set: {:02X}", val);
+                    self.cram_byte1 = Some(val);
+                } else {
+                    ram[addr - 1] = cram_byte1.unwrap();
+                    ram[addr] = val & 0x0F;
+                    //println!("Written to CRAM: {:02X}{:02X}", ram[addr], ram[addr - 1]);
+                }
+                self.addr = (self.addr + 1) & 0x3F;
+            }
+            None => unreachable!(),
+        }
+        Ok(())
+    }
+    fn read_ram(&mut self) -> Result<u8, String> {
+        self.reset_byte1();
+        let addr = self.addr as usize;
+        let dest = self.dest;
+        match dest {
+            Some(WriteDest::Vram) => {}
+            Some(WriteDest::Cram) => {
+                return Err("Reading from Color RAM is not supported".to_string())
+            }
+            None => return Err("No VDP write dest".to_string()),
+        };
+        if addr > self.vram.len() {
+            return Err(format!(
+                "VDP access to {:?} address too high: {:04X} / {:04X}",
+                dest,
+                addr,
+                self.vram.len()
+            ));
+        }
+        let val = self.vram[addr];
+        self.addr = (self.addr + 1) & 0x3FF;
+        Ok(val)
+    }
+    fn read_status(&mut self) -> Result<u8, String> {
+        self.reset_byte1();
+        let st = self.status;
+        self.status = 0; // clear all three flags
+        Ok(st)
+    }
+}
 impl VDP {
     pub fn new() -> Self {
         VDP {
@@ -94,133 +333,6 @@ impl VDP {
         }
         std::fs::rename("temp.ppm", filename).unwrap();
     }
-    fn character(
-        state: &VDPState,
-        sprite: bool,
-        i: usize,
-        dest: &mut [u8],
-        x: usize,
-        y: usize,
-        line_length: usize,
-    ) {
-        let base = match sprite {
-            false => {
-                assert!(i < 448);
-                0
-            }
-            true => {
-                assert!(i < 256);
-                ((state.reg[6] as usize) & 0x4) << 11
-            }
-        };
-        let pallette_base = match sprite {
-            false => 0,
-            true => 32,
-        };
-        for pix in 0..64 {
-            let addr: usize = base + i * 32 + (pix >> 3) * 4;
-            let offset = 0x7 - (pix & 0x7);
-            let code = (((state.vram[addr + 3] >> offset) & 1) << 3)
-                | (((state.vram[addr + 2] >> offset) & 1) << 2)
-                | (((state.vram[addr + 1] >> offset) & 1) << 1)
-                | (((state.vram[addr + 0] >> offset) & 1) << 0);
-            if sprite && code == 0 {
-                //transparent
-                continue;
-            }
-            /*
-            if code != 0 {
-                println!("@{:04X} : {}", addr, code);
-            }
-            */
-            let color_r = (state.cram[pallette_base + code as usize * 2]) & 0xF;
-            let color_g = (state.cram[pallette_base + code as usize * 2] >> 4) & 0xF;
-            let color_b = (state.cram[pallette_base + code as usize * 2 + 1]) & 0xF;
-
-            let line = pix >> 3;
-            let col = pix & 0x7;
-            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4] = color_r << 4;
-            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4 + 1] = color_g << 4;
-            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4 + 2] = color_b << 4;
-            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4 + 3] = 0xFF;
-        }
-    }
-    fn render_screen(state: &VDPState, pixels: &mut [u8]) {
-        let pattern_base = ((state.reg[2] as usize) & 0x0E) << 10;
-        let sprite_base = ((state.reg[5] as usize) & 0x7E) << 7;
-
-        println!("Double size sprites: {}", state.reg[1] & REG1_SIZE != 0);
-        println!("Scroll screen: Pat name @{:04X}", pattern_base);
-        //let mut bg = vec![0x0F_u8; 32 * 28 * 8 * 8 * 3];
-        let mut chars = [false; 448];
-        for i in (0_usize..0x700).step_by(2) {
-            let b1 = state.vram[pattern_base + i + 1];
-            let character = state.vram[pattern_base + i] as u16 | ((b1 as u16 & 0x1) << 8);
-            let rvh = b1 & PNAME_RVH != 0;
-            let rvv = b1 & PNAME_RVV != 0;
-            let palette1 = b1 & PNAME_CPT != 0;
-            if i > 96 && i < 672 {
-                chars[character as usize] = true;
-            }
-            if character != 0 && false {
-                println!(
-                    "Pattern {:03X}: character {:03X} revh {} revv {} pallette1 {}",
-                    i / 2,
-                    character,
-                    rvh,
-                    rvv,
-                    palette1,
-                );
-            }
-            let x = (i / 2) & 31; // col
-            let y = i >> 6; // row
-            Self::character(state, false, character as usize, pixels, x * 8, y * 8, 32);
-        }
-        println!("Sprites attribute @{:04X}", sprite_base);
-        for i in 0_usize..64 {
-            let v = state.vram[sprite_base + i];
-            let h = state.vram[sprite_base + 0x80 + i * 2];
-            let ch = state.vram[sprite_base + 0x80 + i * 2 + 1] as usize;
-            chars[ch] = true;
-            if h == 0xE0 {
-                break;
-            }
-            //if ch != 0 {
-            println!("Sprite {}: {}x{} char {}", i, h, v, ch);
-            //}
-            if h < 248 && v < 220 {
-                if state.reg[1] & REG1_SIZE != 0 {
-                    // double size
-                    Self::character(state, true, ch & (!0x1), pixels, h as usize, v as usize, 32);
-                    Self::character(
-                        state,
-                        true,
-                        ch | 0x1,
-                        pixels,
-                        h as usize,
-                        v as usize + 8,
-                        32,
-                    );
-                } else {
-                    Self::character(state, true, ch, pixels, h as usize, v as usize, 32);
-                }
-            }
-        }
-        println!("Characters @0x0000");
-        for i in 0_usize..448 {
-            if chars[i] {
-                //println!("Character {}", i);
-                /*
-                let mut data = vec![0; 8 * 8 * 3];
-                Self::character(state, false, i, &mut data, 0, 0, 1);
-                Self::serialize_ppm(format!("./char-{:02X}.ppm", i), 8, 8, &data);
-                */
-            }
-        }
-        //Self::serialize_ppm("bg.ppm".to_string(), 32 * 8, 28 * 8, &bg);
-
-        println!("Color RAM: {:?}", state.cram);
-    }
     pub fn step(&self, pixels: &mut [u8]) -> (VDPInt, VDPDisplay) {
         let mut state = self.state.borrow_mut();
         state.v_counter = state.v_counter.wrapping_add(1);
@@ -228,7 +340,7 @@ impl VDP {
         if state.v_counter == 0xC0 {
             state.status |= ST_I;
             if state.reg[1] & REG1_BLANK != 0 {
-                Self::render_screen(&state, pixels);
+                state.render_screen(pixels);
                 rendered = VDPDisplay::ScreenDone;
             }
         }
@@ -242,129 +354,22 @@ impl VDP {
         };
         (interrupt, rendered)
     }
-    fn write_cmd(&self, val: u8) -> Result<(), String> {
-        let mut state = self.state.borrow_mut();
-        match state.cmd_byte1.take() {
-            Some(data) => match val & 0xC0 {
-                0x80 => {
-                    // This is a register write
-                    let reg = val & !0x80;
-                    if reg > 10 {
-                        panic!("Unexpected high VDP register {:02X}", reg)
-                    }
-                    //dbg!("Writing to vdp reg", reg, data);
-                    state.reg[reg as usize] = data;
-                }
-                0x00 | 0x40 => {
-                    // TODO: differentiate read and write setup ? This is only useful for timings
-                    // after setup
-                    // VRAM address setup
-                    state.addr = data as u16 | ((val as u16 & 0x3F) << 8);
-                    state.dest = Some(WriteDest::Vram);
-                    //dbg!("setup vram address", state.addr);
-                }
-                0xC0 => {
-                    // cram address setup
-                    assert_eq!(val, 0xC0);
-                    assert!(data < 64);
-                    state.addr = data as u16;
-                    state.dest = Some(WriteDest::Cram);
-                    //println!("setup cram address: {:02X}", data);
-                }
-                _ => {
-                    panic!(
-                        "Unexpected high bits in VDP register selection: {:02X} ({:02X})",
-                        val,
-                        val & 0xC0
-                    )
-                }
-            },
-            None => state.cmd_byte1 = Some(val),
+    /*
+    fn reg_side_effect(state: &mut VDPState, reg: usize) {
+        match reg {
+            1 => {}
+            _ => {}
         }
-        Ok(())
     }
-    fn reset_byte1(&self) {
-        let mut state = self.state.borrow_mut();
-        state.cmd_byte1.take();
-    }
-
-    fn write_ram(&self, val: u8) -> Result<(), String> {
-        self.reset_byte1();
-        let mut state = self.state.borrow_mut();
-        let addr = state.addr as usize;
-        let dest = state.dest;
-        let cram_byte1 = state.cram_byte1;
-        let ram = match dest {
-            Some(WriteDest::Vram) => &mut state.vram,
-            Some(WriteDest::Cram) => &mut state.cram,
-            None => return Err("No VDP write dest".to_string()),
-        };
-        if addr > ram.len() {
-            return Err(format!(
-                "VDP access to {:?} address too high: {:04X} / {:04X}",
-                dest,
-                addr,
-                ram.len()
-            ));
-        }
-        match dest {
-            Some(WriteDest::Vram) => {
-                ram[addr] = val;
-                state.addr = (state.addr + 1) & 0x3FFF;
-            }
-            Some(WriteDest::Cram) => {
-                if addr & 1 == 0 {
-                    //println!("Upper CRAM byte set: {:02X}", val);
-                    state.cram_byte1 = Some(val);
-                } else {
-                    ram[addr - 1] = cram_byte1.unwrap();
-                    ram[addr] = val & 0x0F;
-                    //println!("Written to CRAM: {:02X}{:02X}", ram[addr], ram[addr - 1]);
-                }
-                state.addr = (state.addr + 1) & 0x3F;
-            }
-            None => unreachable!(),
-        }
-        Ok(())
-    }
-    fn read_ram(&self) -> Result<u8, String> {
-        self.reset_byte1();
-        let mut state = self.state.borrow_mut();
-        let addr = state.addr as usize;
-        let dest = state.dest;
-        match dest {
-            Some(WriteDest::Vram) => {}
-            Some(WriteDest::Cram) => {
-                return Err("Reading from Color RAM is not supported".to_string())
-            }
-            None => return Err("No VDP write dest".to_string()),
-        };
-        if addr > state.vram.len() {
-            return Err(format!(
-                "VDP access to {:?} address too high: {:04X} / {:04X}",
-                dest,
-                addr,
-                state.vram.len()
-            ));
-        }
-        let val = state.vram[addr];
-        state.addr = (state.addr + 1) & 0x3FF;
-        Ok(val)
-    }
-    fn read_status(&self) -> Result<u8, String> {
-        self.reset_byte1();
-        let mut state = self.state.borrow_mut();
-        let st = state.status;
-        state.status = 0; // clear all three flags
-        Ok(st)
-    }
+    */
 }
 
 impl io::Device for VDP {
     fn out(&self, addr: u16, val: u8) -> Result<(), String> {
+        let mut state = self.state.borrow_mut();
         match addr & 0xFF {
-            0xBF => self.write_cmd(val),
-            0xBE => self.write_ram(val),
+            0xBF => state.write_cmd(val),
+            0xBE => state.write_ram(val),
             _ => Err(format!(
                 "unknown VDP output address @{:04X} ({:02X} ",
                 addr, val
@@ -372,13 +377,14 @@ impl io::Device for VDP {
         }
     }
     fn input(&self, addr: u16) -> Result<u8, String> {
+        let mut state = self.state.borrow_mut();
         match addr & 0xFF {
             0x7E => {
-                let vcounter = self.state.borrow().v_counter;
+                let vcounter = state.v_counter;
                 Ok(vcounter)
             }
-            0xBF => self.read_status(),
-            0xBE => self.read_ram(),
+            0xBF => state.read_status(),
+            0xBE => state.read_ram(),
             _ => Err(format!("unknown VDP input address @{:04X}", addr)),
         }
     }
