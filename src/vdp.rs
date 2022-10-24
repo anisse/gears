@@ -58,6 +58,7 @@ struct VDPState {
     cram: Vec<u8>,
     cmd_byte1: Option<u8>,
     cram_byte1: Option<u8>,
+    vertical_scroll: u8, // We need to save it at the beginning of the frame
 }
 
 #[derive(Debug)]
@@ -124,11 +125,6 @@ impl VDPState {
                 //transparent
                 continue;
             }
-            /*
-            if code != 0 {
-                println!("@{:04X} : {}", addr, code);
-            }
-            */
             let color_r = (self.cram[pallette_base + code as usize * 2]) & 0xF;
             let color_g = (self.cram[pallette_base + code as usize * 2] >> 4) & 0xF;
             let color_b = (self.cram[pallette_base + code as usize * 2 + 1]) & 0xF;
@@ -375,6 +371,9 @@ impl VDP {
         let mut state = self.state.borrow_mut();
         state.v_counter = state.v_counter.wrapping_add(1);
         let mut rendered = VDPDisplay::NoDisplay;
+        if state.v_counter == 0 {
+            state.vertical_scroll = state.reg[9];
+        }
         if state.v_counter == 0xC0 {
             state.status |= ST_I;
             if state.reg[1] & REG1_BLANK != 0 {
@@ -445,6 +444,7 @@ impl Default for VDPState {
             status: 0,
             cmd_byte1: None,
             cram_byte1: None,
+            vertical_scroll: 0,
         }
     }
 }
