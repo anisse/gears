@@ -40,6 +40,8 @@ flag!(PatternName,
     PNAME_PRI => 4,
 );
 
+const DEBUG: bool = false;
+
 #[derive(Debug, Clone, Copy)]
 enum WriteDest {
     Vram,
@@ -74,44 +76,51 @@ pub enum VDPDisplay {
     ScreenDone,
 }
 
+struct CharSettings {
+    char_num: u16, // max value is 448
+    x: u8,
+    y: u8,
+    line_length: u8,
+    line: u8,
+    // Those three could be merged in one, with one bit to spare
+    x_start: u8,
+    x_end: u8,
+    sprite: bool,
+}
+
 impl VDPState {
-    fn character(
-        &self,
-        sprite: bool,
-        i: usize,
-        dest: &mut [u8],
-        x: usize,
-        y: usize,
-        line_length: usize,
-    ) {
-        let base = match sprite {
+    fn character_line(&self, dest: &mut [u8], c: CharSettings) {
+        assert!(c.x_start < 8);
+        assert!(c.x_end <= 8);
+        let base = match c.sprite {
             false => {
-                assert!(i < 448);
+                assert!(c.char_num < 448);
                 0
             }
             true => {
-                assert!(i < 256);
+                assert!(c.char_num < 256);
                 ((self.reg[6] as usize) & 0x4) << 11
             }
         };
-        let pallette_base = match sprite {
+        let pallette_base = match c.sprite {
             false => 0,
             true => 32,
         };
-        if sprite {
-            println!("i{}: @{:04X} : {} {}x{}", i, base, pallette_base, x, y);
+        if c.sprite && DEBUG {
+            println!(
+                "i{}: @{:04X} : {} {}x{}",
+                c.char_num, base, pallette_base, c.x, c.y
+            );
         }
-        for pix in 0..64 {
-            let addr: usize = base + i * 32 + (pix >> 3) * 4;
+        for pix in c.x_start..c.x_end {
+            let addr: usize = base + c.char_num as usize * 32 + (c.line as usize) * 4;
             let offset = 0x7 - (pix & 0x7);
+            #[allow(clippy::identity_op)]
             let code = (((self.vram[addr + 3] >> offset) & 1) << 3)
                 | (((self.vram[addr + 2] >> offset) & 1) << 2)
                 | (((self.vram[addr + 1] >> offset) & 1) << 1)
                 | (((self.vram[addr + 0] >> offset) & 1) << 0);
-            if sprite && (i | 0x1) == 39 {
-                println!("@{:04X} : {}", addr, code);
-            }
-            if sprite && code == 0 {
+            if c.sprite && code == 0 {
                 //transparent
                 continue;
             }
@@ -124,12 +133,41 @@ impl VDPState {
             let color_g = (self.cram[pallette_base + code as usize * 2] >> 4) & 0xF;
             let color_b = (self.cram[pallette_base + code as usize * 2 + 1]) & 0xF;
 
-            let line = pix >> 3;
-            let col = pix & 0x7;
-            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4] = color_r << 4;
-            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4 + 1] = color_g << 4;
-            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4 + 2] = color_b << 4;
-            dest[(y + line) * (line_length * 8 * 4) + (x + col) * 4 + 3] = 0xFF;
+            let line = c.line as usize;
+            let col = pix as usize;
+            let x = c.x as usize * 8;
+            let y = c.y as usize * 8;
+            let line_length = c.line_length as usize * 8;
+            let pix_size = 4; // 4 bytes per pixels, one for each component
+            dest[(y + line) * (line_length * pix_size) + (x + col) * pix_size] = color_r << 4;
+            dest[(y + line) * (line_length * pix_size) + (x + col) * pix_size + 1] = color_g << 4;
+            dest[(y + line) * (line_length * pix_size) + (x + col) * pix_size + 2] = color_b << 4;
+            dest[(y + line) * (line_length * pix_size) + (x + col) * pix_size + 3] = 0xFF;
+        }
+    }
+    fn character(
+        &self,
+        sprite: bool,
+        i: usize,
+        dest: &mut [u8],
+        x: usize,
+        y: usize,
+        line_length: usize,
+    ) {
+        for line in 0..8 {
+            self.character_line(
+                dest,
+                CharSettings {
+                    char_num: i as u16,
+                    x: (x / 8) as u8,
+                    y: (y / 8) as u8,
+                    line_length: line_length as u8,
+                    line,
+                    x_start: 0,
+                    x_end: 8,
+                    sprite,
+                },
+            );
         }
     }
     fn render_screen(&self, pixels: &mut [u8]) {
