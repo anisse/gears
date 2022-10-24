@@ -362,11 +362,11 @@ impl VDP {
         {
             let mut f = std::fs::File::create("temp.ppm").unwrap();
             use std::io::Write;
-            write!(f, "P3\n").unwrap();
-            write!(f, "{} {}\n", width, height).unwrap();
-            write!(f, "15\n").unwrap();
+            writeln!(f, "P3").unwrap();
+            writeln!(f, "{} {}", width, height).unwrap();
+            writeln!(f, "15").unwrap();
             for (i, _) in data.iter().enumerate().step_by(3) {
-                write!(f, "{} {} {}\n", data[i], data[i + 1], data[i + 2]).unwrap();
+                writeln!(f, "{} {} {}", data[i], data[i + 1], data[i + 2]).unwrap();
             }
         }
         std::fs::rename("temp.ppm", filename).unwrap();
