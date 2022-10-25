@@ -42,6 +42,16 @@ flag!(PatternName,
 
 const DEBUG: bool = false;
 
+const SCROLL_SCREEN_WIDTH: usize = 32;
+const SCROLL_SCREEN_HEIGHT: usize = 28;
+const VISIBLE_AREA_WIDTH: usize = 20;
+const VISIBLE_AREA_HEIGHT: usize = 18;
+const CHAR_SIZE: u8 = 8;
+const VISIBLE_AREA_START_X: usize =
+    ((SCROLL_SCREEN_WIDTH - VISIBLE_AREA_WIDTH) / 2) as usize * CHAR_SIZE as usize;
+const VISIBLE_AREA_START_Y: usize =
+    ((SCROLL_SCREEN_HEIGHT - VISIBLE_AREA_HEIGHT) / 2) as usize * CHAR_SIZE as usize;
+
 #[derive(Debug, Clone, Copy)]
 enum WriteDest {
     Vram,
@@ -78,21 +88,21 @@ pub enum VDPDisplay {
 }
 
 struct CharSettings {
-    char_num: u16, // max value is 448
-    x: u8,
-    y: u8,
-    line_length: u8,
-    line: u8,
+    char_num: u16,   // max value is 448; character number
+    x: u8,           // x coord in destination buffer (unit: characters)
+    y: u8,           // y coord in destination buffer (unit: characters)
+    line_length: u8, // line length of destination buffer (unit: characters)
+    line: u8,        // line number to of char to draw (in pixels, [0; 8[ )
     // Those three could be merged in one, with one bit to spare
-    x_start: u8,
-    x_end: u8,
-    sprite: bool,
+    x_start: u8,  // start x of character (in pixels, [0; 8[)
+    x_end: u8,    // end x of character (in pixels, [0; 8] )
+    sprite: bool, // whether this character is sprite or background pattern
 }
 
 impl VDPState {
     fn character_line(&self, dest: &mut [u8], c: CharSettings) {
-        assert!(c.x_start < 8);
-        assert!(c.x_end <= 8);
+        assert!(c.x_start < CHAR_SIZE);
+        assert!(c.x_end <= CHAR_SIZE);
         let base = match c.sprite {
             false => {
                 assert!(c.char_num < 448);
@@ -131,9 +141,9 @@ impl VDPState {
 
             let line = c.line as usize;
             let col = pix as usize;
-            let x = c.x as usize * 8;
-            let y = c.y as usize * 8;
-            let line_length = c.line_length as usize * 8;
+            let x = c.x as usize * CHAR_SIZE as usize;
+            let y = c.y as usize * CHAR_SIZE as usize;
+            let line_length = c.line_length as usize * CHAR_SIZE as usize;
             let pix_size = 4; // 4 bytes per pixels, one for each component
             dest[(y + line) * (line_length * pix_size) + (x + col) * pix_size] = color_r << 4;
             dest[(y + line) * (line_length * pix_size) + (x + col) * pix_size + 1] = color_g << 4;
@@ -150,20 +160,90 @@ impl VDPState {
         y: usize,
         line_length: usize,
     ) {
-        for line in 0..8 {
+        for line in 0..CHAR_SIZE {
             self.character_line(
                 dest,
                 CharSettings {
                     char_num: i as u16,
-                    x: (x / 8) as u8,
-                    y: (y / 8) as u8,
+                    x: (x / CHAR_SIZE as usize) as u8,
+                    y: (y / CHAR_SIZE as usize) as u8,
                     line_length: line_length as u8,
                     line,
                     x_start: 0,
-                    x_end: 8,
+                    x_end: CHAR_SIZE,
                     sprite,
                 },
             );
+        }
+    }
+    fn render_background_line(&self, pixels: &mut [u8], line: u8, visible_only: bool) {
+        // xxx
+        let scroll_offset_x = if visible_only {
+            self.reg[8] as usize + VISIBLE_AREA_START_X
+        } else {
+            0
+        };
+        let scroll_offset_y = if visible_only {
+            self.vertical_scroll as usize + VISIBLE_AREA_START_Y
+        } else {
+            0
+        };
+        let line_length = if visible_only {
+            VISIBLE_AREA_WIDTH as u8
+        } else {
+            SCROLL_SCREEN_WIDTH as u8
+        };
+
+        let pattern_base = ((self.reg[2] as usize) & 0x0E) << 10;
+
+        let scroll_start_y =
+            (line as usize + scroll_offset_y) % (SCROLL_SCREEN_HEIGHT * CHAR_SIZE as usize);
+        let scroll_start_x = scroll_offset_x % (SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize);
+
+        const CHAR_DESC_LEN: usize = 2;
+        let line_length_px = line_length as usize * CHAR_SIZE as usize;
+
+        let mut x = 0;
+        loop {
+            let ch_start_y = scroll_start_y % CHAR_SIZE as usize;
+            let ch_start_x = (scroll_start_x + x) % CHAR_SIZE as usize;
+            let ch = ((scroll_start_y - ch_start_y) / CHAR_SIZE as usize * SCROLL_SCREEN_WIDTH
+                + (scroll_start_x + x - ch_start_x) / CHAR_SIZE as usize)
+                as u16;
+            let addr = pattern_base + (ch as usize * CHAR_DESC_LEN);
+            let b1 = self.vram[addr + 1];
+            let character = self.vram[addr] as u16 | ((b1 as u16 & 0x1) << 8);
+            let rvh = b1 & PNAME_RVH != 0;
+            let rvv = b1 & PNAME_RVV != 0;
+            let palette1 = b1 & PNAME_CPT != 0;
+            if character != 0 && DEBUG {
+                println!(
+                    "Pattern {:03X}: character {:03X} revh {} revv {} pallette1 {}",
+                    ch, character, rvh, rvv, palette1,
+                );
+            }
+            let x_end = if (x + CHAR_SIZE as usize) <= line_length_px {
+                CHAR_SIZE
+            } else {
+                (x % CHAR_SIZE as usize) as u8
+            };
+            self.character_line(
+                pixels,
+                CharSettings {
+                    char_num: character,
+                    x: (x / CHAR_SIZE as usize) as u8,
+                    y: line / CHAR_SIZE,
+                    line_length,
+                    line: ch_start_y as u8,
+                    x_start: ch_start_x as u8,
+                    x_end,
+                    sprite: false,
+                },
+            );
+            x += x_end as usize - ch_start_x;
+            if x >= line_length_px as usize {
+                break;
+            }
         }
     }
     fn render_screen(&self, pixels: &mut [u8]) {
@@ -174,28 +254,8 @@ impl VDPState {
         println!("Scroll screen: Pat name @{:04X}", pattern_base);
         //let mut bg = vec![0x0F_u8; 32 * 28 * 8 * 8 * 3];
         let mut chars = [false; 448];
-        for i in (0_usize..0x700).step_by(2) {
-            let b1 = self.vram[pattern_base + i + 1];
-            let character = self.vram[pattern_base + i] as u16 | ((b1 as u16 & 0x1) << 8);
-            let rvh = b1 & PNAME_RVH != 0;
-            let rvv = b1 & PNAME_RVV != 0;
-            let palette1 = b1 & PNAME_CPT != 0;
-            if i > 96 && i < 672 {
-                chars[character as usize] = true;
-            }
-            if character != 0 && false {
-                println!(
-                    "Pattern {:03X}: character {:03X} revh {} revv {} pallette1 {}",
-                    i / 2,
-                    character,
-                    rvh,
-                    rvv,
-                    palette1,
-                );
-            }
-            let x = (i / 2) & 31; // col
-            let y = i >> 6; // row
-            self.character(false, character as usize, pixels, x * 8, y * 8, 32);
+        for line in 0_u8..(SCROLL_SCREEN_HEIGHT as u8 * CHAR_SIZE) {
+            self.render_background_line(pixels, line, false);
         }
         println!("Sprites attribute @{:04X}", sprite_base);
         for i in 0_usize..64 {
