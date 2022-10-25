@@ -97,6 +97,8 @@ struct CharSettings {
     x_start: u8,  // start x of character (in pixels, [0; 8[)
     x_end: u8,    // end x of character (in pixels, [0; 8] )
     sprite: bool, // whether this character is sprite or background pattern
+    rvh: bool,    // character is reversed horizontally
+    rvv: bool,    // character is reversed vertically
 }
 
 impl VDPState {
@@ -127,9 +129,18 @@ impl VDPState {
                 c.char_num, base, pallette_base, c.x, c.y
             );
         }
+        let src_line = if c.rvv {
+            CHAR_SIZE - 1 - c.line
+        } else {
+            c.line
+        } as usize;
         for pix in c.x_start..c.x_end {
-            let addr: usize = base + c.char_num as usize * 32 + (c.line as usize) * 4;
-            let offset = 0x7 - (pix & 0x7);
+            let addr: usize = base + c.char_num as usize * 32 + (src_line) * 4;
+            let offset = if c.rvh {
+                pix % CHAR_SIZE
+            } else {
+                CHAR_SIZE - 1 - (pix % CHAR_SIZE)
+            };
             #[allow(clippy::identity_op)]
             let code = (((self.vram[addr + 3] >> offset) & 1) << 3)
                 | (((self.vram[addr + 2] >> offset) & 1) << 2)
@@ -176,6 +187,8 @@ impl VDPState {
                     x_start: 0,
                     x_end: CHAR_SIZE,
                     sprite,
+                    rvh: false,
+                    rvv: false,
                 },
             );
         }
@@ -242,6 +255,8 @@ impl VDPState {
                     x_start: ch_start_x as u8,
                     x_end,
                     sprite: false,
+                    rvh,
+                    rvv,
                 },
             );
             x += x_end as usize - ch_start_x;
