@@ -105,6 +105,10 @@ impl VDPState {
         assert!(c.x_end <= CHAR_SIZE);
         let base = match c.sprite {
             false => {
+                if c.char_num >= 448 {
+                    println!("char overflow: {}", c.char_num);
+                    return;
+                }
                 assert!(c.char_num < 448);
                 0
             }
