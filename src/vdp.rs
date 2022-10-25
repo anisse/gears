@@ -233,10 +233,11 @@ impl VDPState {
             let rvh = b1 & PNAME_RVH != 0;
             let rvv = b1 & PNAME_RVV != 0;
             let palette1 = b1 & PNAME_CPT != 0;
+            let prio = b1 & PNAME_PRI != 0;
             if character != 0 && DEBUG {
                 println!(
-                    "Pattern {:03X}: character {:03X} revh {} revv {} pallette1 {}",
-                    ch, character, rvh, rvv, palette1,
+                    "Pattern {:03X}: character {:03X} revh {} revv {} pallette1 {} prio {}",
+                    ch, character, rvh, rvv, palette1, prio
                 );
             }
             let x_end = if (x + CHAR_SIZE as usize) <= line_length_px {
