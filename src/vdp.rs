@@ -92,8 +92,8 @@ struct CharSettings {
     x: u8,           // x coord in destination buffer (unit: characters)
     y: u8,           // y coord in destination buffer (unit: characters)
     line_length: u8, // line length of destination buffer (unit: characters)
-    line: u8,        // line number to of char to draw (in pixels, [0; 8[ )
-    // Those three could be merged in one, with one bit to spare
+    // Rest of the struct should fit an u16, but we won't optimize for now
+    line: u8,     // line number to of char to draw (in pixels, [0; 8[ )
     x_start: u8,  // start x of character (in pixels, [0; 8[)
     x_end: u8,    // end x of character (in pixels, [0; 8] )
     sprite: bool, // whether this character is sprite or background pattern
