@@ -90,11 +90,11 @@ pub enum VDPDisplay {
 
 struct CharSettings {
     char_num: u16,   // max value is 448; character number
-    x: u8,           // x coord in destination buffer (unit: characters)
-    y: u8,           // y coord in destination buffer (unit: characters)
+    x: u8,           // x coord in destination buffer (in pixels [0; 256[ )
+    y: u8,           // y coord in destination buffer (in pixels [0; 224[ )
     line_length: u8, // line length of destination buffer (unit: characters)
     // Rest of the struct should fit an u16, but we won't optimize for now
-    line: u8,     // line number to of char to draw (in pixels, [0; 8[ )
+    src_line: u8, // line number to of char to draw (in pixels, [0; 8[ )
     x_start: u8,  // start x of character (in pixels, [0; 8[)
     x_end: u8,    // end x of character (in pixels, [0; 8] )
     sprite: bool, // whether this character is sprite or background pattern
@@ -115,7 +115,10 @@ impl VDPState {
                         c.char_num,
                         c.x,
                         c.y,
-                        c.x < 26 && c.x > 6 && c.y < 23 && c.y > 5
+                        c.x + c.x_end >= VISIBLE_AREA_START_X as u8
+                            && c.x + c.x_start < VISIBLE_AREA_END_X as u8
+                            && c.y >= VISIBLE_AREA_START_Y as u8
+                            && c.y < VISIBLE_AREA_END_Y as u8
                     );
                     //return;
                 }
@@ -138,9 +141,9 @@ impl VDPState {
             );
         }
         let src_line = if c.rvv {
-            CHAR_SIZE - 1 - c.line
+            CHAR_SIZE - 1 - c.src_line
         } else {
-            c.line
+            c.src_line
         } as usize;
         for pix in c.x_start..c.x_end {
             let addr: usize = base + c.char_num as usize * 32 + (src_line) * 4;
@@ -162,16 +165,15 @@ impl VDPState {
             let color_g = (self.cram[pallette_base + code as usize * 2] >> 4) & 0xF;
             let color_b = (self.cram[pallette_base + code as usize * 2 + 1]) & 0xF;
 
-            let line = c.line as usize;
             let col = pix as usize;
-            let x = c.x as usize * CHAR_SIZE as usize;
-            let y = c.y as usize * CHAR_SIZE as usize;
+            let x = c.x as usize;
+            let y = c.y as usize;
             let line_length = c.line_length as usize * CHAR_SIZE as usize;
             let pix_size = 4; // 4 bytes per pixels, one for each component
-            dest[(y + line) * (line_length * pix_size) + (x + col) * pix_size] = color_r << 4;
-            dest[(y + line) * (line_length * pix_size) + (x + col) * pix_size + 1] = color_g << 4;
-            dest[(y + line) * (line_length * pix_size) + (x + col) * pix_size + 2] = color_b << 4;
-            dest[(y + line) * (line_length * pix_size) + (x + col) * pix_size + 3] = 0xFF;
+            dest[y * line_length * pix_size + (x + col) * pix_size] = color_r << 4;
+            dest[y * line_length * pix_size + (x + col) * pix_size + 1] = color_g << 4;
+            dest[y * line_length * pix_size + (x + col) * pix_size + 2] = color_b << 4;
+            dest[y * line_length * pix_size + (x + col) * pix_size + 3] = 0xFF;
         }
     }
     fn character(
@@ -183,15 +185,15 @@ impl VDPState {
         y: usize,
         line_length: usize,
     ) {
-        for line in 0..CHAR_SIZE {
+        for src_line in 0..CHAR_SIZE {
             self.character_line(
                 dest,
                 CharSettings {
                     char_num: i as u16,
-                    x: (x / CHAR_SIZE as usize) as u8,
-                    y: (y / CHAR_SIZE as usize) as u8,
+                    x: x as u8,
+                    y: y as u8 + src_line,
                     line_length: line_length as u8,
-                    line,
+                    src_line,
                     x_start: 0,
                     x_end: CHAR_SIZE,
                     sprite,
@@ -257,10 +259,10 @@ impl VDPState {
                 pixels,
                 CharSettings {
                     char_num: character,
-                    x: (x / CHAR_SIZE as usize) as u8,
-                    y: line / CHAR_SIZE,
+                    x: x as u8,
+                    y: line as u8,
                     line_length,
-                    line: ch_start_y as u8,
+                    src_line: ch_start_y as u8,
                     x_start: ch_start_x as u8,
                     x_end,
                     sprite: false,
