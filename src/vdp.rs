@@ -48,9 +48,10 @@ const VISIBLE_AREA_WIDTH: usize = 20;
 const VISIBLE_AREA_HEIGHT: usize = 18;
 const CHAR_SIZE: u8 = 8;
 const VISIBLE_AREA_START_X: usize =
-    ((SCROLL_SCREEN_WIDTH - VISIBLE_AREA_WIDTH) / 2) as usize * CHAR_SIZE as usize;
-const VISIBLE_AREA_START_Y: usize =
-    ((SCROLL_SCREEN_HEIGHT - VISIBLE_AREA_HEIGHT) / 2) as usize * CHAR_SIZE as usize;
+    ((SCROLL_SCREEN_WIDTH - VISIBLE_AREA_WIDTH) / 2) * CHAR_SIZE as usize;
+const VISIBLE_AREA_START_Y: usize = 4 * CHAR_SIZE as usize;
+const VISIBLE_AREA_END_X: usize = VISIBLE_AREA_WIDTH * CHAR_SIZE as usize + VISIBLE_AREA_START_X;
+const VISIBLE_AREA_END_Y: usize = VISIBLE_AREA_HEIGHT * CHAR_SIZE as usize + VISIBLE_AREA_START_Y;
 
 #[derive(Debug, Clone, Copy)]
 enum WriteDest {
