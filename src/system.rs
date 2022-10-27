@@ -18,6 +18,20 @@ impl io::Device for System {
             0x0 => {
                 panic!("System write: @{:04X} {:02X}", addr, val);
             }
+            0x02 | 0x01 => {
+                println!(
+                    "Ignoring system write unknown EXT port value: @{:04X} {:02X}",
+                    addr, val
+                );
+                Ok(())
+            }
+            0x05 => {
+                println!(
+                    "Ignoring system write unknown serial port value: @{:04X} {:02X}",
+                    addr, val
+                );
+                Ok(())
+            }
             _ => Err(format!(
                 "unknown system port output write address @{:04X} {:02X}",
                 addr, val

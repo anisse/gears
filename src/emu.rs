@@ -88,7 +88,7 @@ impl Emulator {
         self.cpu.io.register(0xBE, 0xBF, 0xFF01, vdp);
         self.cpu.io.register(
             0,
-            0,
+            5,
             0xFF00,
             Rc::clone(&self.devs.sys) as Rc<dyn io::Device>,
         );
