@@ -318,25 +318,11 @@ impl VDPState {
         }
         let x = if visible_only {
             std::cmp::max(h as i16 - VISIBLE_AREA_START_X as i16, 0) as u8
-            /*
-            if h > VISIBLE_AREA_START_X {
-                (h - VISIBLE_AREA_START_X) as u8
-            } else {
-                0
-            }
-                */
         } else {
             h as u8
         };
         let x_start = if visible_only {
             std::cmp::max(VISIBLE_AREA_START_X as i16 - h as i16, 0) as u8
-            /*
-            if h > VISIBLE_AREA_START_X {
-                0
-            } else {
-                (VISIBLE_AREA_START_X - h) as u8
-            }
-                */
         } else {
             0
         };
@@ -345,13 +331,6 @@ impl VDPState {
                 CHAR_SIZE as i16 - (x + CHAR_SIZE) as i16 - VISIBLE_AREA_END_X as i16,
                 CHAR_SIZE as i16,
             ) as u8
-            /*
-            if x + CHAR_SIZE - x_start > VISIBLE_AREA_END_X as u8 {
-                CHAR_SIZE - (x + CHAR_SIZE - x_start - VISIBLE_AREA_END_X as u8)
-            } else {
-                CHAR_SIZE
-            }
-                */
         } else {
             std::cmp::max(
                 CHAR_SIZE as i16
@@ -359,13 +338,6 @@ impl VDPState {
                     - (SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize) as i16,
                 CHAR_SIZE as i16,
             ) as u8
-            /*
-            if x + CHAR_SIZE - x_start > SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize {
-                CHAR_SIZE - (x + CHAR_SIZE - x_start - SCROLL_SCREEN_WIDTH * CHAR_SIZE)
-            } else {
-                CHAR_SIZE
-            }
-                */
         };
         let ldiff = if visible_only {
             line - v - SPRITE_VISIBLE_AREA_START_Y as u8
