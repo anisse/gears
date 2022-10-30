@@ -17,7 +17,7 @@ macro_rules! flag {
 
 flag!(Status,
     ST_I => 7,
-    ST_S9 => 6,
+    ST_9S => 6,
     ST_C => 5,
 );
 
@@ -49,7 +49,8 @@ const VISIBLE_AREA_HEIGHT: usize = 18;
 const CHAR_SIZE: u8 = 8;
 const VISIBLE_AREA_START_X: usize =
     ((SCROLL_SCREEN_WIDTH - VISIBLE_AREA_WIDTH) / 2) * CHAR_SIZE as usize;
-const VISIBLE_AREA_START_Y: usize = 4 * CHAR_SIZE as usize;
+const VISIBLE_AREA_START_Y: usize = 3 * CHAR_SIZE as usize;
+const SPRITE_VISIBLE_AREA_START_Y: usize = 0x42;
 const VISIBLE_AREA_END_X: usize = VISIBLE_AREA_WIDTH * CHAR_SIZE as usize + VISIBLE_AREA_START_X;
 const VISIBLE_AREA_END_Y: usize = VISIBLE_AREA_HEIGHT * CHAR_SIZE as usize + VISIBLE_AREA_START_Y;
 
@@ -110,16 +111,16 @@ impl VDPState {
             false => {
                 if c.char_num >= 448 {
                     // TODO: dump those overflow chars
-                    println!(
-                        "char overflow: {}, x {} y {} visible ? {}",
-                        c.char_num,
-                        c.x,
-                        c.y,
-                        c.x + c.x_end >= VISIBLE_AREA_START_X as u8
-                            && c.x + c.x_start < VISIBLE_AREA_END_X as u8
-                            && c.y >= VISIBLE_AREA_START_Y as u8
-                            && c.y < VISIBLE_AREA_END_Y as u8
-                    );
+                    let visible = c.x + c.x_end > VISIBLE_AREA_START_X as u8
+                        && c.x + c.x_start < VISIBLE_AREA_END_X as u8
+                        && c.y >= VISIBLE_AREA_START_Y as u8
+                        && c.y < VISIBLE_AREA_END_Y as u8;
+                    if visible {
+                        println!(
+                            "char overflow: {}, x {} y {} visible ? {}",
+                            c.char_num, c.x, c.y, visible,
+                        );
+                    }
                     //return;
                 }
                 assert!(c.char_num < 512);
@@ -136,8 +137,16 @@ impl VDPState {
         };
         if c.sprite && DEBUG {
             println!(
-                "i{}: @{:04X} : {} {}x{}",
-                c.char_num, base, pallette_base, c.x, c.y
+                "Sprite char {}: @{:04X} : {} {}x{} (char line length: {}) from ({}->{})x{}",
+                c.char_num,
+                base,
+                pallette_base,
+                c.x,
+                c.y,
+                c.line_length,
+                c.x_start,
+                c.x_end,
+                c.src_line
             );
         }
         let src_line = if c.rvv {
@@ -176,6 +185,7 @@ impl VDPState {
             dest[y * line_length * pix_size + (x + col) * pix_size + 3] = 0xFF;
         }
     }
+    /*
     fn character(
         &self,
         sprite: bool,
@@ -203,6 +213,7 @@ impl VDPState {
             );
         }
     }
+    */
     fn render_background_line(&self, pixels: &mut [u8], line: u8, visible_only: bool) {
         // xxx
         let scroll_offset_x = if visible_only {
@@ -276,7 +287,158 @@ impl VDPState {
             }
         }
     }
-    fn render_screen(&self, pixels: &mut [u8]) {
+    #[allow(clippy::too_many_arguments)]
+    fn render_sprite_line(
+        &self,
+        pixels: &mut [u8],
+        line: u8,
+        visible_only: bool,
+        char_num: u16,
+        line_length: u8,
+        v: u8,
+        h: usize,
+    ) -> u8 {
+        if char_num != 0 && DEBUG {
+            println!("Sprite {}x{} char {}", h, v, char_num);
+        }
+        let x = if visible_only {
+            std::cmp::max(h as i16 - VISIBLE_AREA_START_X as i16, 0) as u8
+            /*
+            if h > VISIBLE_AREA_START_X {
+                (h - VISIBLE_AREA_START_X) as u8
+            } else {
+                0
+            }
+                */
+        } else {
+            h as u8
+        };
+        let x_start = if visible_only {
+            std::cmp::max(VISIBLE_AREA_START_X as i16 - h as i16, 0) as u8
+            /*
+            if h > VISIBLE_AREA_START_X {
+                0
+            } else {
+                (VISIBLE_AREA_START_X - h) as u8
+            }
+                */
+        } else {
+            0
+        };
+        let x_end = if visible_only {
+            std::cmp::max(
+                CHAR_SIZE as i16 - (x + CHAR_SIZE) as i16 - VISIBLE_AREA_END_X as i16,
+                CHAR_SIZE as i16,
+            ) as u8
+            /*
+            if x + CHAR_SIZE - x_start > VISIBLE_AREA_END_X as u8 {
+                CHAR_SIZE - (x + CHAR_SIZE - x_start - VISIBLE_AREA_END_X as u8)
+            } else {
+                CHAR_SIZE
+            }
+                */
+        } else {
+            std::cmp::max(
+                CHAR_SIZE as i16
+                    - (x as i16 + CHAR_SIZE as i16)
+                    - (SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize) as i16,
+                CHAR_SIZE as i16,
+            ) as u8
+            /*
+            if x + CHAR_SIZE - x_start > SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize {
+                CHAR_SIZE - (x + CHAR_SIZE - x_start - SCROLL_SCREEN_WIDTH * CHAR_SIZE)
+            } else {
+                CHAR_SIZE
+            }
+                */
+        };
+        let ldiff = if visible_only {
+            line - v - SPRITE_VISIBLE_AREA_START_Y as u8
+        } else {
+            line - v
+        };
+        let (char_num, src_line) = if self.reg[1] & REG1_SIZE == 0 {
+            // simple size
+            (char_num, ldiff)
+        } else {
+            // double size
+            if ldiff < CHAR_SIZE {
+                //upper sprite
+                (char_num & (!0x1), ldiff)
+            } else {
+                // lower sprite
+                (char_num | 0x1, ldiff - CHAR_SIZE)
+            }
+        };
+        self.character_line(
+            pixels,
+            CharSettings {
+                char_num,
+                x,
+                y: line,
+                line_length,
+                src_line,
+                x_start,
+                x_end,
+                sprite: true,
+                rvh: false,
+                rvv: false,
+            },
+        );
+        0
+    }
+    fn render_sprites_line(&mut self, pixels: &mut [u8], line: u8, visible_only: bool) {
+        let sprite_base = ((self.reg[5] as usize) & 0x7E) << 7;
+        let sprite_height = if self.reg[1] & REG1_SIZE != 0 { 16 } else { 8 };
+        let mut rendered_sprites = 0;
+        let mut line_bitmap_collision = [0_u8; SCROLL_SCREEN_WIDTH]; // works because size of u8 == CHAR_SIZE
+        let line_length = if visible_only {
+            VISIBLE_AREA_WIDTH as u8
+        } else {
+            SCROLL_SCREEN_WIDTH as u8
+        };
+
+        // Compute collisions, priorities....
+        for sprite in 0_usize..64 {
+            // sprite number is priority; once we have rendered eight sprites, we stop
+            let v = self.vram[sprite_base + sprite];
+            if DEBUG {
+                println!(
+                    "Sprite {}, on line {} v: {} sprite height: {}",
+                    sprite, line, v, sprite_height
+                );
+            }
+            if v <= line && (line as u16) < (v as u16) + sprite_height {
+                if rendered_sprites >= 8 {
+                    // We have reached sprite 9
+                    self.status |= ST_9S;
+                    break; //nothing more to render
+                }
+                rendered_sprites += 1;
+                let h = self.vram[sprite_base + 0x80 + sprite * 2] as usize;
+                if visible_only
+                    && ((h + CHAR_SIZE as usize) < VISIBLE_AREA_START_X || h >= VISIBLE_AREA_END_X)
+                {
+                    // We only render the visible area, so we count the sprites for priority, but
+                    // nothing more
+                    continue;
+                }
+
+                let char_num = self.vram[sprite_base + 0x80 + sprite * 2 + 1] as u16;
+                let _bitmap = self.render_sprite_line(
+                    pixels,
+                    line,
+                    visible_only,
+                    char_num,
+                    line_length,
+                    v,
+                    h,
+                );
+                // TODO: check collision
+            }
+        }
+    }
+    fn render_screen(&mut self, pixels: &mut [u8]) {
         let pattern_base = ((self.reg[2] as usize) & 0x0E) << 10;
         let sprite_base = ((self.reg[5] as usize) & 0x7E) << 7;
 
@@ -288,6 +450,10 @@ impl VDPState {
             self.render_background_line(pixels, line, false);
         }
         //println!("Sprites attribute @{:04X}", sprite_base);
+        for line in 0_u8..(SCROLL_SCREEN_HEIGHT as u8 * CHAR_SIZE) {
+            self.render_sprites_line(pixels, line, false);
+        }
+        /*
         for i in 0_usize..64 {
             let v = self.vram[sprite_base + i];
             let h = self.vram[sprite_base + 0x80 + i * 2];
@@ -310,6 +476,7 @@ impl VDPState {
                 }
             }
         }
+        */
         //println!("Characters @0x0000");
         for i in 0_usize..448 {
             if chars[i] {
