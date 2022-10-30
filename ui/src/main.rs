@@ -16,7 +16,6 @@ use gears::emu;
 
 const WIDTH: u32 = 32 * 8;
 const HEIGHT: u32 = 28 * 8;
-const BOX_SIZE: i16 = 64;
 
 fn main() -> Result<(), String> {
     let event_loop = EventLoop::new();
