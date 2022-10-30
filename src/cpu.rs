@@ -711,7 +711,7 @@ pub fn init() -> State {
 pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
     let mut update_pc = true;
     if s.pending_interrupt && s.r.IFF1 {
-        println!("Processing interrupt");
+        //println!("Processing interrupt");
         s.pending_interrupt = false;
         s.r.IFF1 = false;
         s.r.IFF2 = false;
