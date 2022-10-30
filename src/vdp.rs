@@ -41,6 +41,7 @@ flag!(PatternName,
 );
 
 const DEBUG: bool = false;
+const OVERFLOW_TRACK: bool = false;
 
 const SCROLL_SCREEN_WIDTH: usize = 32;
 const SCROLL_SCREEN_HEIGHT: usize = 28;
@@ -107,6 +108,7 @@ impl VDPState {
     fn character_line(&self, dest: &mut [u8], c: CharSettings) {
         assert!(c.x_start < CHAR_SIZE);
         assert!(c.x_end <= CHAR_SIZE);
+        let mut overflow_pause = false;
         let base = match c.sprite {
             false => {
                 if c.char_num >= 448 {
@@ -115,11 +117,12 @@ impl VDPState {
                         && c.x + c.x_start < VISIBLE_AREA_END_X as u8
                         && c.y >= VISIBLE_AREA_START_Y as u8
                         && c.y < VISIBLE_AREA_END_Y as u8;
-                    if visible {
+                    if OVERFLOW_TRACK && visible {
                         println!(
                             "char overflow: {}, x {} y {} visible ? {}",
                             c.char_num, c.x, c.y, visible,
                         );
+                        overflow_pause = true;
                     }
                     //return;
                 }
@@ -168,6 +171,9 @@ impl VDPState {
                 | (((self.vram[addr + 0] >> offset) & 1) << 0);
             if c.sprite && code == 0 {
                 //transparent
+                if overflow_pause {
+                    println!("skipping sprite !");
+                }
                 continue;
             }
             let color_r = (self.cram[pallette_base + code as usize * 2]) & 0xF;
@@ -183,6 +189,15 @@ impl VDPState {
             dest[y * line_length * pix_size + (x + col) * pix_size + 1] = color_g << 4;
             dest[y * line_length * pix_size + (x + col) * pix_size + 2] = color_b << 4;
             dest[y * line_length * pix_size + (x + col) * pix_size + 3] = 0xFF;
+            if overflow_pause && (col == 0 || col == 7 || src_line == 0 || src_line == 7) {
+                dest[y * line_length * pix_size + (x + col) * pix_size] = 0xF3;
+                dest[y * line_length * pix_size + (x + col) * pix_size + 1] = 0;
+                dest[y * line_length * pix_size + (x + col) * pix_size + 2] = 0;
+                dest[y * line_length * pix_size + (x + col) * pix_size + 3] = 0xFF;
+            }
+        }
+        if overflow_pause {
+            std::thread::sleep(std::time::Duration::from_millis(2));
         }
     }
     /*
