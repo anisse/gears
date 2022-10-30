@@ -8,7 +8,7 @@ use std::path::Path;
 
 use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
-use winit::event::{Event, VirtualKeyCode, WindowEvent};
+use winit::event::{ElementState, Event, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 
@@ -51,6 +51,7 @@ fn main() -> Result<(), String> {
 
     let mut emu = emu::Emulator::init(data);
 
+    let mut run = true;
     event_loop.run(move |event, _, control_flow| {
         // Draw the current frame
         match event {
@@ -75,6 +76,11 @@ fn main() -> Result<(), String> {
                         *control_flow = ControlFlow::Exit;
                         return;
                     }
+                    Some(VirtualKeyCode::Space) => {
+                        if input.state == ElementState::Pressed {
+                            run = !run;
+                        }
+                    }
                     _ => {}
                 },
                 WindowEvent::Resized(size) => {
@@ -84,15 +90,19 @@ fn main() -> Result<(), String> {
             },
             Event::MainEventsCleared => {
                 // Update internal state and request a redraw
-                println!("Stepping");
-                loop {
-                    if emu.step(pixels.get_frame()) {
-                        break;
+                //println!("Stepping");
+
+                if run {
+                    loop {
+                        if emu.step(pixels.get_frame()) {
+                            break;
+                        }
                     }
                 }
                 window.request_redraw();
             }
             _ => {}
         }
+        print!("");
     });
 }
