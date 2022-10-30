@@ -438,58 +438,16 @@ impl VDPState {
             }
         }
     }
+    fn render_line(&mut self, pixels: &mut [u8], line: u8) {
+        // First render background, then sprites ; we could optimize here by only rendering what is
+        // needed
+        self.render_background_line(pixels, line, false);
+        self.render_sprites_line(pixels, line, false);
+    }
     fn render_screen(&mut self, pixels: &mut [u8]) {
-        let pattern_base = ((self.reg[2] as usize) & 0x0E) << 10;
-        let sprite_base = ((self.reg[5] as usize) & 0x7E) << 7;
-
-        //println!("Double size sprites: {}", self.reg[1] & REG1_SIZE != 0);
-        //println!("Scroll screen: Pat name @{:04X}", pattern_base);
-        //let mut bg = vec![0x0F_u8; 32 * 28 * 8 * 8 * 3];
-        let mut chars = [false; 448];
         for line in 0_u8..(SCROLL_SCREEN_HEIGHT as u8 * CHAR_SIZE) {
-            self.render_background_line(pixels, line, false);
+            self.render_line(pixels, line);
         }
-        //println!("Sprites attribute @{:04X}", sprite_base);
-        for line in 0_u8..(SCROLL_SCREEN_HEIGHT as u8 * CHAR_SIZE) {
-            self.render_sprites_line(pixels, line, false);
-        }
-        /*
-        for i in 0_usize..64 {
-            let v = self.vram[sprite_base + i];
-            let h = self.vram[sprite_base + 0x80 + i * 2];
-            let ch = self.vram[sprite_base + 0x80 + i * 2 + 1] as usize;
-            chars[ch] = true;
-            if h == 0xE0 {
-                break;
-            }
-            //if ch != 0 {
-            //println!("Sprite {}: {}x{} char {}", i, h, v, ch);
-            //}
-            if h < 248 && v < 220 {
-                if self.reg[1] & REG1_SIZE != 0 {
-                    //println!("Sprite {}: {}x{} char {}", i, h, v, ch);
-                    // double size
-                    self.character(true, ch & (!0x1), pixels, h as usize, v as usize, 32);
-                    self.character(true, ch | 0x1, pixels, h as usize, v as usize + 8, 32);
-                } else {
-                    self.character(true, ch, pixels, h as usize, v as usize, 32);
-                }
-            }
-        }
-        */
-        //println!("Characters @0x0000");
-        for i in 0_usize..448 {
-            if chars[i] {
-                //println!("Character {}", i);
-                /*
-                let mut data = vec![0; 8 * 8 * 3];
-                Self::character(self, false, i, &mut data, 0, 0, 1);
-                Self::serialize_ppm(format!("./char-{:02X}.ppm", i), 8, 8, &data);
-                */
-            }
-        }
-        //Self::serialize_ppm("bg.ppm".to_string(), 32 * 8, 28 * 8, &bg);
-
         //println!("Color RAM: {:?}", self.cram);
     }
     fn write_cmd(&mut self, val: u8) -> Result<(), String> {
