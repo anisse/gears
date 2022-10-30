@@ -200,37 +200,8 @@ impl VDPState {
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
     }
-    /*
-    fn character(
-        &self,
-        sprite: bool,
-        i: usize,
-        dest: &mut [u8],
-        x: usize,
-        y: usize,
-        line_length: usize,
-    ) {
-        for src_line in 0..CHAR_SIZE {
-            self.character_line(
-                dest,
-                CharSettings {
-                    char_num: i as u16,
-                    x: x as u8,
-                    y: y as u8 + src_line,
-                    line_length: line_length as u8,
-                    src_line,
-                    x_start: 0,
-                    x_end: CHAR_SIZE,
-                    sprite,
-                    rvh: false,
-                    rvv: false,
-                },
-            );
-        }
-    }
-    */
+
     fn render_background_line(&self, pixels: &mut [u8], line: u8, visible_only: bool) {
-        // xxx
         let scroll_offset_x = if visible_only {
             self.reg[8] as usize + VISIBLE_AREA_START_X
         } else {
