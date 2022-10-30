@@ -564,14 +564,6 @@ impl VDP {
         };
         (interrupt, rendered)
     }
-    /*
-    fn reg_side_effect(state: &mut VDPState, reg: usize) {
-        match reg {
-            1 => {}
-            _ => {}
-        }
-    }
-    */
 }
 
 impl io::Device for VDP {
