@@ -33,7 +33,7 @@ impl Default for Joystick {
 }
 
 impl Joystick {
-    fn set_button(&self, button: Button, val: bool) {
+    pub fn set_button(&self, button: Button, val: bool) {
         let mut state = self.state.borrow_mut();
         state.buttons[button as usize] = val;
     }

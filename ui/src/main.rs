@@ -81,7 +81,7 @@ fn main() -> Result<(), String> {
                             run = !run;
                         }
                     }
-                    _ => {}
+                    _ => handle_key(&mut emu, input),
                 },
                 WindowEvent::Resized(size) => {
                     pixels.resize_surface(size.width, size.height);
@@ -105,4 +105,24 @@ fn main() -> Result<(), String> {
         }
         print!("");
     });
+}
+
+fn handle_key(emu: &mut emu::Emulator, input: &winit::event::KeyboardInput) {
+    let button = match input.virtual_keycode {
+        Some(VirtualKeyCode::Up) => Some(emu::Button::Up),
+        Some(VirtualKeyCode::Down) => Some(emu::Button::Down),
+        Some(VirtualKeyCode::Left) => Some(emu::Button::Left),
+        Some(VirtualKeyCode::Right) => Some(emu::Button::Right),
+        Some(VirtualKeyCode::Back) => Some(emu::Button::One),
+        Some(VirtualKeyCode::Return) => Some(emu::Button::Two),
+        Some(VirtualKeyCode::LShift) => Some(emu::Button::Start),
+        _ => None,
+    };
+    let f = match input.state {
+        ElementState::Pressed => emu::Emulator::press,
+        ElementState::Released => emu::Emulator::release,
+    };
+    if let Some(b) = button {
+        f(emu, b)
+    }
 }

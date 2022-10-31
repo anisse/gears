@@ -8,7 +8,7 @@ pub struct System {
 }
 
 impl System {
-    fn set_start_button(&self, val: bool) {
+    pub fn set_start_button(&self, val: bool) {
         self.start_button.replace(val);
     }
 }

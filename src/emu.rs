@@ -7,6 +7,30 @@ use crate::mem;
 use crate::system;
 use crate::vdp;
 
+pub enum Button {
+    Start,
+    One,
+    Two,
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+impl From<Button> for joystick::Button {
+    fn from(val: Button) -> Self {
+        match val {
+            Button::Start => panic!("Unsupported Start button to Joystick conversion"),
+            Button::One => joystick::Button::One,
+            Button::Two => joystick::Button::Two,
+            Button::Up => joystick::Button::Up,
+            Button::Down => joystick::Button::Down,
+            Button::Left => joystick::Button::Left,
+            Button::Right => joystick::Button::Right,
+        }
+    }
+}
+
 struct DebugIO {}
 impl io::Device for DebugIO {
     fn out(&self, addr: u16, val: u8) -> Result<(), String> {
@@ -128,5 +152,17 @@ impl Emulator {
             return true;
         }
         false
+    }
+    pub fn press(&mut self, button: Button) {
+        match button {
+            Button::Start => (*self.devs.sys).set_start_button(true),
+            _ => (*self.devs.joy).set_button(button.into(), true),
+        }
+    }
+    pub fn release(&mut self, button: Button) {
+        match button {
+            Button::Start => (*self.devs.sys).set_start_button(false),
+            _ => (*self.devs.joy).set_button(button.into(), false),
+        }
     }
 }
