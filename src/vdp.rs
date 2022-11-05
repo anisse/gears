@@ -137,9 +137,10 @@ impl VDPState {
             false => 0,
             true => 32,
         };
-        if c.sprite && DEBUG {
+        if DEBUG {
             println!(
-                "Sprite char {}: @{:04X} : {} {}x{} (char line length: {}) from ({}->{})x{}",
+                "{} char {}: @{:04X} : {} {}x{} (char line length: {}) from ({}->{})x{}",
+                if c.sprite { "Sprite" } else { "BG" },
                 c.char_num,
                 base,
                 pallette_base,
