@@ -379,7 +379,7 @@ impl VDPState {
                 rendered_sprites += 1;
                 let h = self.vram[sprite_base + 0x80 + sprite * 2] as usize;
                 if visible_only
-                    && ((h + CHAR_SIZE as usize) < VISIBLE_AREA_START_X || h >= VISIBLE_AREA_END_X)
+                    && ((h + CHAR_SIZE as usize) <= VISIBLE_AREA_START_X || h >= VISIBLE_AREA_END_X)
                 {
                     // We only render the visible area, so we count the sprites for priority, but
                     // nothing more
