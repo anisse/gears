@@ -179,7 +179,7 @@ impl VDPState {
             let color_g = (self.cram[pallette_base + code as usize * 2] >> 4) & 0xF;
             let color_b = (self.cram[pallette_base + code as usize * 2 + 1]) & 0xF;
 
-            let col = pix as usize;
+            let col = pix as usize - c.x_start as usize;
             let x = c.x as usize;
             let y = c.y as usize;
             let line_length = c.line_length as usize * CHAR_SIZE as usize;
