@@ -366,9 +366,10 @@ impl VDPState {
             // sprite number is priority; once we have rendered eight sprites, we stop
             let v = self.vram[sprite_base + sprite];
             if DEBUG {
+                let h = self.vram[sprite_base + 0x80 + sprite * 2] as usize;
                 println!(
-                    "Sprite {}, on line {} v: {} sprite height: {}",
-                    sprite, line, v, sprite_height
+                    "Sprite {}, on dest line {} (vline: {}) v: {} h: {} sprite height: {}",
+                    sprite, line, vcoord_line, v, h, sprite_height
                 );
             }
             if v <= vcoord_line && (vcoord_line as u16) < (v as u16) + sprite_height {
