@@ -249,7 +249,7 @@ impl VDPState {
             let x_end = if (x + CHAR_SIZE as usize) <= line_length_px {
                 CHAR_SIZE
             } else {
-                (x % CHAR_SIZE as usize) as u8
+                CHAR_SIZE - (x % CHAR_SIZE as usize) as u8
             };
             self.character_line(
                 pixels,
