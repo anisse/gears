@@ -199,11 +199,13 @@ impl VDPState {
         if overflow_pause {
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
+        char_bitmap
     }
 
     fn render_background_line(&self, pixels: &mut [u8], line: u8, visible_only: bool) {
         let scroll_offset_x = if visible_only {
-            self.reg[8] as usize + VISIBLE_AREA_START_X
+            (SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize) - (self.reg[8] as usize)
+                + VISIBLE_AREA_START_X
         } else {
             0
         };
