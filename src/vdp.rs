@@ -300,10 +300,7 @@ impl VDPState {
             0
         };
         let x_end = if visible_only {
-            std::cmp::max(
-                CHAR_SIZE as i16 - (x + CHAR_SIZE) as i16 - VISIBLE_AREA_END_X as i16,
-                CHAR_SIZE as i16,
-            ) as u8
+            std::cmp::min((x as i16 - VISIBLE_AREA_END_X as i16) as u8, CHAR_SIZE)
         } else {
             std::cmp::max(
                 CHAR_SIZE as i16
