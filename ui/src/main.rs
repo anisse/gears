@@ -14,8 +14,8 @@ use winit::window::WindowBuilder;
 
 use gears::emu;
 
-const WIDTH: u32 = 32 * 8;
-const HEIGHT: u32 = 28 * 8;
+const WIDTH: u32 = 20 * 8;
+const HEIGHT: u32 = 18 * 8;
 
 fn main() -> Result<(), String> {
     let event_loop = EventLoop::new();
@@ -49,7 +49,7 @@ fn main() -> Result<(), String> {
         panic!("Could not read {}: {}", path.display(), why);
     }
 
-    let mut emu = emu::Emulator::init(data, false);
+    let mut emu = emu::Emulator::init(data, true);
 
     let mut run = true;
     event_loop.run(move |event, _, control_flow| {
