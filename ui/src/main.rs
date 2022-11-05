@@ -49,7 +49,7 @@ fn main() -> Result<(), String> {
         panic!("Could not read {}: {}", path.display(), why);
     }
 
-    let mut emu = emu::Emulator::init(data);
+    let mut emu = emu::Emulator::init(data, false);
 
     let mut run = true;
     event_loop.run(move |event, _, control_flow| {

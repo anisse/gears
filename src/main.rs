@@ -27,7 +27,7 @@ pub fn main() {
         panic!("Could not read {}: {}", path.display(), why);
     }
 
-    let mut emu = emu::Emulator::init(data);
+    let mut emu = emu::Emulator::init(data, false);
     let mut pixels = vec![0; 32 * 8 * 28 * 8 * 4];
     loop {
         emu.step(&mut pixels);

@@ -396,15 +396,15 @@ impl VDPState {
             }
         }
     }
-    fn render_line(&mut self, pixels: &mut [u8], line: u8) {
+    fn render_line(&mut self, pixels: &mut [u8], line: u8, visible_only: bool) {
         // First render background, then sprites ; we could optimize here by only rendering what is
         // needed
-        self.render_background_line(pixels, line, false);
-        self.render_sprites_line(pixels, line, false);
+        self.render_background_line(pixels, line, visible_only);
+        self.render_sprites_line(pixels, line, visible_only);
     }
-    fn render_screen(&mut self, pixels: &mut [u8]) {
-        for line in 0_u8..(SCROLL_SCREEN_HEIGHT as u8 * CHAR_SIZE) {
-            self.render_line(pixels, line);
+    fn render_screen(&mut self, pixels: &mut [u8], visible_only: bool) {
+        for line in 0_u8..(VISIBLE_AREA_HEIGHT as u8 * CHAR_SIZE) {
+            self.render_line(pixels, line, visible_only);
         }
         //println!("Color RAM: {:?}", self.cram);
     }
@@ -540,7 +540,7 @@ impl VDP {
         }
         std::fs::rename("temp.ppm", filename).unwrap();
     }
-    pub fn step(&self, pixels: &mut [u8]) -> (VDPInt, VDPDisplay) {
+    pub fn step(&self, pixels: &mut [u8], visible_only: bool) -> (VDPInt, VDPDisplay) {
         let mut state = self.state.borrow_mut();
         state.v_counter = state.v_counter.wrapping_add(1);
         let mut rendered = VDPDisplay::NoDisplay;
@@ -550,7 +550,7 @@ impl VDP {
         if state.v_counter == 0xC0 {
             state.status |= ST_I;
             if state.reg[1] & REG1_BLANK != 0 {
-                state.render_screen(pixels);
+                state.render_screen(pixels, visible_only);
                 rendered = VDPDisplay::ScreenDone;
             }
         }
@@ -621,6 +621,6 @@ fn run_step() {
 
     let vdp = VDP::default();
     let mut pixels = vec![0; 32 * 8 * 28 * 8 * 4];
-    vdp.step(&mut pixels);
+    vdp.step(&mut pixels, false);
     assert_eq!(vdp.input(0x7E), Ok(1_u8),);
 }
