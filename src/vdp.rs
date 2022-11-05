@@ -51,7 +51,6 @@ const CHAR_SIZE: u8 = 8;
 const VISIBLE_AREA_START_X: usize =
     ((SCROLL_SCREEN_WIDTH - VISIBLE_AREA_WIDTH) / 2) * CHAR_SIZE as usize;
 const VISIBLE_AREA_START_Y: usize = 3 * CHAR_SIZE as usize;
-const SPRITE_VISIBLE_AREA_START_Y: usize = 0x42;
 const VISIBLE_AREA_END_X: usize = VISIBLE_AREA_WIDTH * CHAR_SIZE as usize + VISIBLE_AREA_START_X;
 const VISIBLE_AREA_END_Y: usize = VISIBLE_AREA_HEIGHT * CHAR_SIZE as usize + VISIBLE_AREA_START_Y;
 
@@ -311,7 +310,7 @@ impl VDPState {
             ) as u8
         };
         let ldiff = if visible_only {
-            line - v - SPRITE_VISIBLE_AREA_START_Y as u8
+            (line + VISIBLE_AREA_START_Y as u8) - v
         } else {
             line - v
         };
@@ -355,6 +354,11 @@ impl VDPState {
         } else {
             SCROLL_SCREEN_WIDTH as u8
         };
+        let vcoord_line = if visible_only {
+            line + VISIBLE_AREA_START_Y as u8
+        } else {
+            line
+        };
 
         // Compute collisions, priorities....
         for sprite in 0_usize..64 {
@@ -366,7 +370,7 @@ impl VDPState {
                     sprite, line, v, sprite_height
                 );
             }
-            if v <= line && (line as u16) < (v as u16) + sprite_height {
+            if v <= vcoord_line && (vcoord_line as u16) < (v as u16) + sprite_height {
                 if rendered_sprites >= 8 {
                     // We have reached sprite 9
                     self.status |= ST_9S;
