@@ -10,26 +10,15 @@ pub enum Button {
     One = 4,
     Two = 5,
 }
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct JoystickState {
     buttons: [bool; 6],
     buttons_ext: [bool; 6], // not really emulated
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Joystick {
     state: RefCell<JoystickState>,
-}
-
-impl Default for Joystick {
-    fn default() -> Self {
-        Joystick {
-            state: RefCell::new(JoystickState {
-                buttons: [true; 6],
-                buttons_ext: [true; 6],
-            }),
-        }
-    }
 }
 
 impl Joystick {

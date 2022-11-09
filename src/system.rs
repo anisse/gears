@@ -41,7 +41,7 @@ impl io::Device for System {
 
     fn input(&self, addr: u16) -> Result<u8, String> {
         match addr & 0xFF {
-            0x0 => Ok((*self.start_button.borrow() as u8) << 7 | 0x6F),
+            0x0 => Ok((!(*self.start_button.borrow() as u8) << 7) | 0x6F),
             _ => Err(format!(
                 "unknown system port output write address @{:04X}",
                 addr
