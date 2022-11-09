@@ -64,6 +64,7 @@ struct VDPState {
     status: u8,
     reg: [u8; 11],
     v_counter: u8,
+    v_counter_jumped: bool,
     addr: u16,
     dest: Option<WriteDest>,
     vram: Vec<u8>,
@@ -407,12 +408,6 @@ impl VDPState {
         self.render_background_line(pixels, line, visible_only);
         self.render_sprites_line(pixels, line, visible_only);
     }
-    fn render_screen(&mut self, pixels: &mut [u8], visible_only: bool) {
-        for line in 0_u8..(VISIBLE_AREA_HEIGHT as u8 * CHAR_SIZE) {
-            self.render_line(pixels, line, visible_only);
-        }
-        //println!("Color RAM: {:?}", self.cram);
-    }
     fn write_cmd(&mut self, val: u8) -> Result<(), String> {
         match self.cmd_byte1.take() {
             Some(data) => match val & 0xC0 {
@@ -551,16 +546,31 @@ impl VDP {
         let mut rendered = VDPDisplay::NoDisplay;
         if state.v_counter == 0 {
             state.vertical_scroll = state.reg[9];
+            state.v_counter_jumped = false;
+        }
+        if state.v_counter == 0xDA && !state.v_counter_jumped {
+            state.v_counter_jumped = true;
+            state.v_counter = 0xD5
+        }
+        if visible_only {
+            if state.v_counter >= VISIBLE_AREA_START_Y as u8
+                && state.v_counter < VISIBLE_AREA_END_Y as u8
+            {
+                let line = state.v_counter - VISIBLE_AREA_START_Y as u8;
+                state.render_line(pixels, line, visible_only);
+            }
+        } else if state.v_counter < SCROLL_SCREEN_HEIGHT as u8 * CHAR_SIZE {
+            let line = state.v_counter as u8;
+            state.render_line(pixels, line, visible_only);
         }
         if state.v_counter == 0xC0 {
             state.status |= ST_I;
             if state.reg[1] & REG1_BLANK != 0 {
-                state.render_screen(pixels, visible_only);
                 rendered = VDPDisplay::ScreenDone;
             }
         }
         if state.reg[0] & REG0_IE1 != 0 {
-            println!("Down counter interrupt should be enabled");
+            println!("H counter interrupt (line completion) should be enabled");
         }
         let interrupt = if state.status & ST_I != 0 && state.reg[1] & REG1_IE != 0 {
             VDPInt::InterruptGenerated
@@ -607,6 +617,7 @@ impl Default for VDPState {
         VDPState {
             reg: [0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 1],
             v_counter: 0,
+            v_counter_jumped: false,
             addr: 0,
             dest: None,
             vram: vec![0; 16 * 1024],
