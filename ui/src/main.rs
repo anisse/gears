@@ -140,20 +140,18 @@ fn handle_joystick_event(emu: &mut emu::Emulator, ev: gilrs::EventType) {
 
 fn handle_key(emu: &mut emu::Emulator, input: &winit::event::KeyboardInput) {
     let button = match input.virtual_keycode {
-        Some(VirtualKeyCode::Up) => Some(emu::Button::Up),
-        Some(VirtualKeyCode::Down) => Some(emu::Button::Down),
-        Some(VirtualKeyCode::Left) => Some(emu::Button::Left),
-        Some(VirtualKeyCode::Right) => Some(emu::Button::Right),
-        Some(VirtualKeyCode::Back) => Some(emu::Button::One),
-        Some(VirtualKeyCode::Return) => Some(emu::Button::Two),
-        Some(VirtualKeyCode::LShift) => Some(emu::Button::Start),
-        _ => None,
+        Some(VirtualKeyCode::Up) => emu::Button::Up,
+        Some(VirtualKeyCode::Down) => emu::Button::Down,
+        Some(VirtualKeyCode::Left) => emu::Button::Left,
+        Some(VirtualKeyCode::Right) => emu::Button::Right,
+        Some(VirtualKeyCode::Back) => emu::Button::One,
+        Some(VirtualKeyCode::Return) => emu::Button::Two,
+        Some(VirtualKeyCode::LShift) => emu::Button::Start,
+        _ => return,
     };
-    let f = match input.state {
+    let emu_action = match input.state {
         ElementState::Pressed => emu::Emulator::press,
         ElementState::Released => emu::Emulator::release,
     };
-    if let Some(b) = button {
-        f(emu, b)
-    }
+    emu_action(emu, button)
 }
