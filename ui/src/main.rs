@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
+use gilrs::Gilrs;
 use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, Event, VirtualKeyCode, WindowEvent};
@@ -35,6 +36,10 @@ fn main() -> Result<(), String> {
         Pixels::new(WIDTH, HEIGHT, surface_texture)
             .map_err(|e| format!("pixels buffer init: {e}"))?
     };
+
+    let mut gilrs =
+        Gilrs::new().map_err(|e| format!("cannot init gilrs gamepad library: {}", e))?;
+
     let args: Vec<String> = env::args().collect();
     let file = args.get(1).expect("needs an argument");
     let path = Path::new(file);
@@ -91,6 +96,9 @@ fn main() -> Result<(), String> {
             Event::MainEventsCleared => {
                 // Update internal state and request a redraw
                 //println!("Stepping");
+                while let Some(gilrs::Event { id, event, time }) = gilrs.next_event() {
+                    handle_joystick_event(&mut emu, event);
+                }
 
                 if run {
                     loop {
@@ -105,6 +113,29 @@ fn main() -> Result<(), String> {
         }
         print!("");
     });
+}
+
+fn handle_joystick_event(emu: &mut emu::Emulator, ev: gilrs::EventType) {
+    let (emu_action, btn): (fn(&mut emu::Emulator, emu::Button), _) = match ev {
+        gilrs::EventType::ButtonPressed(button, _) => (emu::Emulator::press, button),
+        gilrs::EventType::ButtonReleased(button, _) => (emu::Emulator::release, button),
+        //gilrs::EventType::AxisValueChanged(button, val, _) => todo!(),
+        _ => return,
+    };
+    println!("{:?}", btn);
+    let button = match btn {
+        gilrs::Button::DPadUp => emu::Button::Up,
+        gilrs::Button::DPadDown => emu::Button::Down,
+        gilrs::Button::DPadLeft => emu::Button::Left,
+        gilrs::Button::DPadRight => emu::Button::Right,
+        gilrs::Button::South => emu::Button::One,
+        gilrs::Button::East => emu::Button::Two,
+        gilrs::Button::West => emu::Button::One,
+        gilrs::Button::North => emu::Button::Two,
+        gilrs::Button::Start => emu::Button::Start,
+        _ => return,
+    };
+    emu_action(emu, button);
 }
 
 fn handle_key(emu: &mut emu::Emulator, input: &winit::event::KeyboardInput) {
