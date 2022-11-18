@@ -200,7 +200,6 @@ impl VDPState {
         if overflow_pause {
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
-        char_bitmap
     }
 
     fn render_background_line(&self, pixels: &mut [u8], line: u8, visible_only: bool) {
@@ -301,7 +300,10 @@ impl VDPState {
             0
         };
         let x_end = if visible_only {
-            std::cmp::min((x as i16 - VISIBLE_AREA_END_X as i16) as u8, CHAR_SIZE)
+            std::cmp::min(
+                ((VISIBLE_AREA_WIDTH as i16 * CHAR_SIZE as i16) - x as i16) as u8,
+                CHAR_SIZE,
+            )
         } else {
             std::cmp::max(
                 CHAR_SIZE as i16
