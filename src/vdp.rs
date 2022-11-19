@@ -452,9 +452,13 @@ impl VDPState {
                 }
                 0xC0 => {
                     // cram address setup
-                    assert_eq!(val, 0xC0);
-                    assert!(data < 64);
-                    self.addr = data as u16;
+                    if val != 0xC0 {
+                        println!("VDP cram address setup: {} != 0xC0", val);
+                    }
+                    if data >= 64 {
+                        println!("VDP cram data write: {} >= 64", val);
+                    }
+                    self.addr = data as u16 & 0x3F;
                     self.dest = Some(WriteDest::Cram);
                     //println!("setup cram address: {:02X}", data);
                 }
