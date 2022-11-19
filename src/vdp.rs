@@ -260,8 +260,10 @@ impl VDPState {
             let prio = b1 & PNAME_PRI != 0;
             if character != 0 && DEBUG {
                 println!(
-                    "Pattern {:03X}: character {:03X} revh {} revv {} pallette1 {} prio {}",
-                    ch, character, rvh, rvv, palette1, prio
+                    "Line {} src {} Pattern: {:03X} @{:04X} (base @{:04X} character {:03X} revh {} revv {} pallette1 {} prio {}",
+                    (scroll_start_y - ch_start_y) / CHAR_SIZE as usize,
+                    ch_start_y, ch, addr, pattern_base,
+                    character, rvh, rvv, palette1, prio
                 );
             }
             let x_end = if (x + CHAR_SIZE as usize) <= line_length_px {
