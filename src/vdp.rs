@@ -107,7 +107,7 @@ struct CharSettings {
 }
 
 impl VDPState {
-    fn character_line(&self, dest: &mut [u8], c: CharSettings) {
+    fn character_line(&self, dest: &mut [u8], c: CharSettings) -> u8 {
         assert!(c.x_start < CHAR_SIZE);
         assert!(c.x_end <= CHAR_SIZE);
         let mut overflow_pause = false;
@@ -160,6 +160,7 @@ impl VDPState {
         } else {
             c.src_line
         } as usize;
+        let mut char_bitmap: u8 = 0;
         for pix in c.x_start..c.x_end {
             let addr: usize = base + c.char_num as usize * 32 + (src_line) * 4;
             let offset = if c.rvh {
@@ -179,6 +180,7 @@ impl VDPState {
                 }
                 continue;
             }
+            char_bitmap |= 1 << pix;
             let color_r = (self.cram[pallette_base + code as usize * 2]) & 0xF;
             let color_g = (self.cram[pallette_base + code as usize * 2] >> 4) & 0xF;
             let color_b = (self.cram[pallette_base + code as usize * 2 + 1]) & 0xF;
@@ -188,6 +190,7 @@ impl VDPState {
             let y = c.y as usize;
             let line_length = c.line_length as usize * CHAR_SIZE as usize;
             let pix_size = 4; // 4 bytes per pixels, one for each component
+
             dest[y * line_length * pix_size + (x + col) * pix_size] = color_r << 4;
             dest[y * line_length * pix_size + (x + col) * pix_size + 1] = color_g << 4;
             dest[y * line_length * pix_size + (x + col) * pix_size + 2] = color_b << 4;
@@ -211,6 +214,7 @@ impl VDPState {
         if overflow_pause {
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
+        char_bitmap
     }
 
     fn render_background_line(&self, pixels: &mut [u8], line: u8, visible_only: bool) {
@@ -359,8 +363,7 @@ impl VDPState {
                 #[cfg(feature = "pattern_debug")]
                 bg_num: 0,
             },
-        );
-        0
+        )
     }
     fn render_sprites_line(&mut self, pixels: &mut [u8], line: u8, visible_only: bool) {
         let sprite_base = ((self.reg[5] as usize) & 0x7E) << 7;
