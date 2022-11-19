@@ -102,6 +102,8 @@ struct CharSettings {
     sprite: bool, // whether this character is sprite or background pattern
     rvh: bool,    // character is reversed horizontally
     rvv: bool,    // character is reversed vertically
+    #[cfg(feature = "pattern_debug")]
+    bg_num: u16,
 }
 
 impl VDPState {
@@ -196,6 +198,15 @@ impl VDPState {
                 dest[y * line_length * pix_size + (x + col) * pix_size + 2] = 0;
                 dest[y * line_length * pix_size + (x + col) * pix_size + 3] = 0xFF;
             }
+            #[cfg(feature = "pattern_debug")]
+            if (col == 0 || src_line == 0) {
+                dest[y * line_length * pix_size + (x + col) * pix_size] =
+                    ((c.char_num >> 4) & 0xFF) as u8;
+                dest[y * line_length * pix_size + (x + col) * pix_size + 1] =
+                    ((c.char_num & 0xF) as u8) << 4 | (((c.bg_num >> 8) & 0xF) as u8);
+                dest[y * line_length * pix_size + (x + col) * pix_size + 2] =
+                    (c.bg_num & 0xFF) as u8;
+            }
         }
         if overflow_pause {
             std::thread::sleep(std::time::Duration::from_millis(2));
@@ -267,6 +278,8 @@ impl VDPState {
                     sprite: false,
                     rvh,
                     rvv,
+                    #[cfg(feature = "pattern_debug")]
+                    bg_num: ch,
                 },
             );
             x += x_end as usize - ch_start_x;
@@ -343,6 +356,8 @@ impl VDPState {
                 sprite: true,
                 rvh: false,
                 rvv: false,
+                #[cfg(feature = "pattern_debug")]
+                bg_num: 0,
             },
         );
         0

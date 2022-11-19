@@ -13,6 +13,10 @@ version = "0.3"
 default-features = false
 features = ["cargo_bench_support"]
 
+[features]
+#default = ["pattern_debug"]
+pattern_debug = []
+
 [[bench]]
 name = "mem"
 harness = false
