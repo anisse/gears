@@ -45,8 +45,8 @@ impl io::Device for DebugIO {
     }
 }
 
-struct PSG {}
-impl io::Device for PSG {
+struct Psg {}
+impl io::Device for Psg {
     fn out(&self, _addr: u16, _val: u8) -> Result<(), String> {
         //println!("Ignored PSG write. @{:04X} {:02X}", _addr, _val);
         Ok(())
@@ -55,11 +55,11 @@ impl io::Device for PSG {
         panic!("Unsupported PSG read @{:04X}", addr);
     }
 }
-struct PSGorVDP {
-    psg: Rc<PSG>,
-    vdp: Rc<vdp::VDP>,
+struct PsgOrVdp {
+    psg: Rc<Psg>,
+    vdp: Rc<vdp::Vdp>,
 }
-impl io::Device for PSGorVDP {
+impl io::Device for PsgOrVdp {
     fn out(&self, addr: u16, val: u8) -> Result<(), String> {
         self.psg.out(addr, val)
     }
@@ -78,7 +78,7 @@ struct Devices {
     dbg_io: Rc<DebugIO>,
     sys: Rc<system::System>,
     joy: Rc<joystick::Joystick>,
-    pov: Rc<PSGorVDP>,
+    pov: Rc<PsgOrVdp>,
 }
 impl Devices {
     pub fn new() -> Self {
@@ -86,9 +86,9 @@ impl Devices {
             dbg_io: Rc::new(DebugIO {}),
             sys: Rc::new(system::System::default()),
             joy: Rc::new(joystick::Joystick::default()),
-            pov: Rc::new(PSGorVDP {
-                psg: Rc::new(PSG {}),
-                vdp: Rc::new(vdp::VDP::default()),
+            pov: Rc::new(PsgOrVdp {
+                psg: Rc::new(Psg {}),
+                vdp: Rc::new(vdp::Vdp::default()),
             }),
         }
     }
@@ -145,12 +145,12 @@ impl Emulator {
     }
     pub fn step(&mut self, pixels: &mut [u8]) -> bool {
         let (int, render) = self.devs.pov.vdp.step(pixels, self.visible_only);
-        if let vdp::VDPInt::InterruptGenerated = int {
+        if let vdp::VdpInt::InterruptGenerated = int {
             //println!("VDP sent an interrupt !");
             cpu::interrupt_mode_1(&mut self.cpu).unwrap();
         }
         cpu::run(&mut self.cpu, 227, false).unwrap();
-        if let vdp::VDPDisplay::ScreenDone = render {
+        if let vdp::VdpDisplay::ScreenDone = render {
             return true;
         }
         false

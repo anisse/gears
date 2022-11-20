@@ -60,7 +60,7 @@ enum WriteDest {
     Cram,
 }
 #[derive(Debug)]
-struct VDPState {
+struct VdpState {
     status: u8,
     reg: [u8; 11],
     v_counter: u8,
@@ -75,17 +75,17 @@ struct VDPState {
 }
 
 #[derive(Debug)]
-pub struct VDP {
-    state: RefCell<VDPState>,
+pub struct Vdp {
+    state: RefCell<VdpState>,
 }
 #[derive(Debug)]
-pub enum VDPInt {
+pub enum VdpInt {
     NoInterrupt,
     InterruptGenerated,
 }
 
 #[derive(Debug)]
-pub enum VDPDisplay {
+pub enum VdpDisplay {
     NoDisplay,
     ScreenDone,
 }
@@ -106,7 +106,7 @@ struct CharSettings {
     bg_num: u16,
 }
 
-impl VDPState {
+impl VdpState {
     fn character_line(&self, dest: &mut [u8], c: CharSettings) -> u8 {
         assert!(c.x_start < CHAR_SIZE);
         assert!(c.x_end <= CHAR_SIZE);
@@ -546,10 +546,10 @@ impl VDPState {
         Ok(st)
     }
 }
-impl VDP {
+impl Vdp {
     pub fn new() -> Self {
-        VDP {
-            state: RefCell::new(VDPState::default()),
+        Vdp {
+            state: RefCell::new(VdpState::default()),
         }
     }
 
@@ -566,10 +566,10 @@ impl VDP {
         }
         std::fs::rename("temp.ppm", filename).unwrap();
     }
-    pub fn step(&self, pixels: &mut [u8], visible_only: bool) -> (VDPInt, VDPDisplay) {
+    pub fn step(&self, pixels: &mut [u8], visible_only: bool) -> (VdpInt, VdpDisplay) {
         let mut state = self.state.borrow_mut();
         state.v_counter = state.v_counter.wrapping_add(1);
-        let mut rendered = VDPDisplay::NoDisplay;
+        let mut rendered = VdpDisplay::NoDisplay;
         if state.v_counter == 0 {
             state.vertical_scroll = state.reg[9];
             state.v_counter_jumped = false;
@@ -592,22 +592,22 @@ impl VDP {
         if state.v_counter == 0xC0 {
             state.status |= ST_I;
             if state.reg[1] & REG1_BLANK != 0 {
-                rendered = VDPDisplay::ScreenDone;
+                rendered = VdpDisplay::ScreenDone;
             }
         }
         if state.reg[0] & REG0_IE1 != 0 {
             println!("H counter interrupt (line completion) should be enabled");
         }
         let interrupt = if state.status & ST_I != 0 && state.reg[1] & REG1_IE != 0 {
-            VDPInt::InterruptGenerated
+            VdpInt::InterruptGenerated
         } else {
-            VDPInt::NoInterrupt
+            VdpInt::NoInterrupt
         };
         (interrupt, rendered)
     }
 }
 
-impl io::Device for VDP {
+impl io::Device for Vdp {
     fn out(&self, addr: u16, val: u8) -> Result<(), String> {
         let mut state = self.state.borrow_mut();
         match addr & 0xFF {
@@ -633,14 +633,14 @@ impl io::Device for VDP {
     }
 }
 
-impl Default for VDP {
+impl Default for Vdp {
     fn default() -> Self {
         Self::new()
     }
 }
-impl Default for VDPState {
+impl Default for VdpState {
     fn default() -> Self {
-        VDPState {
+        VdpState {
             reg: [0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 1],
             v_counter: 0,
             v_counter_jumped: false,
@@ -661,7 +661,7 @@ impl Default for VDPState {
 fn run_step() {
     use crate::io::Device;
 
-    let vdp = VDP::default();
+    let vdp = Vdp::default();
     let mut pixels = vec![0; 32 * 8 * 28 * 8 * 4];
     vdp.step(&mut pixels, false);
     assert_eq!(vdp.input(0x7E), Ok(1_u8),);
