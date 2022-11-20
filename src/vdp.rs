@@ -371,7 +371,7 @@ impl VdpState {
         let sprite_base = ((self.reg[5] as usize) & 0x7E) << 7;
         let sprite_height = if self.reg[1] & REG1_SIZE != 0 { 16 } else { 8 };
         let mut rendered_sprites = 0;
-        let mut line_bitmap_collision = [0_u8; SCROLL_SCREEN_WIDTH]; // works because size of u8 == CHAR_SIZE
+        let mut _line_bitmap_collision = [0_u8; SCROLL_SCREEN_WIDTH]; // works because size of u8 == CHAR_SIZE
         let line_length = if visible_only {
             VISIBLE_AREA_WIDTH as u8
         } else {
