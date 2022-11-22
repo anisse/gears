@@ -71,7 +71,7 @@ impl io::Device for PsgOrVdp {
 pub struct Emulator {
     cpu: cpu::State,
     devs: Devices,
-    visible_only: bool,
+    render_area: vdp::RenderArea,
 }
 
 struct Devices {
@@ -98,7 +98,11 @@ impl Emulator {
         let mut emu = Self {
             cpu: cpu::init(),
             devs: Devices::new(),
-            visible_only,
+            render_area: if visible_only {
+                vdp::RenderArea::VisibleOnly
+            } else {
+                vdp::RenderArea::EffectiveArea
+            },
         };
         emu.cpu.mem = mem::Memory::init(mem::Mapper::SegaGG {
             rom,
@@ -144,7 +148,7 @@ impl Emulator {
         );
     }
     pub fn step(&mut self, pixels: &mut [u8]) -> bool {
-        let (int, render) = self.devs.pov.vdp.step(pixels, self.visible_only);
+        let (int, render) = self.devs.pov.vdp.step(pixels, self.render_area);
         if let vdp::VdpInt::InterruptGenerated = int {
             //println!("VDP sent an interrupt !");
             cpu::interrupt_mode_1(&mut self.cpu).unwrap();

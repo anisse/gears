@@ -13,7 +13,7 @@ fn common_test(filename: String, mut frame: u64, result: &[u8]) -> Result<bool, 
     let mut data: Vec<u8> = vec![];
     file.read_to_end(&mut data)
         .map_err(|why| format!("Could not read {}: {}", path.display(), why))?;
-    let mut emu = emu::Emulator::init(data);
+    let mut emu = emu::Emulator::init(data, false);
     let mut pixels = vec![0; 32 * 8 * 28 * 8 * 4];
     assert_eq!(pixels.len(), result.len());
     loop {
