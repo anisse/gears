@@ -115,6 +115,26 @@ struct CharSettings {
 }
 
 impl VdpState {
+    fn character_line_sprite_bitmap(&self, c: CharSettings) -> u8 {
+        let base = ((self.reg[6] as usize) & 0x4) << 11;
+        let src_line = c.src_line as usize;
+        let mut char_bitmap: u8 = 0;
+        for pix in c.x_start..c.x_end {
+            let addr: usize = base + c.char_num as usize * 32 + (src_line) * 4;
+            let offset = CHAR_SIZE - 1 - (pix % CHAR_SIZE);
+            #[allow(clippy::identity_op)]
+            let code = (((self.vram[addr + 3] >> offset) & 1) << 3)
+                | (((self.vram[addr + 2] >> offset) & 1) << 2)
+                | (((self.vram[addr + 1] >> offset) & 1) << 1)
+                | (((self.vram[addr + 0] >> offset) & 1) << 0);
+            if code == 0 {
+                //transparent
+                continue;
+            }
+            char_bitmap |= 1 << pix;
+        }
+        char_bitmap
+    }
     fn character_line(&self, dest: &mut [u8], c: CharSettings) -> u8 {
         assert!(c.x_start < CHAR_SIZE);
         assert!(c.x_end <= CHAR_SIZE);
@@ -324,7 +344,7 @@ impl VdpState {
         vline: u8,
         char_num: u16,
         v: u8,
-        h: usize,
+        h: u8,
     ) -> CharSettings {
         let line_length = VISIBLE_AREA_WIDTH as u8;
         let x = std::cmp::max(h as i16 - VISIBLE_AREA_START_X as i16, 0) as u8;
@@ -357,7 +377,7 @@ impl VdpState {
         vline: u8,
         char_num: u16,
         v: u8,
-        h: usize,
+        h: u8,
     ) -> CharSettings {
         let line_length = SCROLL_SCREEN_WIDTH as u8;
         let x = h as u8;
@@ -390,13 +410,13 @@ impl VdpState {
         &mut self,
         pixels: &mut [u8],
         vcoord_line: u8,
-        invisible: fn(usize) -> bool,
-        sprite_settings: fn(bool, u8, u16, u8, usize) -> CharSettings,
+        invisible: fn(u8) -> bool,
+        sprite_settings: fn(bool, u8, u16, u8, u8) -> CharSettings,
     ) {
         let sprite_base = ((self.reg[5] as usize) & 0x7E) << 7;
         let sprite_height = if self.reg[1] & REG1_SIZE != 0 { 16 } else { 8 };
         let mut rendered_sprites = 0;
-        let mut _line_bitmap_collision = [0_u8; SCROLL_SCREEN_WIDTH]; // works because size of u8 == CHAR_SIZE
+        let mut line_bitmap_collision = [0_u8; SCROLL_SCREEN_WIDTH]; // works because size of u8 == CHAR_SIZE
 
         // Compute collisions, priorities....
         for sprite in 0_usize..64 {
@@ -416,21 +436,53 @@ impl VdpState {
                     break; //nothing more to render
                 }
                 rendered_sprites += 1;
-                let h = self.vram[sprite_base + 0x80 + sprite * 2] as usize;
+                let h = self.vram[sprite_base + 0x80 + sprite * 2];
+                let char_num = self.vram[sprite_base + 0x80 + sprite * 2 + 1] as u16;
+                let char_settings =
+                    sprite_settings(self.reg[1] & REG1_SIZE != 0, vcoord_line, char_num, v, h);
                 if invisible(h) {
-                    // We only render the visible area, so we count the sprites for priority, but
-                    // nothing more
+                    // We only render the visible area, so we count the sprites for priority, and
+                    // collision, but not rendering
+                    let bitmap = self.character_line_sprite_bitmap(char_settings);
+                    self.collision_check(&mut line_bitmap_collision, bitmap, h);
                     continue;
                 }
 
-                let char_num = self.vram[sprite_base + 0x80 + sprite * 2 + 1] as u16;
-                let _bitmap = self.character_line(
-                    pixels,
-                    sprite_settings(self.reg[1] & REG1_SIZE != 0, vcoord_line, char_num, v, h),
-                );
-                // TODO: check collision
-                //self.check_collision(line_bitmap_collision, _bitmap);
+                let bitmap = self.character_line(pixels, char_settings);
+                self.collision_check(&mut line_bitmap_collision, bitmap, h);
             }
+        }
+    }
+    fn collision_check(&mut self, line_bitmap_collision: &mut [u8; 32], bitmap: u8, h: u8) {
+        if Self::collision_calc(line_bitmap_collision, bitmap, h) {
+            self.status |= ST_C;
+        }
+        let shift = h % CHAR_SIZE;
+        line_bitmap_collision[h as usize / CHAR_SIZE as usize] |= bitmap << shift;
+        line_bitmap_collision[(h as usize / CHAR_SIZE as usize + 1) % SCROLL_SCREEN_WIDTH] |=
+            bitmap >> ((CHAR_SIZE - shift) % CHAR_SIZE);
+    }
+    fn collision_calc(line_bitmap_collision: &[u8; 32], bitmap: u8, h: u8) -> bool {
+        if h % CHAR_SIZE == 0 {
+            line_bitmap_collision[h as usize / CHAR_SIZE as usize] & bitmap != 0
+        } else {
+            let shift = h % CHAR_SIZE;
+            let mask = 0xFF << shift;
+            let l0 = line_bitmap_collision[h as usize / CHAR_SIZE as usize];
+            let l1 =
+                line_bitmap_collision[(h as usize / CHAR_SIZE as usize + 1) % SCROLL_SCREEN_WIDTH];
+            /*
+            println!(
+                "{:02X}{:02X} coll {:04X} (= {:02X} << {})",
+                l1,
+                l0,
+                (bitmap as u16) << shift,
+                bitmap,
+                shift
+            );
+            */
+            (l0 & mask) & (bitmap << shift) != 0
+                || (l1 & !mask) & (bitmap >> (CHAR_SIZE - shift)) != 0
         }
     }
     fn render_line_effective(&mut self, pixels: &mut [u8], line: u8) {
@@ -451,7 +503,10 @@ impl VdpState {
         self.render_sprites_line(
             pixels,
             line + VISIBLE_AREA_START_Y as u8,
-            |h| (h + CHAR_SIZE as usize) <= VISIBLE_AREA_START_X || h >= VISIBLE_AREA_END_X,
+            |h| {
+                (h as usize + CHAR_SIZE as usize) <= VISIBLE_AREA_START_X
+                    || h as usize >= VISIBLE_AREA_END_X
+            },
             Self::sprite_line_settings_visible,
         );
     }
@@ -781,4 +836,28 @@ fn sprite_coord() {
             rvv: false,
         }
     );
+}
+
+#[cfg(test)]
+#[test]
+fn sprite_collisions() {
+    let mut line_bitmap_collision = [0_u8; 32];
+    line_bitmap_collision[8] = 0xF3;
+    assert!(VdpState::collision_calc(&line_bitmap_collision, 0xF, 64));
+    assert!(!VdpState::collision_calc(&line_bitmap_collision, 0xF, 72));
+    // with a shift
+    line_bitmap_collision[12] = 0x3C;
+    assert!(VdpState::collision_calc(&line_bitmap_collision, 0xF, 95));
+    assert!(!VdpState::collision_calc(&line_bitmap_collision, 0xF, 94));
+    // with a shift
+    line_bitmap_collision[10] = 0x1;
+    assert!(VdpState::collision_calc(&line_bitmap_collision, 0xFF, 80));
+    assert!(VdpState::collision_calc(&line_bitmap_collision, 0xFF, 73));
+    assert!(!VdpState::collision_calc(&line_bitmap_collision, 0xFF, 81));
+    assert!(!VdpState::collision_calc(&line_bitmap_collision, 0xFF, 72));
+    line_bitmap_collision[10] = 0x80;
+    assert!(VdpState::collision_calc(&line_bitmap_collision, 0xFF, 80));
+    assert!(VdpState::collision_calc(&line_bitmap_collision, 0xFF, 87));
+    assert!(!VdpState::collision_calc(&line_bitmap_collision, 0xFF, 79));
+    assert!(!VdpState::collision_calc(&line_bitmap_collision, 0xFF, 88));
 }
