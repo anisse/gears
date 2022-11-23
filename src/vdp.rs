@@ -276,9 +276,10 @@ impl VdpState {
         loop {
             let ch_start_y = scroll_start_y % CHAR_SIZE as usize;
             let ch_start_x = (scroll_start_x + x) % CHAR_SIZE as usize;
+            let src_x =
+                (scroll_start_x + x - ch_start_x) % (SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize);
             let ch = ((scroll_start_y - ch_start_y) / CHAR_SIZE as usize * SCROLL_SCREEN_WIDTH
-                + (scroll_start_x + x - ch_start_x) / CHAR_SIZE as usize)
-                as u16;
+                + src_x / CHAR_SIZE as usize) as u16;
             let addr = pattern_base + (ch as usize * CHAR_DESC_LEN);
             let b1 = self.vram[addr + 1];
             let character = self.vram[addr] as u16 | ((b1 as u16 & 0x1) << 8);
@@ -288,9 +289,9 @@ impl VdpState {
             let prio = b1 & PNAME_PRI != 0;
             if character != 0 && DEBUG {
                 println!(
-                    "Line {} src {} Pattern: {:03X} @{:04X} (base @{:04X} character {:03X} revh {} revv {} pallette1 {} prio {}",
-                    (scroll_start_y - ch_start_y) / CHAR_SIZE as usize,
-                    ch_start_y, ch, addr, pattern_base,
+                    "BG src {}x{} dest {}x{} Pattern: {:03X} @{:04X} (base @{:04X} character {:03X} revh {} revv {} pallette1 {} prio {}",
+                    src_x, scroll_start_y - ch_start_y, x, line,
+                    ch, addr, pattern_base,
                     character, rvh, rvv, palette1, prio
                 );
             }
