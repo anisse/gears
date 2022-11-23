@@ -860,4 +860,11 @@ fn sprite_collisions() {
     assert!(VdpState::collision_calc(&line_bitmap_collision, 0xFF, 87));
     assert!(!VdpState::collision_calc(&line_bitmap_collision, 0xFF, 79));
     assert!(!VdpState::collision_calc(&line_bitmap_collision, 0xFF, 88));
+    line_bitmap_collision[31] = 0xFF;
+    // edge
+    assert!(VdpState::collision_calc(&line_bitmap_collision, 0xFF, 250));
+    // TODO: should be a match or not ?. We wrap around, but should we ?
+    line_bitmap_collision[31] = 0;
+    line_bitmap_collision[0] = 0xFF;
+    assert!(VdpState::collision_calc(&line_bitmap_collision, 0xFF, 250));
 }
