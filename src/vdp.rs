@@ -140,6 +140,7 @@ impl VdpState {
         }
         char_bitmap
     }
+    #[inline]
     fn character_line(&self, dest: &mut [u8], c: CharSettings) -> u8 {
         assert!(c.x_start < CHAR_SIZE);
         assert!(c.x_end <= CHAR_SIZE);
