@@ -115,6 +115,15 @@ struct CharSettings {
 }
 
 impl VdpState {
+    #[inline]
+    fn color_code(&self, addr: usize, offset: u8) -> u8 {
+        #[allow(clippy::identity_op)]
+        let c = (((self.vram[addr + 3] >> offset) & 1) << 3)
+            | (((self.vram[addr + 2] >> offset) & 1) << 2)
+            | (((self.vram[addr + 1] >> offset) & 1) << 1)
+            | (((self.vram[addr + 0] >> offset) & 1) << 0);
+        c
+    }
     fn character_line_sprite_bitmap(&self, c: CharSettings) -> u8 {
         let base = ((self.reg[6] as usize) & 0x4) << 11;
         let src_line = c.src_line as usize;
@@ -122,11 +131,7 @@ impl VdpState {
         for pix in c.x_start..c.x_end {
             let addr: usize = base + c.char_num as usize * 32 + (src_line) * 4;
             let offset = CHAR_SIZE - 1 - (pix % CHAR_SIZE);
-            #[allow(clippy::identity_op)]
-            let code = (((self.vram[addr + 3] >> offset) & 1) << 3)
-                | (((self.vram[addr + 2] >> offset) & 1) << 2)
-                | (((self.vram[addr + 1] >> offset) & 1) << 1)
-                | (((self.vram[addr + 0] >> offset) & 1) << 0);
+            let code = self.color_code(addr, offset);
             if code == 0 {
                 //transparent
                 continue;
@@ -196,11 +201,7 @@ impl VdpState {
             } else {
                 CHAR_SIZE - 1 - (pix % CHAR_SIZE)
             };
-            #[allow(clippy::identity_op)]
-            let code = (((self.vram[addr + 3] >> offset) & 1) << 3)
-                | (((self.vram[addr + 2] >> offset) & 1) << 2)
-                | (((self.vram[addr + 1] >> offset) & 1) << 1)
-                | (((self.vram[addr + 0] >> offset) & 1) << 0);
+            let code = self.color_code(addr, offset);
             if c.sprite && code == 0 {
                 //transparent
                 if overflow_pause {
