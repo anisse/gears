@@ -69,6 +69,7 @@ impl io::Device for PsgOrVdp {
 }
 
 pub struct Emulator {
+    cache: cpu::DisasCache,
     cpu: cpu::State,
     devs: Devices,
     render_area: vdp::RenderArea,
@@ -96,6 +97,7 @@ impl Devices {
 impl Emulator {
     pub fn init(rom: Vec<u8>, visible_only: bool) -> Self {
         let mut emu = Self {
+            cache: cpu::DisasCache::init(),
             cpu: cpu::init(),
             devs: Devices::new(),
             render_area: if visible_only {
@@ -153,7 +155,7 @@ impl Emulator {
             //println!("VDP sent an interrupt !");
             cpu::interrupt_mode_1(&mut self.cpu).unwrap();
         }
-        cpu::run(&mut self.cpu, 227, false).unwrap();
+        cpu::run_cached(&self.cache, &mut self.cpu, 227, false).unwrap();
         if let vdp::VdpDisplay::ScreenDone = render {
             return true;
         }
