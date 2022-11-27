@@ -465,27 +465,13 @@ impl VdpState {
             bitmap >> ((CHAR_SIZE - shift) % CHAR_SIZE);
     }
     fn collision_calc(line_bitmap_collision: &[u8; 32], bitmap: u8, h: u8) -> bool {
-        if h % CHAR_SIZE == 0 {
-            line_bitmap_collision[h as usize / CHAR_SIZE as usize] & bitmap != 0
-        } else {
-            let shift = h % CHAR_SIZE;
-            let mask = 0xFF << shift;
-            let l0 = line_bitmap_collision[h as usize / CHAR_SIZE as usize];
-            let l1 =
-                line_bitmap_collision[(h as usize / CHAR_SIZE as usize + 1) % SCROLL_SCREEN_WIDTH];
-            /*
-            println!(
-                "{:02X}{:02X} coll {:04X} (= {:02X} << {})",
-                l1,
-                l0,
-                (bitmap as u16) << shift,
-                bitmap,
-                shift
-            );
-            */
-            (l0 & mask) & (bitmap << shift) != 0
-                || (l1 & !mask) & (bitmap >> (CHAR_SIZE - shift)) != 0
-        }
+        let shift = h % CHAR_SIZE;
+        let bitmap: u16 = (bitmap as u16) << shift;
+        let line: u16 = line_bitmap_collision[h as usize / CHAR_SIZE as usize] as u16
+            | (line_bitmap_collision[(h as usize / CHAR_SIZE as usize + 1) % SCROLL_SCREEN_WIDTH]
+                as u16)
+                << 8;
+        (line & (0xFF << shift)) & bitmap != 0
     }
     fn render_line_effective(&mut self, pixels: &mut [u8], line: u8) {
         // First render background, then sprites ; we could optimize here by only rendering what is
