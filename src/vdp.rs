@@ -228,11 +228,7 @@ impl VdpState {
         assert!(c.x_start < CHAR_SIZE);
         assert!(c.x_end <= CHAR_SIZE);
         let mut overflow_pause = false;
-        let sprite = if let MoreSettings::SpritePriority(_) = m {
-            true
-        } else {
-            false
-        };
+        let sprite = matches!(m, MoreSettings::SpritePriority(_));
         let base = match sprite {
             false => {
                 if c.char_num >= 448 {
