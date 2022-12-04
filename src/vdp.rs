@@ -40,6 +40,13 @@ flag!(PatternName,
     PNAME_PRI => 4,
 );
 
+macro_rules! debugln {
+    ($($rest:tt)*) => {
+        if DEBUG {
+            std::println!($($rest)*)
+        }
+    }
+}
 const DEBUG: bool = false;
 const OVERFLOW_TRACK: bool = false;
 
