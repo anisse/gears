@@ -117,6 +117,7 @@ struct CharSettings {
     sprite: bool, // whether this character is sprite or background pattern
     rvh: bool,    // character is reversed horizontally
     rvv: bool,    // character is reversed vertically
+    priority: u8, // for sprites: priority map aligned with sprite start
     #[cfg(feature = "pattern_debug")]
     bg_num: u16,
 }
@@ -258,21 +259,36 @@ impl VdpState {
                 CHAR_SIZE - 1 - (pix % CHAR_SIZE)
             };
             let code = self.color_code(addr, offset);
-            if c.sprite && code == 0 {
-                //transparent
-                if overflow_pause {
-                    println!("skipping sprite !");
+            let col = pix as usize - c.x_start as usize;
+            let x = c.x as usize;
+            let y = c.y as usize;
+            if c.sprite {
+                if code == 0 {
+                    //transparent
+                    if overflow_pause {
+                        println!("skipping sprite !");
+                    }
+                    continue;
                 }
-                continue;
+
+                if c.priority & (1 << col) != 0 {
+                    debugln!(
+                        "Skipping prio sprite pixel {} at dest coord x={} b1 = {:02X}",
+                        pix,
+                        x + col,
+                        c.priority,
+                    );
+                    continue;
+                }
             }
-            char_bitmap |= 1 << pix;
+            /* for background (sprites already had this check) */
+            if code != 0 {
+                char_bitmap |= 1 << pix;
+            }
             let color_r = (self.cram[pallette_base + code as usize * 2]) & 0xF;
             let color_g = (self.cram[pallette_base + code as usize * 2] >> 4) & 0xF;
             let color_b = (self.cram[pallette_base + code as usize * 2 + 1]) & 0xF;
 
-            let col = pix as usize - c.x_start as usize;
-            let x = c.x as usize;
-            let y = c.y as usize;
             let line_length = c.line_length as usize * CHAR_SIZE as usize;
             let pix_size = 4; // 4 bytes per pixels, one for each component
 
@@ -302,7 +318,13 @@ impl VdpState {
         char_bitmap
     }
 
-    fn render_background_line(&self, pixels: &mut [u8], line: u8, visible_only: bool) {
+    fn render_background_line(
+        &self,
+        pixels: &mut [u8],
+        line: u8,
+        visible_only: bool,
+        priorities: &mut Bitmap<u8, SCROLL_SCREEN_WIDTH>,
+    ) {
         let scroll_offset_x = if visible_only {
             (SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize) - (self.reg[8] as usize)
                 + VISIBLE_AREA_START_X
@@ -357,7 +379,7 @@ impl VdpState {
             } else {
                 CHAR_SIZE - (x % CHAR_SIZE as usize) as u8
             };
-            self.character_line(
+            let bitmap = self.character_line(
                 pixels,
                 CharSettings {
                     char_num: character,
@@ -370,15 +392,20 @@ impl VdpState {
                     sprite: false,
                     rvh,
                     rvv,
+                    priority: 0,
                     #[cfg(feature = "pattern_debug")]
                     bg_num: ch,
                 },
             );
+            if prio {
+                priorities.set((x as u8).wrapping_sub(ch_start_x as u8) as usize, bitmap);
+            }
             x += x_end as usize - ch_start_x;
             if x >= line_length_px as usize {
                 break;
             }
         }
+        debugln!("L{line:3}priority map: {:?}", priorities);
     }
     fn sprite_double_size_src_line(double_size: bool, char_num: u16, ldiff: u8) -> (u16, u8) {
         if !double_size {
@@ -424,6 +451,7 @@ impl VdpState {
             sprite: true,
             rvh: false,
             rvv: false,
+            priority: 0,
             #[cfg(feature = "pattern_debug")]
             bg_num: 0,
         }
@@ -459,6 +487,7 @@ impl VdpState {
             sprite: true,
             rvh: false,
             rvv: false,
+            priority: 0,
             #[cfg(feature = "pattern_debug")]
             bg_num: 0,
         }
@@ -470,6 +499,7 @@ impl VdpState {
         vcoord_line: u8,
         invisible: fn(u8) -> bool,
         sprite_settings: fn(bool, u8, u16, u8, u8) -> CharSettings,
+        priorities: &Bitmap<u8, SCROLL_SCREEN_WIDTH>,
     ) {
         let sprite_base = ((self.reg[5] as usize) & 0x7E) << 7;
         let sprite_height = if self.reg[1] & REG1_SIZE != 0 { 16 } else { 8 };
@@ -496,7 +526,7 @@ impl VdpState {
                 rendered_sprites += 1;
                 let h = self.vram[sprite_base + 0x80 + sprite * 2];
                 let char_num = self.vram[sprite_base + 0x80 + sprite * 2 + 1] as u16;
-                let char_settings =
+                let mut char_settings =
                     sprite_settings(self.reg[1] & REG1_SIZE != 0, vcoord_line, char_num, v, h);
                 if invisible(h) {
                     // We only render the visible area, so we count the sprites for priority, and
@@ -505,7 +535,12 @@ impl VdpState {
                     self.collision_check(&mut line_bitmap_collision, bitmap, h);
                     continue;
                 }
-
+                let xprio = char_settings.x.wrapping_sub(char_settings.x_start) as usize;
+                char_settings.priority = priorities.get(xprio);
+                debugln!(
+                    "priority for sprite {sprite:2} at {xprio:3}: {:02X}",
+                    char_settings.priority
+                );
                 let bitmap = self.character_line(pixels, char_settings);
                 self.collision_check(&mut line_bitmap_collision, bitmap, h);
             }
@@ -529,20 +564,23 @@ impl VdpState {
             != 0
     }
     fn render_line_effective(&mut self, pixels: &mut [u8], line: u8) {
+        let mut priority = Bitmap::new();
         // First render background, then sprites ; we could optimize here by only rendering what is
         // needed
-        self.render_background_line(pixels, line, false);
+        self.render_background_line(pixels, line, false, &mut priority);
         self.render_sprites_line(
             pixels,
             line,
             |_| false,
             Self::sprite_line_settings_effective,
+            &priority,
         );
     }
     fn render_line_visible(&mut self, pixels: &mut [u8], line: u8) {
+        let mut priority = Bitmap::new();
         // First render background, then sprites ; we could optimize here by only rendering what is
         // needed
-        self.render_background_line(pixels, line, true);
+        self.render_background_line(pixels, line, true, &mut priority);
         self.render_sprites_line(
             pixels,
             line + VISIBLE_AREA_START_Y as u8,
@@ -551,6 +589,7 @@ impl VdpState {
                     || h as usize >= VISIBLE_AREA_END_X
             },
             Self::sprite_line_settings_visible,
+            &priority,
         );
     }
     fn render_line(&mut self, pixels: &mut [u8], line: u8, render_area: RenderArea) {
@@ -813,6 +852,7 @@ fn sprite_coord() {
             sprite: true,
             rvh: false,
             rvv: false,
+            priority: 0,
         }
     );
     // double size, first sprite
@@ -829,6 +869,7 @@ fn sprite_coord() {
             sprite: true,
             rvh: false,
             rvv: false,
+            priority: 0,
         }
     );
     // double size, second sprite
@@ -845,6 +886,7 @@ fn sprite_coord() {
             sprite: true,
             rvh: false,
             rvv: false,
+            priority: 0,
         }
     );
     // partial x, left edge
@@ -861,6 +903,7 @@ fn sprite_coord() {
             sprite: true,
             rvh: false,
             rvv: false,
+            priority: 0,
         }
     );
     // partial x, right edge
@@ -877,6 +920,7 @@ fn sprite_coord() {
             sprite: true,
             rvh: false,
             rvv: false,
+            priority: 0,
         }
     );
 }
