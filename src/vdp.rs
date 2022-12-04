@@ -502,7 +502,7 @@ impl VdpState {
         let sprite_base = ((self.reg[5] as usize) & 0x7E) << 7;
         let sprite_height = if self.reg[1] & REG1_SIZE != 0 { 16 } else { 8 };
         let mut rendered_sprites = 0;
-        let mut line_bitmap_collision = [0_u8; SCROLL_SCREEN_WIDTH]; // works because size of u8 == CHAR_SIZE
+        let mut line_bitmap_collision = Bitmap::new();
 
         // Compute collisions, priorities....
         for sprite in 0_usize..64 {
@@ -545,22 +545,23 @@ impl VdpState {
             }
         }
     }
-    fn collision_check(&mut self, line_bitmap_collision: &mut [u8; 32], bitmap: u8, h: u8) {
+    fn collision_check(
+        &mut self,
+        line_bitmap_collision: &mut Bitmap<u8, SCROLL_SCREEN_WIDTH>,
+        bitmap: u8,
+        h: u8,
+    ) {
         if Self::collision_calc(line_bitmap_collision, bitmap, h) {
             self.status |= ST_C;
         }
-        let shift = h % CHAR_SIZE;
-        line_bitmap_collision[h as usize / CHAR_SIZE as usize] |= bitmap << shift;
-        line_bitmap_collision[(h as usize / CHAR_SIZE as usize + 1) % SCROLL_SCREEN_WIDTH] |=
-            bitmap >> ((CHAR_SIZE - shift) % CHAR_SIZE);
+        line_bitmap_collision.set(h as usize, bitmap);
     }
-    fn collision_calc(line_bitmap_collision: &[u8; 32], bitmap: u8, h: u8) -> bool {
-        Bitmap {
-            bits: *line_bitmap_collision,
-        }
-        .get(h as usize)
-            & bitmap
-            != 0
+    fn collision_calc(
+        line_bitmap_collision: &Bitmap<u8, SCROLL_SCREEN_WIDTH>,
+        bitmap: u8,
+        h: u8,
+    ) -> bool {
+        line_bitmap_collision.get(h as usize) & bitmap != 0
     }
     fn render_line_effective(&mut self, pixels: &mut [u8], line: u8) {
         let mut priority = Bitmap::new();
@@ -924,30 +925,30 @@ fn sprite_coord() {
 
 #[test]
 fn sprite_collisions() {
-    let mut line_bitmap_collision = [0_u8; 32];
-    line_bitmap_collision[8] = 0xF3;
+    let mut line_bitmap_collision: Bitmap<u8, 32> = Bitmap::new();
+    line_bitmap_collision.bits[8] = 0xF3;
     assert!(VdpState::collision_calc(&line_bitmap_collision, 0xF, 64));
     assert!(!VdpState::collision_calc(&line_bitmap_collision, 0xF, 72));
     // with a shift
-    line_bitmap_collision[12] = 0x3C;
+    line_bitmap_collision.bits[12] = 0x3C;
     assert!(VdpState::collision_calc(&line_bitmap_collision, 0xF, 95));
     assert!(!VdpState::collision_calc(&line_bitmap_collision, 0xF, 94));
     // with a shift
-    line_bitmap_collision[10] = 0x1;
+    line_bitmap_collision.bits[10] = 0x1;
     assert!(VdpState::collision_calc(&line_bitmap_collision, 0xFF, 80));
     assert!(VdpState::collision_calc(&line_bitmap_collision, 0xFF, 73));
     assert!(!VdpState::collision_calc(&line_bitmap_collision, 0xFF, 81));
     assert!(!VdpState::collision_calc(&line_bitmap_collision, 0xFF, 72));
-    line_bitmap_collision[10] = 0x80;
+    line_bitmap_collision.bits[10] = 0x80;
     assert!(VdpState::collision_calc(&line_bitmap_collision, 0xFF, 80));
     assert!(VdpState::collision_calc(&line_bitmap_collision, 0xFF, 87));
     assert!(!VdpState::collision_calc(&line_bitmap_collision, 0xFF, 79));
     assert!(!VdpState::collision_calc(&line_bitmap_collision, 0xFF, 88));
-    line_bitmap_collision[31] = 0xFF;
+    line_bitmap_collision.bits[31] = 0xFF;
     // edge
     assert!(VdpState::collision_calc(&line_bitmap_collision, 0xFF, 250));
     // TODO: should be a match or not ?. We wrap around, but should we ?
-    line_bitmap_collision[31] = 0;
-    line_bitmap_collision[0] = 0xFF;
+    line_bitmap_collision.bits[31] = 0;
+    line_bitmap_collision.bits[0] = 0xFF;
     assert!(VdpState::collision_calc(&line_bitmap_collision, 0xFF, 250));
 }
