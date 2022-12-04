@@ -558,6 +558,10 @@ impl VdpState {
                     "priority for sprite {sprite:2} at {xprio:3}: {:02X}",
                     priorities.get(xprio),
                 );
+                // TODO: we should *not* render over sprites of higher priority
+                // which means we must check the collision bitmap as well
+                // but instead of *simplysimply  skipping* the pixels, we should do the proper
+                // collision check, otherwise we won't have the collision bit set
                 let bitmap = self.character_line(
                     pixels,
                     char_settings,
