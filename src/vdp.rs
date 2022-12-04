@@ -824,7 +824,6 @@ impl Default for VdpState {
     }
 }
 
-#[cfg(test)]
 #[test]
 fn run_step() {
     use crate::io::Device;
@@ -835,7 +834,6 @@ fn run_step() {
     assert_eq!(vdp.input(0x7E), Ok(1_u8),);
 }
 
-#[cfg(test)]
 #[test]
 fn sprite_coord() {
     // random one
@@ -925,7 +923,6 @@ fn sprite_coord() {
     );
 }
 
-#[cfg(test)]
 #[test]
 fn sprite_collisions() {
     let mut line_bitmap_collision = [0_u8; 32];
