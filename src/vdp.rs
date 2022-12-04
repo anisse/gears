@@ -271,24 +271,16 @@ impl VdpState {
             c.x_end,
             c.src_line
         );
-        let src_line = if let MoreSettings::BgSettings { rvv, .. } = m {
-            if rvv {
-                CHAR_SIZE - 1 - c.src_line
-            } else {
-                c.src_line
-            }
+        let src_line = if matches!(m, MoreSettings::BgSettings { rvv, .. } if rvv) {
+            CHAR_SIZE - 1 - c.src_line
         } else {
             c.src_line
         } as usize;
         let mut char_bitmap: u8 = 0;
         for pix in c.x_start..c.x_end {
             let addr: usize = base + c.char_num as usize * 32 + (src_line) * 4;
-            let offset = if let MoreSettings::BgSettings { rvh, .. } = m {
-                if rvh {
-                    pix % CHAR_SIZE
-                } else {
-                    CHAR_SIZE - 1 - (pix % CHAR_SIZE)
-                }
+            let offset = if matches!(m, MoreSettings::BgSettings { rvh, .. } if rvh) {
+                pix % CHAR_SIZE
             } else {
                 CHAR_SIZE - 1 - (pix % CHAR_SIZE)
             };
