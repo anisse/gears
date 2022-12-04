@@ -230,21 +230,19 @@ impl VdpState {
             false => 0,
             true => 32,
         };
-        if DEBUG {
-            println!(
-                "{} char {}: @{:04X} : {} {}x{} (char line length: {}) from ({}->{})x{}",
-                if c.sprite { "Sprite" } else { "BG" },
-                c.char_num,
-                base,
-                pallette_base,
-                c.x,
-                c.y,
-                c.line_length,
-                c.x_start,
-                c.x_end,
-                c.src_line
-            );
-        }
+        debugln!(
+            "{} char {}: @{:04X} : {} {}x{} (char line length: {}) from ({}->{})x{}",
+            if c.sprite { "Sprite" } else { "BG" },
+            c.char_num,
+            base,
+            pallette_base,
+            c.x,
+            c.y,
+            c.line_length,
+            c.x_start,
+            c.x_end,
+            c.src_line
+        );
         let src_line = if c.rvv {
             CHAR_SIZE - 1 - c.src_line
         } else {
@@ -366,8 +364,8 @@ impl VdpState {
             let rvv = b1 & PNAME_RVV != 0;
             let palette1 = b1 & PNAME_CPT != 0;
             let prio = b1 & PNAME_PRI != 0;
-            if character != 0 && DEBUG {
-                println!(
+            if character != 0 {
+                debugln!(
                     "BG src {}x{} dest {}x{} Pattern: {:03X} @{:04X} (base @{:04X} character {:03X} revh {} revv {} pallette1 {} prio {}",
                     src_x, scroll_start_y - ch_start_y, x, line,
                     ch, addr, pattern_base,
@@ -510,13 +508,14 @@ impl VdpState {
         for sprite in 0_usize..64 {
             // sprite number is priority; once we have rendered eight sprites, we stop
             let v = self.vram[sprite_base + sprite];
-            if DEBUG {
-                let h = self.vram[sprite_base + 0x80 + sprite * 2] as usize;
-                println!(
-                    "Sprite {}, on dest vline: {} v: {} h: {} sprite height: {}",
-                    sprite, vcoord_line, v, h, sprite_height
-                );
-            }
+            debugln!(
+                "Sprite {}, on dest vline: {} v: {} h: {} sprite height: {}",
+                sprite,
+                vcoord_line,
+                v,
+                self.vram[sprite_base + 0x80 + sprite * 2] as usize,
+                sprite_height
+            );
             if v <= vcoord_line && (vcoord_line as u16) < (v as u16) + sprite_height {
                 if rendered_sprites >= 8 {
                     // We have reached sprite 9
