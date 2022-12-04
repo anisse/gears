@@ -114,12 +114,16 @@ struct CharSettings {
     src_line: u8, // line number to of char to draw (in pixels, [0; 8[ )
     x_start: u8,  // start x of character (in pixels, [0; 8[)
     x_end: u8,    // end x of character (in pixels, [0; 8] )
-    sprite: bool, // whether this character is sprite or background pattern
-    rvh: bool,    // character is reversed horizontally
-    rvv: bool,    // character is reversed vertically
-    priority: u8, // for sprites: priority map aligned with sprite start
-    #[cfg(feature = "pattern_debug")]
-    bg_num: u16,
+}
+#[derive(Debug, PartialEq)]
+enum MoreSettings {
+    BgSettings {
+        rvh: bool, // character is reversed horizontally
+        rvv: bool, // character is reversed vertically
+        #[cfg(feature = "pattern_debug")]
+        bg_num: u16,
+    },
+    SpritePriority(u8), // for sprites: priority map aligned with sprite start
 }
 struct Bitmap<T, const N: usize> {
     bits: [T; N],
@@ -180,6 +184,29 @@ impl VdpState {
             | (((self.vram[addr + 0] >> offset) & 1) << 0);
         c
     }
+    #[inline]
+    fn rgb(&self, palette_base: usize, code: u8) -> (u8, u8, u8) {
+        (
+            (self.cram[palette_base + code as usize * 2]) & 0xF,
+            (self.cram[palette_base + code as usize * 2] >> 4) & 0xF,
+            (self.cram[palette_base + code as usize * 2 + 1]) & 0xF,
+        )
+    }
+    #[inline]
+    fn pixel_set(
+        dest: &mut [u8],
+        x: usize,
+        line_offset: usize,
+        pix_size: usize,
+        r: u8,
+        g: u8,
+        b: u8,
+    ) {
+        dest[line_offset * pix_size + x * pix_size] = r << 4;
+        dest[line_offset * pix_size + x * pix_size + 1] = g << 4;
+        dest[line_offset * pix_size + x * pix_size + 2] = b << 4;
+        dest[line_offset * pix_size + x * pix_size + 3] = 0xFF;
+    }
     fn character_line_sprite_bitmap(&self, c: CharSettings) -> u8 {
         let base = ((self.reg[6] as usize) & 0x4) << 11;
         let src_line = c.src_line as usize;
@@ -197,11 +224,16 @@ impl VdpState {
         char_bitmap
     }
     #[inline]
-    fn character_line(&self, dest: &mut [u8], c: CharSettings) -> u8 {
+    fn character_line(&self, dest: &mut [u8], c: CharSettings, m: MoreSettings) -> u8 {
         assert!(c.x_start < CHAR_SIZE);
         assert!(c.x_end <= CHAR_SIZE);
         let mut overflow_pause = false;
-        let base = match c.sprite {
+        let sprite = if let MoreSettings::SpritePriority(_) = m {
+            true
+        } else {
+            false
+        };
+        let base = match sprite {
             false => {
                 if c.char_num >= 448 {
                     // TODO: dump those overflow chars
@@ -226,13 +258,13 @@ impl VdpState {
                 ((self.reg[6] as usize) & 0x4) << 11
             }
         };
-        let pallette_base = match c.sprite {
+        let pallette_base = match sprite {
             false => 0,
             true => 32,
         };
         debugln!(
             "{} char {}: @{:04X} : {} {}x{} (char line length: {}) from ({}->{})x{}",
-            if c.sprite { "Sprite" } else { "BG" },
+            if sprite { "Sprite" } else { "BG" },
             c.char_num,
             base,
             pallette_base,
@@ -243,16 +275,24 @@ impl VdpState {
             c.x_end,
             c.src_line
         );
-        let src_line = if c.rvv {
-            CHAR_SIZE - 1 - c.src_line
+        let src_line = if let MoreSettings::BgSettings { rvv, .. } = m {
+            if rvv {
+                CHAR_SIZE - 1 - c.src_line
+            } else {
+                c.src_line
+            }
         } else {
             c.src_line
         } as usize;
         let mut char_bitmap: u8 = 0;
         for pix in c.x_start..c.x_end {
             let addr: usize = base + c.char_num as usize * 32 + (src_line) * 4;
-            let offset = if c.rvh {
-                pix % CHAR_SIZE
+            let offset = if let MoreSettings::BgSettings { rvh, .. } = m {
+                if rvh {
+                    pix % CHAR_SIZE
+                } else {
+                    CHAR_SIZE - 1 - (pix % CHAR_SIZE)
+                }
             } else {
                 CHAR_SIZE - 1 - (pix % CHAR_SIZE)
             };
@@ -260,7 +300,7 @@ impl VdpState {
             let col = pix as usize - c.x_start as usize;
             let x = c.x as usize;
             let y = c.y as usize;
-            if c.sprite {
+            if let MoreSettings::SpritePriority(priority) = m {
                 if code == 0 {
                     //transparent
                     if overflow_pause {
@@ -269,12 +309,12 @@ impl VdpState {
                     continue;
                 }
 
-                if c.priority & (1 << col) != 0 {
+                if priority & (1 << col) != 0 {
                     debugln!(
                         "Skipping prio sprite pixel {} at dest coord x={} b1 = {:02X}",
                         pix,
                         x + col,
-                        c.priority,
+                        priority,
                     );
                     continue;
                 }
@@ -283,31 +323,34 @@ impl VdpState {
             if code != 0 {
                 char_bitmap |= 1 << pix;
             }
-            let color_r = (self.cram[pallette_base + code as usize * 2]) & 0xF;
-            let color_g = (self.cram[pallette_base + code as usize * 2] >> 4) & 0xF;
-            let color_b = (self.cram[pallette_base + code as usize * 2 + 1]) & 0xF;
+            let (color_r, color_g, color_b) = self.rgb(pallette_base, code);
 
             let line_length = c.line_length as usize * CHAR_SIZE as usize;
             let pix_size = 4; // 4 bytes per pixels, one for each component
 
-            dest[y * line_length * pix_size + (x + col) * pix_size] = color_r << 4;
-            dest[y * line_length * pix_size + (x + col) * pix_size + 1] = color_g << 4;
-            dest[y * line_length * pix_size + (x + col) * pix_size + 2] = color_b << 4;
-            dest[y * line_length * pix_size + (x + col) * pix_size + 3] = 0xFF;
+            Self::pixel_set(
+                dest,
+                x + col,
+                y * line_length,
+                pix_size,
+                color_r,
+                color_g,
+                color_b,
+            );
             if overflow_pause && (col == 0 || col == 7 || src_line == 0 || src_line == 7) {
-                dest[y * line_length * pix_size + (x + col) * pix_size] = 0xF3;
-                dest[y * line_length * pix_size + (x + col) * pix_size + 1] = 0;
-                dest[y * line_length * pix_size + (x + col) * pix_size + 2] = 0;
-                dest[y * line_length * pix_size + (x + col) * pix_size + 3] = 0xFF;
+                Self::pixel_set(dest, x + col, y * line_length, pix_size, 0xF3, 0, 0);
             }
             #[cfg(feature = "pattern_debug")]
             if (col == 0 || src_line == 0) {
-                dest[y * line_length * pix_size + (x + col) * pix_size] =
-                    ((c.char_num >> 4) & 0xFF) as u8;
-                dest[y * line_length * pix_size + (x + col) * pix_size + 1] =
-                    ((c.char_num & 0xF) as u8) << 4 | (((c.bg_num >> 8) & 0xF) as u8);
-                dest[y * line_length * pix_size + (x + col) * pix_size + 2] =
-                    (c.bg_num & 0xFF) as u8;
+                Self::pixel_set(
+                    dest,
+                    x + col,
+                    y * line_length,
+                    pix_size,
+                    ((c.char_num >> 4) & 0xFF) as u8,
+                    ((c.char_num & 0xF) as u8) << 4 | (((c.bg_num >> 8) & 0xF) as u8),
+                    (c.bg_num & 0xFF) as u8,
+                );
             }
         }
         if overflow_pause {
@@ -387,10 +430,10 @@ impl VdpState {
                     src_line: ch_start_y as u8,
                     x_start: ch_start_x as u8,
                     x_end,
-                    sprite: false,
+                },
+                MoreSettings::BgSettings {
                     rvh,
                     rvv,
-                    priority: 0,
                     #[cfg(feature = "pattern_debug")]
                     bg_num: ch,
                 },
@@ -446,12 +489,6 @@ impl VdpState {
             src_line,
             x_start,
             x_end,
-            sprite: true,
-            rvh: false,
-            rvv: false,
-            priority: 0,
-            #[cfg(feature = "pattern_debug")]
-            bg_num: 0,
         }
     }
     #[allow(clippy::too_many_arguments)]
@@ -482,12 +519,6 @@ impl VdpState {
             src_line,
             x_start,
             x_end,
-            sprite: true,
-            rvh: false,
-            rvv: false,
-            priority: 0,
-            #[cfg(feature = "pattern_debug")]
-            bg_num: 0,
         }
     }
     #[allow(clippy::too_many_arguments)]
@@ -525,7 +556,7 @@ impl VdpState {
                 rendered_sprites += 1;
                 let h = self.vram[sprite_base + 0x80 + sprite * 2];
                 let char_num = self.vram[sprite_base + 0x80 + sprite * 2 + 1] as u16;
-                let mut char_settings =
+                let char_settings =
                     sprite_settings(self.reg[1] & REG1_SIZE != 0, vcoord_line, char_num, v, h);
                 if invisible(h) {
                     // We only render the visible area, so we count the sprites for priority, and
@@ -535,12 +566,15 @@ impl VdpState {
                     continue;
                 }
                 let xprio = char_settings.x.wrapping_sub(char_settings.x_start) as usize;
-                char_settings.priority = priorities.get(xprio);
                 debugln!(
                     "priority for sprite {sprite:2} at {xprio:3}: {:02X}",
-                    char_settings.priority
+                    priorities.get(xprio),
                 );
-                let bitmap = self.character_line(pixels, char_settings);
+                let bitmap = self.character_line(
+                    pixels,
+                    char_settings,
+                    MoreSettings::SpritePriority(priorities.get(xprio)),
+                );
                 self.collision_check(&mut line_bitmap_collision, bitmap, h);
             }
         }
@@ -847,10 +881,6 @@ fn sprite_coord() {
             src_line: 4,
             x_start: 0,
             x_end: 8,
-            sprite: true,
-            rvh: false,
-            rvv: false,
-            priority: 0,
         }
     );
     // double size, first sprite
@@ -864,10 +894,6 @@ fn sprite_coord() {
             src_line: 7,
             x_start: 0,
             x_end: 8,
-            sprite: true,
-            rvh: false,
-            rvv: false,
-            priority: 0,
         }
     );
     // double size, second sprite
@@ -881,10 +907,6 @@ fn sprite_coord() {
             src_line: 0,
             x_start: 0,
             x_end: 8,
-            sprite: true,
-            rvh: false,
-            rvv: false,
-            priority: 0,
         }
     );
     // partial x, left edge
@@ -898,10 +920,6 @@ fn sprite_coord() {
             src_line: 0,
             x_start: 3,
             x_end: 8,
-            sprite: true,
-            rvh: false,
-            rvv: false,
-            priority: 0,
         }
     );
     // partial x, right edge
@@ -915,10 +933,6 @@ fn sprite_coord() {
             src_line: 4,
             x_start: 0,
             x_end: 5,
-            sprite: true,
-            rvh: false,
-            rvv: false,
-            priority: 0,
         }
     );
 }
