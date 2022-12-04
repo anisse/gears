@@ -113,6 +113,54 @@ struct CharSettings {
     #[cfg(feature = "pattern_debug")]
     bg_num: u16,
 }
+struct Bitmap<T, const N: usize> {
+    bits: [T; N],
+}
+impl<T, const N: usize> Bitmap<T, N>
+where
+    T: std::ops::BitOrAssign
+        + std::ops::Shl<usize, Output = T>
+        + std::ops::Shr<usize, Output = T>
+        + std::ops::BitOr<Output = T>
+        + Default
+        + Copy,
+{
+    const ITEM_SIZE: usize = std::mem::size_of::<T>() * 8;
+
+    #[inline]
+    fn new() -> Self {
+        Self {
+            bits: [T::default(); N],
+        }
+    }
+    #[inline]
+    fn set(&mut self, bit_offset: usize, value: T) {
+        let offset = bit_offset % (N * Self::ITEM_SIZE);
+        let shift = offset % Self::ITEM_SIZE;
+        self.bits[offset / Self::ITEM_SIZE] |= value << shift;
+        self.bits[(offset / Self::ITEM_SIZE + 1) % N] |=
+            (value >> 1) >> (Self::ITEM_SIZE - shift - 1);
+    }
+    #[inline]
+    fn get(&self, bit_offset: usize) -> T {
+        let offset = bit_offset % (N * Self::ITEM_SIZE);
+        let shift = offset % Self::ITEM_SIZE;
+        let e1 = self.bits[offset / Self::ITEM_SIZE];
+        let e2 = self.bits[(offset / Self::ITEM_SIZE + 1) % N];
+        (e1 >> shift) | ((e2 << 1) << (Self::ITEM_SIZE - shift - 1))
+    }
+}
+impl<T, const N: usize> std::fmt::Debug for Bitmap<T, N>
+where
+    T: std::fmt::UpperHex,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for i in self.bits.iter() {
+            write!(f, "{i:0$X} ", std::mem::size_of::<T>() * 2)?;
+        }
+        Ok(())
+    }
+}
 
 impl VdpState {
     #[inline]
@@ -466,13 +514,12 @@ impl VdpState {
             bitmap >> ((CHAR_SIZE - shift) % CHAR_SIZE);
     }
     fn collision_calc(line_bitmap_collision: &[u8; 32], bitmap: u8, h: u8) -> bool {
-        let shift = h % CHAR_SIZE;
-        let bitmap: u16 = (bitmap as u16) << shift;
-        let line: u16 = line_bitmap_collision[h as usize / CHAR_SIZE as usize] as u16
-            | (line_bitmap_collision[(h as usize / CHAR_SIZE as usize + 1) % SCROLL_SCREEN_WIDTH]
-                as u16)
-                << 8;
-        (line & (0xFF << shift)) & bitmap != 0
+        Bitmap {
+            bits: *line_bitmap_collision,
+        }
+        .get(h as usize)
+            & bitmap
+            != 0
     }
     fn render_line_effective(&mut self, pixels: &mut [u8], line: u8) {
         // First render background, then sprites ; we could optimize here by only rendering what is
