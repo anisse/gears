@@ -568,7 +568,7 @@ impl VdpState {
                 );
                 // TODO: we should *not* render over sprites of higher priority
                 // which means we must check the collision bitmap as well
-                // but instead of *simplysimply  skipping* the pixels, we should do the proper
+                // but instead of *simply skipping* the pixels, we should do the proper
                 // collision check, otherwise we won't have the collision bit set
                 let bitmap = self.character_line(
                     pixels,
