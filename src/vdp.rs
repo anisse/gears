@@ -47,7 +47,7 @@ macro_rules! debugln {
         }
     }
 }
-const DEBUG: bool = false;
+const DEBUG: bool = true;
 const OVERFLOW_TRACK: bool = false;
 
 const SCROLL_SCREEN_WIDTH: usize = 32;
@@ -451,18 +451,19 @@ impl VdpState {
             }
         }
     }
-    #[allow(clippy::too_many_arguments)]
     #[inline]
     fn sprite_line_settings_visible(
         double_size: bool,
+        early_clock: bool,
         vline: u8,
         char_num: u16,
         v: u8,
         h: u8,
     ) -> CharSettings {
         let line_length = VISIBLE_AREA_WIDTH as u8;
-        let x = std::cmp::max(h as i16 - VISIBLE_AREA_START_X as i16, 0) as u8;
-        let x_start = std::cmp::max(VISIBLE_AREA_START_X as i16 - h as i16, 0) as u8;
+        let sub = if early_clock { 8 } else { 0 };
+        let x = std::cmp::max(h as i16 - VISIBLE_AREA_START_X as i16 - sub, 0) as u8;
+        let x_start = std::cmp::max(VISIBLE_AREA_START_X as i16 + sub - h as i16, 0) as u8;
         let x_end = std::cmp::min(
             ((VISIBLE_AREA_WIDTH as i16 * CHAR_SIZE as i16) - x as i16) as u8,
             CHAR_SIZE,
@@ -479,17 +480,18 @@ impl VdpState {
             x_end,
         }
     }
-    #[allow(clippy::too_many_arguments)]
     #[inline]
     fn sprite_line_settings_effective(
         double_size: bool,
+        early_clock: bool,
         vline: u8,
         char_num: u16,
         v: u8,
         h: u8,
     ) -> CharSettings {
         let line_length = SCROLL_SCREEN_WIDTH as u8;
-        let x = h as u8;
+        let sub = if early_clock { 8 } else { 0 };
+        let x = (h as u8).wrapping_sub(sub);
         let x_start = 0;
         let x_end = std::cmp::max(
             CHAR_SIZE as i16
@@ -515,7 +517,7 @@ impl VdpState {
         pixels: &mut [u8],
         vcoord_line: u8,
         invisible: fn(u8) -> bool,
-        sprite_settings: fn(bool, u8, u16, u8, u8) -> CharSettings,
+        sprite_settings: fn(bool, bool, u8, u16, u8, u8) -> CharSettings,
         priorities: &Bitmap<u8, SCROLL_SCREEN_WIDTH>,
     ) {
         let sprite_base = ((self.reg[5] as usize) & 0x7E) << 7;
@@ -544,8 +546,14 @@ impl VdpState {
                 rendered_sprites += 1;
                 let h = self.vram[sprite_base + 0x80 + sprite * 2];
                 let char_num = self.vram[sprite_base + 0x80 + sprite * 2 + 1] as u16;
-                let char_settings =
-                    sprite_settings(self.reg[1] & REG1_SIZE != 0, vcoord_line, char_num, v, h);
+                let char_settings = sprite_settings(
+                    self.reg[1] & REG1_SIZE != 0,
+                    self.reg[0] & REG0_EC != 0,
+                    vcoord_line,
+                    char_num,
+                    v,
+                    h,
+                );
                 if invisible(h) {
                     // We only render the visible area, so we count the sprites for priority, and
                     // collision, but not rendering
@@ -864,7 +872,7 @@ fn run_step() {
 fn sprite_coord() {
     // random one
     assert_eq!(
-        VdpState::sprite_line_settings_visible(false, 32, 0, 28, 50),
+        VdpState::sprite_line_settings_visible(false, false, 32, 0, 28, 50),
         CharSettings {
             char_num: 0,
             x: 2,
@@ -877,7 +885,7 @@ fn sprite_coord() {
     );
     // double size, first sprite
     assert_eq!(
-        VdpState::sprite_line_settings_visible(true, 37, 3, 30, 55),
+        VdpState::sprite_line_settings_visible(true, false, 37, 3, 30, 55),
         CharSettings {
             char_num: 2,
             x: 7,
@@ -890,7 +898,7 @@ fn sprite_coord() {
     );
     // double size, second sprite
     assert_eq!(
-        VdpState::sprite_line_settings_visible(true, 38, 3, 30, 55),
+        VdpState::sprite_line_settings_visible(true, false, 38, 3, 30, 55),
         CharSettings {
             char_num: 3,
             x: 7,
@@ -903,7 +911,7 @@ fn sprite_coord() {
     );
     // partial x, left edge
     assert_eq!(
-        VdpState::sprite_line_settings_visible(true, 38, 3, 30, 45),
+        VdpState::sprite_line_settings_visible(true, false, 38, 3, 30, 45),
         CharSettings {
             char_num: 3,
             x: 0,
@@ -916,7 +924,59 @@ fn sprite_coord() {
     );
     // partial x, right edge
     assert_eq!(
-        VdpState::sprite_line_settings_visible(false, 38, 42, 34, 203),
+        VdpState::sprite_line_settings_visible(false, false, 38, 42, 34, 203),
+        CharSettings {
+            char_num: 42,
+            x: 155,
+            y: 14,
+            line_length: 20,
+            src_line: 4,
+            x_start: 0,
+            x_end: 5,
+        }
+    );
+    // random one, early clock
+    assert_eq!(
+        VdpState::sprite_line_settings_visible(false, true, 32, 0, 28, 58),
+        CharSettings {
+            char_num: 0,
+            x: 2,
+            y: 8,
+            line_length: 20,
+            src_line: 4,
+            x_start: 0,
+            x_end: 8,
+        }
+    );
+    // double size, second sprite, early clock
+    assert_eq!(
+        VdpState::sprite_line_settings_visible(true, true, 38, 3, 30, 63),
+        CharSettings {
+            char_num: 3,
+            x: 7,
+            y: 14,
+            line_length: 20,
+            src_line: 0,
+            x_start: 0,
+            x_end: 8,
+        }
+    );
+    // partial x, left edge, early clock
+    assert_eq!(
+        VdpState::sprite_line_settings_visible(true, true, 38, 3, 30, 53),
+        CharSettings {
+            char_num: 3,
+            x: 0,
+            y: 14,
+            line_length: 20,
+            src_line: 0,
+            x_start: 3,
+            x_end: 8,
+        }
+    );
+    // partial x, right edge, early clock
+    assert_eq!(
+        VdpState::sprite_line_settings_visible(false, true, 38, 42, 34, 211),
         CharSettings {
             char_num: 42,
             x: 155,
