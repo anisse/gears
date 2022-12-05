@@ -309,7 +309,7 @@ impl VdpState {
             }
             /* for background (sprites already had this check) */
             if code != 0 {
-                char_bitmap |= 1 << pix;
+                char_bitmap |= 1 << col;
             }
             let (color_r, color_g, color_b) = self.rgb(pallette_base, code);
 
