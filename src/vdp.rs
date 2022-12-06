@@ -329,15 +329,20 @@ impl VdpState {
                 Self::pixel_set(dest, x + col, y * line_length, pix_size, 0xF3, 0, 0);
             }
             #[cfg(feature = "pattern_debug")]
-            if (col == 0 || src_line == 0) {
+            if col == 0 || src_line == 0 {
+                let bg_num = if let MoreSettings::BgSettings { bg_num, .. } = m {
+                    bg_num
+                } else {
+                    0
+                };
                 Self::pixel_set(
                     dest,
                     x + col,
                     y * line_length,
                     pix_size,
                     ((c.char_num >> 4) & 0xFF) as u8,
-                    ((c.char_num & 0xF) as u8) << 4 | (((c.bg_num >> 8) & 0xF) as u8),
-                    (c.bg_num & 0xFF) as u8,
+                    ((c.char_num & 0xF) as u8) << 4 | (((bg_num >> 8) & 0xF) as u8),
+                    (bg_num & 0xFF) as u8,
                 );
             }
         }
