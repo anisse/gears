@@ -13,7 +13,7 @@ pub enum Button {
 #[derive(Debug, Default)]
 struct JoystickState {
     buttons: [bool; 6],
-    buttons_ext: [bool; 6], // not really emulated
+    _buttons_ext: [bool; 6], // not really emulated
 }
 
 #[derive(Debug, Default)]
