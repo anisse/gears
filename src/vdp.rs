@@ -759,7 +759,6 @@ impl Vdp {
             state: RefCell::new(VdpState::default()),
         }
     }
-
     fn _serialize_ppm(filename: String, width: usize, height: usize, data: &[u8]) {
         {
             let mut f = std::fs::File::create("temp.ppm").unwrap();
@@ -800,6 +799,9 @@ impl Vdp {
             state.status |= ST_I;
             if state.reg[1] & REG1_BLANK != 0 {
                 rendered = VdpDisplay::ScreenDone;
+            } else {
+                // we should fill screen we backdrop color
+                Self::blank(&state, pixels, render_area);
             }
         }
         if state.reg[0] & REG0_IE1 != 0 {
@@ -811,6 +813,26 @@ impl Vdp {
             VdpInt::NoInterrupt
         };
         (interrupt, rendered)
+    }
+    fn blank(state: &VdpState, pixels: &mut [u8], render_area: RenderArea) {
+        debugln!("Filling with backdrop color");
+        let bc = state.rgb(32, state.reg[7]);
+        let ranges = if let RenderArea::VisibleOnly = render_area {
+            (
+                0..(VISIBLE_AREA_HEIGHT * (CHAR_SIZE as usize)),
+                0..(VISIBLE_AREA_WIDTH * CHAR_SIZE as usize),
+            )
+        } else {
+            (
+                0..(SCROLL_SCREEN_HEIGHT * (CHAR_SIZE as usize)),
+                0..(SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize),
+            )
+        };
+        for y in ranges.0 {
+            for x in (ranges.1.start)..(ranges.1.end) {
+                VdpState::pixel_set(pixels, x, y, 4, bc.0, bc.1, bc.2);
+            }
+        }
     }
 }
 
