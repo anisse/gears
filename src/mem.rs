@@ -1,14 +1,14 @@
 use std::fmt;
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 enum Dest {
-    ROM { start: u32 },
-    RAM { start: u16 },
-    BRAM { start: u16 },
+    Rom { start: u32 },
+    Ram { start: u16 },
+    Bram { start: u16 },
     Panic,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum Mapper {
     ZX64K, // useful for testing
     SegaGG {
@@ -18,7 +18,7 @@ pub enum Mapper {
     // Leave possibility to add codemasters mapper later
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Memory {
     ram: Vec<u8>,
     mapper: Mapper,
@@ -36,43 +36,43 @@ impl Memory {
                     Mapper::SegaGG { rom, backup_ram } => Mapper::SegaGG { rom, backup_ram },
                 },
                 map: [
-                    Dest::RAM { start: 0x0000 },
-                    Dest::RAM { start: 0x2000 },
-                    Dest::RAM { start: 0x4000 },
-                    Dest::RAM { start: 0x6000 },
-                    Dest::RAM { start: 0x8000 },
-                    Dest::RAM { start: 0xA000 },
-                    Dest::RAM { start: 0xC000 },
-                    Dest::RAM { start: 0xE000 },
+                    Dest::Ram { start: 0x0000 },
+                    Dest::Ram { start: 0x2000 },
+                    Dest::Ram { start: 0x4000 },
+                    Dest::Ram { start: 0x6000 },
+                    Dest::Ram { start: 0x8000 },
+                    Dest::Ram { start: 0xA000 },
+                    Dest::Ram { start: 0xC000 },
+                    Dest::Ram { start: 0xE000 },
                 ],
             },
             Mapper::SegaGG { .. } => Memory {
                 ram: vec![0; 8192],
                 mapper,
                 map: [
-                    Dest::ROM { start: 0x0000 },
-                    Dest::ROM { start: 0x2000 },
-                    Dest::ROM { start: 0x4000 },
-                    Dest::ROM { start: 0x6000 },
-                    Dest::ROM { start: 0x8000 },
-                    Dest::ROM { start: 0xA000 },
-                    Dest::RAM { start: 0x0 },
-                    Dest::RAM { start: 0x0 },
+                    Dest::Rom { start: 0x0000 },
+                    Dest::Rom { start: 0x2000 },
+                    Dest::Rom { start: 0x4000 },
+                    Dest::Rom { start: 0x6000 },
+                    Dest::Rom { start: 0x8000 },
+                    Dest::Rom { start: 0xA000 },
+                    Dest::Ram { start: 0x0 },
+                    Dest::Ram { start: 0x0 },
                 ],
             },
         }
     }
     pub fn fetch_u8(&self, addr: u16) -> u8 {
         match self.map[addr as usize >> 13] {
-            Dest::ROM { start } => {
+            Dest::Rom { start } => {
                 if let Mapper::SegaGG { rom, .. } = &self.mapper {
                     rom[(addr & !0xE000) as usize + start as usize]
                 } else {
                     unreachable!()
                 }
             }
-            Dest::RAM { start } => self.ram[((addr & !0xE000).wrapping_add(start)) as usize],
-            Dest::BRAM { start } => {
+            Dest::Ram { start } => self.ram[((addr & !0xE000).wrapping_add(start)) as usize],
+            Dest::Bram { start } => {
                 if let Mapper::SegaGG {
                     backup_ram: Some(bram),
                     ..
@@ -92,7 +92,7 @@ impl Memory {
 
     pub fn fetch_range_safe(&self, addr: u16, len: u16) -> &[u8] {
         match self.map[addr as usize >> 13] {
-            Dest::ROM { start } => {
+            Dest::Rom { start } => {
                 if let Mapper::SegaGG { rom, .. } = &self.mapper {
                     &rom[((addr & !0xE000) as usize + start as usize)
                         ..((addr & !0xE000) as usize + start as usize + len as usize)]
@@ -100,11 +100,11 @@ impl Memory {
                     unreachable!()
                 }
             }
-            Dest::RAM { start } => {
+            Dest::Ram { start } => {
                 &self.ram
                     [((addr & !0xE000) + start) as usize..((addr & !0xE000) + start + len) as usize]
             }
-            Dest::BRAM { start } => {
+            Dest::Bram { start } => {
                 if let Mapper::SegaGG {
                     backup_ram: Some(bram),
                     ..
@@ -122,7 +122,7 @@ impl Memory {
 
     pub fn set_u8(&mut self, addr: u16, val: u8) {
         match self.map[addr as usize >> 13] {
-            Dest::ROM { .. } => {
+            Dest::Rom { .. } => {
                 println!(
                     "Ignoring write to ROM address: @{:04X} = {:02X} (old:{:02X})",
                     addr,
@@ -130,7 +130,7 @@ impl Memory {
                     self.fetch_u8(addr)
                 );
             }
-            Dest::RAM { start } => {
+            Dest::Ram { start } => {
                 if addr >= 0xFFFC {
                     if let Mapper::SegaGG { .. } = self.mapper {
                         self.rom_banking(addr, val);
@@ -138,7 +138,7 @@ impl Memory {
                 }
                 self.ram[((addr & !0xE000).wrapping_add(start)) as usize] = val
             }
-            Dest::BRAM { start } => {
+            Dest::Bram { start } => {
                 if let Mapper::SegaGG {
                     backup_ram: Some(bram),
                     ..
@@ -159,10 +159,10 @@ impl Memory {
 
     fn set_bank(&mut self, num: usize, val: u8) {
         let _shift = self.ram[0x1FFC] & 0x3;
-        let d1 = Dest::ROM {
+        let d1 = Dest::Rom {
             start: (val as u32) << 14,
         };
-        let d2 = Dest::ROM {
+        let d2 = Dest::Rom {
             start: ((val as u32) << 14) + 0x2000,
         };
         //println!("setting bank {} to dest {:?}", num, &d1);
@@ -180,8 +180,8 @@ impl Memory {
                             backup_ram.replace(vec![0; 8192]);
                         }
                         if backup_ram.is_some() {
-                            self.map[4] = Dest::BRAM { start: 0x0000 };
-                            self.map[5] = Dest::BRAM { start: 0x0000 };
+                            self.map[4] = Dest::Bram { start: 0x0000 };
+                            self.map[5] = Dest::Bram { start: 0x0000 };
                         } else {
                             unreachable!();
                         }
@@ -226,7 +226,7 @@ impl From<Vec<u8>> for Memory {
             mapper: Mapper::ZX64K,
             map: [
                 // todo: proper implementation based on size
-                Dest::RAM { start: 0x0000 },
+                Dest::Ram { start: 0x0000 },
                 Dest::Panic,
                 Dest::Panic,
                 Dest::Panic,
@@ -246,7 +246,7 @@ impl Default for Memory {
             mapper: Mapper::ZX64K,
             map: [
                 // todo: proper implementation based on size
-                Dest::RAM { start: 0x0000 },
+                Dest::Ram { start: 0x0000 },
                 Dest::Panic,
                 Dest::Panic,
                 Dest::Panic,
