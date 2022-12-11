@@ -47,7 +47,7 @@ macro_rules! debugln {
         }
     }
 }
-const DEBUG: bool = true;
+const DEBUG: bool = false;
 const OVERFLOW_TRACK: bool = false;
 
 const SCROLL_SCREEN_WIDTH: usize = 32;
