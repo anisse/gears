@@ -96,7 +96,7 @@ fn main() -> Result<(), String> {
             Event::MainEventsCleared => {
                 // Update internal state and request a redraw
                 //println!("Stepping");
-                while let Some(gilrs::Event { id, event, time }) = gilrs.next_event() {
+                while let Some(gilrs::Event { event, .. }) = gilrs.next_event() {
                     handle_joystick_event(&mut emu, event);
                 }
 
