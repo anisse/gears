@@ -23,7 +23,7 @@ const PV: u8 = Flag::PV as u8;
 const N: u8 = Flag::N as u8;
 const C: u8 = Flag::C as u8;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum RegPair {
     AF,
     BC,
@@ -72,7 +72,7 @@ impl PartialEq for FChanged {
     }
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 #[allow(non_snake_case)]
 pub struct Regs {
     pub A: u8,
@@ -168,51 +168,19 @@ impl Regs {
         }
     }
     pub fn get_regpair(&self, reg: RegPair) -> u16 {
-        let r1;
-        let r2;
-        match reg {
-            RegPair::AF => {
-                r1 = self.A;
-                r2 = self.F
-            }
-            RegPair::BC => {
-                r1 = self.B;
-                r2 = self.C
-            }
-            RegPair::DE => {
-                r1 = self.D;
-                r2 = self.E
-            }
-            RegPair::HL => {
-                r1 = self.H;
-                r2 = self.L
-            }
-            RegPair::AFp => {
-                r1 = self.Ap;
-                r2 = self.Fp
-            }
-            RegPair::BCp => {
-                r1 = self.Bp;
-                r2 = self.Cp
-            }
-            RegPair::DEp => {
-                r1 = self.Dp;
-                r2 = self.Ep
-            }
-            RegPair::HLp => {
-                r1 = self.Hp;
-                r2 = self.Lp
-            }
-            RegPair::IX => {
-                r1 = self.IXh;
-                r2 = self.IXl
-            }
-            RegPair::IY => {
-                r1 = self.IYh;
-                r2 = self.IYl
-            }
+        let (r1, r2) = match reg {
+            RegPair::AF => (self.A, self.F),
+            RegPair::BC => (self.B, self.C),
+            RegPair::DE => (self.D, self.E),
+            RegPair::HL => (self.H, self.L),
+            RegPair::AFp => (self.Ap, self.Fp),
+            RegPair::BCp => (self.Bp, self.Cp),
+            RegPair::DEp => (self.Dp, self.Ep),
+            RegPair::HLp => (self.Hp, self.Lp),
+            RegPair::IX => (self.IXh, self.IXl),
+            RegPair::IY => (self.IYh, self.IYl),
             RegPair::SP => return self.SP,
-        }
+        };
         (r1 as u16) << 8 | r2 as u16
     }
     fn set_flag(&mut self, f: Flag, val: bool) {
