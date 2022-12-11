@@ -56,13 +56,13 @@ impl PartialEq for IO {
     }
 }
 
-impl<'a> Default for IO {
+impl Default for IO {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> Debug for IO {
+impl Debug for IO {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         f.write_str("")
     }
