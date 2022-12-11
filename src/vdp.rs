@@ -828,7 +828,9 @@ impl Vdp {
                 0..(SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize),
             )
         };
+        // consume the first range...
         for y in ranges.0 {
+            // but not the other range, we'd need to use it multiple times
             for x in (ranges.1.start)..(ranges.1.end) {
                 VdpState::pixel_set(pixels, x, y, 4, bc.0, bc.1, bc.2);
             }
