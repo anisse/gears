@@ -1,11 +1,4 @@
-mod cpu;
-mod disas;
-mod emu;
-mod io;
-mod joystick;
-mod mem;
-mod system;
-mod vdp;
+use gears::emu;
 
 use std::env;
 use std::fs::File;

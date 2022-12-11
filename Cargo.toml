@@ -28,5 +28,6 @@ debug=true
 
 [workspace]
 members = [
+	"cli",
 	"ui",
-	]
+]
