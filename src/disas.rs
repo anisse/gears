@@ -1,7 +1,7 @@
 use std::fmt;
 use std::rc::Rc;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Reg8 {
     A,
     B,
@@ -18,7 +18,7 @@ pub enum Reg8 {
     R,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Reg16 {
     AF,
     BC,
@@ -29,7 +29,7 @@ pub enum Reg16 {
     IX,
     IY,
 }
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum RegI {
     IX(i8),
     IY(i8),
@@ -51,7 +51,7 @@ impl fmt::Display for RegI {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum FlagCondition {
     NZ,
     Z,
@@ -63,7 +63,7 @@ pub enum FlagCondition {
     M,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Operand {
     Imm8(u8),        // immediate addressing
     Imm16(u16),      // immediate extended adressing
@@ -79,7 +79,7 @@ pub enum Operand {
     IgnoreIO,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum OpSize {
     S1,
     S2,
@@ -123,7 +123,7 @@ impl fmt::Display for Operand {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum Instruction {
     ADC,
@@ -196,7 +196,7 @@ pub enum Instruction {
     XOR,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct OpCode {
     pub data: Vec<u8>,
     pub length: u8,
@@ -299,7 +299,7 @@ fn decode_operand_cond_cc(arg: u8) -> FlagCondition {
 }
 
 const CACHE_SIZE: usize = 256;
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct DisasCache {
     cache: [Option<Rc<OpCode>>; CACHE_SIZE],
 }
