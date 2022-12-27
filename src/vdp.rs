@@ -419,7 +419,7 @@ impl VdpState {
                 CharSettings {
                     char_num: character,
                     x: x as u8,
-                    y: line as u8,
+                    y: line,
                     line_length,
                     src_line: ch_start_y as u8,
                     x_start: ch_start_x as u8,
@@ -436,7 +436,7 @@ impl VdpState {
                 priorities.set((x as u8).wrapping_sub(ch_start_x as u8) as usize, bitmap);
             }
             x += x_end as usize - ch_start_x;
-            if x >= line_length_px as usize {
+            if x >= line_length_px {
                 break;
             }
         }
@@ -494,7 +494,7 @@ impl VdpState {
     ) -> CharSettings {
         let line_length = SCROLL_SCREEN_WIDTH as u8;
         let sub = if early_clock { 8 } else { 0 };
-        let x = (h as u8).wrapping_sub(sub);
+        let x = h.wrapping_sub(sub);
         let x_start = 0;
         let x_end = std::cmp::max(
             CHAR_SIZE as i16 - (x as i16 + CHAR_SIZE as i16) - SCROLL_PIXEL_WIDTH as i16,
