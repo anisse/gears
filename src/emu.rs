@@ -7,6 +7,7 @@ use crate::mem;
 use crate::system;
 use crate::vdp;
 
+#[derive(Debug, Clone, Copy)]
 pub enum Button {
     Start,
     One,

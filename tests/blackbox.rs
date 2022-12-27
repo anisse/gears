@@ -2,7 +2,42 @@ use std::fs::{self, File};
 use std::io::{self, prelude::*, BufWriter};
 use std::path::{Path, PathBuf};
 
-use gears::emu;
+use gears::emu::{self, Button};
+
+use crate::TestCommand::*;
+
+enum TestCommand {
+    WaitFrames(u32),
+    PressButton(emu::Button),
+    ReleaseButton(emu::Button),
+}
+impl TryFrom<&str> for TestCommand {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if let Some(c) = value.chars().next() {
+            return Ok(match c {
+                '0'..='9' => WaitFrames(value.parse().map_err(|e| format!("not int: {e}"))?),
+                'S' => PressButton(Button::Start),
+                's' => ReleaseButton(Button::Start),
+                'A' => PressButton(Button::One),
+                'a' => ReleaseButton(Button::One),
+                'B' => PressButton(Button::Two),
+                'b' => ReleaseButton(Button::Two),
+                'U' => PressButton(Button::Up),
+                'u' => ReleaseButton(Button::Up),
+                'D' => PressButton(Button::Down),
+                'd' => ReleaseButton(Button::Down),
+                'L' => PressButton(Button::Left),
+                'l' => ReleaseButton(Button::Left),
+                'R' => PressButton(Button::Right),
+                'r' => ReleaseButton(Button::Right),
+                _ => return Err(format!("Unexpected char {c}")),
+            });
+        }
+        Err("empty value".to_string())
+    }
+}
 
 fn write_png(frame_data: &[u8], filename: &Path) -> Result<(), io::Error> {
     let file = File::create(filename)?;
@@ -27,7 +62,7 @@ fn read_png(filename: &Path) -> Result<Vec<u8>, io::Error> {
     Ok(buf)
 }
 
-fn common_test(filename: &Path, frame: u64, result: &[u8]) -> Result<(), String> {
+fn common_test(filename: &Path, cmds: &[TestCommand], result: &[u8]) -> Result<(), String> {
     let path = Path::new(&filename);
 
     let mut file =
@@ -39,8 +74,18 @@ fn common_test(filename: &Path, frame: u64, result: &[u8]) -> Result<(), String>
     let mut emu = emu::Emulator::init(data, true);
     let mut pixels = vec![0; emu::LCD_WIDTH * emu::LCD_HEIGHT * 4];
     assert_eq!(pixels.len(), result.len());
-    for _ in 0..frame {
-        while !emu.step(&mut pixels) {}
+    let mut frame = 0;
+    for cmd in cmds.iter() {
+        match cmd {
+            WaitFrames(f) => {
+                for _ in 0..*f {
+                    while !emu.step(&mut pixels) {}
+                }
+                frame += *f
+            }
+            PressButton(b) => emu.press(*b),
+            ReleaseButton(b) => emu.release(*b),
+        }
     }
     if !pixels.iter().eq(result.iter()) {
         let mut outfile = PathBuf::from(path.file_name().unwrap());
@@ -61,7 +106,7 @@ fn test_roms() {
     let pixels = vec![0; emu::LCD_HEIGHT * emu::LCD_WIDTH * 4];
     common_test(
         Path::new("../roms/Sonic The Hedgehog (World) (Rev 1).gg"),
-        0,
+        &[WaitFrames(0)],
         &pixels,
     )
     .unwrap();
@@ -80,12 +125,10 @@ fn test_roms() {
         rom_name.push(basename[0]);
         rom_name.set_extension("gg");
         let rom_data = read_png(&png_name).expect("reading png");
-        let frame = basename[1]
+        let frame: Vec<_> = basename[1]
             .split('-')
-            .nth(1)
-            .expect("frame")
-            .parse()
-            .expect("an int");
-        common_test(&rom_name, frame, &rom_data).unwrap();
+            .map(|c| c.try_into().expect("a test command"))
+            .collect();
+        common_test(&rom_name, &frame, &rom_data).unwrap();
     }
 }
