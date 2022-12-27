@@ -8,6 +8,9 @@ edition = "2021"
 
 [dependencies]
 
+[dev-dependencies]
+png = "0.17.6"
+
 [dev-dependencies.criterion]
 version = "0.3"
 default-features = false
