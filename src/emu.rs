@@ -17,6 +17,9 @@ pub enum Button {
     Right,
 }
 
+pub const LCD_HEIGHT: usize = vdp::VISIBLE_PIXEL_HEIGHT;
+pub const LCD_WIDTH: usize = vdp::VISIBLE_PIXEL_WIDTH;
+
 impl From<Button> for joystick::Button {
     fn from(val: Button) -> Self {
         match val {
