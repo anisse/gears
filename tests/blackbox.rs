@@ -11,14 +11,6 @@ fn write_png(frame_data: &[u8], filename: &Path) -> Result<(), io::Error> {
     encoder.set_color(png::ColorType::Rgba);
     encoder.set_depth(png::BitDepth::Eight);
     let mut writer = encoder.write_header()?;
-    /*
-    // Remove alpha
-    let data_no_alpha: Vec<_> = frame_data
-        .chunks(4)
-        .flat_map(|a| [a[0], a[1], a[2], 0xFF])
-        .collect();
-    writer.write_image_data(&data_no_alpha)?;
-    */
     writer.write_image_data(frame_data)?;
     Ok(())
 }
@@ -50,14 +42,6 @@ fn common_test(filename: &Path, frame: u64, result: &[u8]) -> Result<(), String>
     for _ in 0..frame {
         while !emu.step(&mut pixels) {}
     }
-    /*
-    pixels
-        .iter()
-        .zip(result.iter())
-        .enumerate()
-        .filter(|(_, (a, b))| a != b)
-        .for_each(|(i, (a, b))| println!("{i}: {a} != {b}"));
-    */
     if !pixels.iter().eq(result.iter()) {
         let mut outfile = PathBuf::from(path.file_name().unwrap());
         outfile.set_extension(format!("frame-{frame}.png"));
