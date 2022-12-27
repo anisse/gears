@@ -76,7 +76,7 @@ fn common_test(filename: &Path, frame: u64, result: &[u8]) -> Result<(), String>
 fn test_roms() {
     let pixels = vec![0; emu::LCD_HEIGHT * emu::LCD_WIDTH * 4];
     common_test(
-        &Path::new("../roms/Sonic The Hedgehog (World) (Rev 1).gg"),
+        Path::new("../roms/Sonic The Hedgehog (World) (Rev 1).gg"),
         0,
         &pixels,
     )
