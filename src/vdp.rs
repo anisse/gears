@@ -52,14 +52,18 @@ const OVERFLOW_TRACK: bool = false;
 
 const SCROLL_SCREEN_WIDTH: usize = 32;
 const SCROLL_SCREEN_HEIGHT: usize = 28;
+const SCROLL_PIXEL_WIDTH: usize = SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize;
+const SCROLL_PIXEL_HEIGHT: usize = SCROLL_SCREEN_HEIGHT * CHAR_SIZE as usize;
 const VISIBLE_AREA_WIDTH: usize = 20;
 const VISIBLE_AREA_HEIGHT: usize = 18;
+pub const VISIBLE_PIXEL_HEIGHT: usize = VISIBLE_AREA_HEIGHT * CHAR_SIZE as usize;
+pub const VISIBLE_PIXEL_WIDTH: usize = VISIBLE_AREA_WIDTH * CHAR_SIZE as usize;
 const CHAR_SIZE: u8 = 8;
 const VISIBLE_AREA_START_X: usize =
     ((SCROLL_SCREEN_WIDTH - VISIBLE_AREA_WIDTH) / 2) * CHAR_SIZE as usize;
 const VISIBLE_AREA_START_Y: usize = 3 * CHAR_SIZE as usize;
-const VISIBLE_AREA_END_X: usize = VISIBLE_AREA_WIDTH * CHAR_SIZE as usize + VISIBLE_AREA_START_X;
-const VISIBLE_AREA_END_Y: usize = VISIBLE_AREA_HEIGHT * CHAR_SIZE as usize + VISIBLE_AREA_START_Y;
+const VISIBLE_AREA_END_X: usize = VISIBLE_PIXEL_WIDTH + VISIBLE_AREA_START_X;
+const VISIBLE_AREA_END_Y: usize = VISIBLE_PIXEL_HEIGHT + VISIBLE_AREA_START_Y;
 
 #[derive(Debug, Clone, Copy)]
 enum WriteDest {
@@ -360,8 +364,7 @@ impl VdpState {
         priorities: &mut Bitmap<u8, SCROLL_SCREEN_WIDTH>,
     ) {
         let scroll_offset_x = if visible_only {
-            (SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize) - (self.reg[8] as usize)
-                + VISIBLE_AREA_START_X
+            SCROLL_PIXEL_WIDTH - (self.reg[8] as usize) + VISIBLE_AREA_START_X
         } else {
             0
         };
@@ -378,9 +381,8 @@ impl VdpState {
 
         let pattern_base = ((self.reg[2] as usize) & 0x0E) << 10;
 
-        let scroll_start_y =
-            (line as usize + scroll_offset_y) % (SCROLL_SCREEN_HEIGHT * CHAR_SIZE as usize);
-        let scroll_start_x = scroll_offset_x % (SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize);
+        let scroll_start_y = (line as usize + scroll_offset_y) % SCROLL_PIXEL_HEIGHT;
+        let scroll_start_x = scroll_offset_x % SCROLL_PIXEL_WIDTH;
 
         const CHAR_DESC_LEN: usize = 2;
         let line_length_px = line_length as usize * CHAR_SIZE as usize;
@@ -389,8 +391,7 @@ impl VdpState {
         loop {
             let ch_start_y = scroll_start_y % CHAR_SIZE as usize;
             let ch_start_x = (scroll_start_x + x) % CHAR_SIZE as usize;
-            let src_x =
-                (scroll_start_x + x - ch_start_x) % (SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize);
+            let src_x = (scroll_start_x + x - ch_start_x) % SCROLL_PIXEL_WIDTH;
             let ch = ((scroll_start_y - ch_start_y) / CHAR_SIZE as usize * SCROLL_SCREEN_WIDTH
                 + src_x / CHAR_SIZE as usize) as u16;
             let addr = pattern_base + (ch as usize * CHAR_DESC_LEN);
@@ -469,10 +470,7 @@ impl VdpState {
         let sub = if early_clock { 8 } else { 0 };
         let x = std::cmp::max(h as i16 - VISIBLE_AREA_START_X as i16 - sub, 0) as u8;
         let x_start = std::cmp::max(VISIBLE_AREA_START_X as i16 + sub - h as i16, 0) as u8;
-        let x_end = std::cmp::min(
-            ((VISIBLE_AREA_WIDTH as i16 * CHAR_SIZE as i16) - x as i16) as u8,
-            CHAR_SIZE,
-        );
+        let x_end = std::cmp::min(((VISIBLE_PIXEL_WIDTH as i16) - x as i16) as u8, CHAR_SIZE);
         let ldiff = vline - v;
         let (char_num, src_line) = Self::sprite_double_size_src_line(double_size, char_num, ldiff);
         CharSettings {
@@ -499,9 +497,7 @@ impl VdpState {
         let x = (h as u8).wrapping_sub(sub);
         let x_start = 0;
         let x_end = std::cmp::max(
-            CHAR_SIZE as i16
-                - (x as i16 + CHAR_SIZE as i16)
-                - (SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize) as i16,
+            CHAR_SIZE as i16 - (x as i16 + CHAR_SIZE as i16) - SCROLL_PIXEL_WIDTH as i16,
             CHAR_SIZE as i16,
         ) as u8;
         let ldiff = vline - v;
@@ -791,8 +787,8 @@ impl Vdp {
                 let line = state.v_counter - VISIBLE_AREA_START_Y as u8;
                 state.render_line(pixels, line, render_area);
             }
-        } else if state.v_counter < SCROLL_SCREEN_HEIGHT as u8 * CHAR_SIZE {
-            let line = state.v_counter as u8;
+        } else if state.v_counter < SCROLL_PIXEL_HEIGHT as u8 {
+            let line = state.v_counter;
             state.render_line(pixels, line, render_area);
         }
         if state.v_counter == 0xC0 {
@@ -818,15 +814,9 @@ impl Vdp {
         debugln!("Filling with backdrop color");
         let bc = state.rgb(32, state.reg[7]);
         let ranges = if let RenderArea::VisibleOnly = render_area {
-            (
-                0..(VISIBLE_AREA_HEIGHT * (CHAR_SIZE as usize)),
-                0..(VISIBLE_AREA_WIDTH * CHAR_SIZE as usize),
-            )
+            (0..VISIBLE_PIXEL_HEIGHT, 0..VISIBLE_PIXEL_WIDTH)
         } else {
-            (
-                0..(SCROLL_SCREEN_HEIGHT * (CHAR_SIZE as usize)),
-                0..(SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize),
-            )
+            (0..SCROLL_PIXEL_HEIGHT, 0..SCROLL_PIXEL_WIDTH)
         };
         // consume the first range...
         for y in ranges.0 {
