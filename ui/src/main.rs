@@ -44,7 +44,7 @@ fn main() -> Result<(), String> {
     let file = args.get(1).expect("needs an argument");
     let path = Path::new(file);
 
-    let mut file = match File::open(&path) {
+    let mut file = match File::open(path) {
         Err(why) => panic!("Cannot open {}: {}", path.display(), why),
         Ok(f) => f,
     };
