@@ -193,10 +193,12 @@ impl VdpState {
     }
     #[inline]
     fn rgb(&self, palette_base: usize, code: u8) -> (u8, u8, u8) {
+        let rg = self.cram[palette_base + code as usize * 2];
+        let b = self.cram[palette_base + code as usize * 2 + 1];
         (
-            (self.cram[palette_base + code as usize * 2]) & 0xF,
-            (self.cram[palette_base + code as usize * 2] >> 4) & 0xF,
-            (self.cram[palette_base + code as usize * 2 + 1]) & 0xF,
+            (rg & 0xF) | ((rg << 4) & 0xF0),
+            ((rg >> 4) & 0xF) | (rg & 0xF0),
+            (b & 0xF) | ((b << 4) & 0xF0),
         )
     }
     #[inline]
@@ -209,9 +211,9 @@ impl VdpState {
         g: u8,
         b: u8,
     ) {
-        dest[line_offset * pix_size + x * pix_size] = r << 4;
-        dest[line_offset * pix_size + x * pix_size + 1] = g << 4;
-        dest[line_offset * pix_size + x * pix_size + 2] = b << 4;
+        dest[line_offset * pix_size + x * pix_size] = r;
+        dest[line_offset * pix_size + x * pix_size + 1] = g;
+        dest[line_offset * pix_size + x * pix_size + 2] = b;
         dest[line_offset * pix_size + x * pix_size + 3] = 0xFF;
     }
     fn character_line_sprite_bitmap(&self, c: CharSettings) -> u8 {
