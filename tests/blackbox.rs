@@ -124,6 +124,27 @@ fn common_test(filename: &Path, cmds: &[TestCommand], result: &[u8]) -> Result<(
             ReleaseButton(b) => emu.release(*b),
         }
     }
+    pixels
+        .iter()
+        .zip(result.iter())
+        .enumerate()
+        .filter(|(_, (a, b))| a != b)
+        .for_each(|(i, (a, b))| {
+            println!(
+                "{} - {} {:03}x{:03}: color {} got {a} != {b} (expected)",
+                filename.display(),
+                TestCommand::slice_str(cmds),
+                (i % (emu::LCD_WIDTH * 4)) / 4,
+                i / (emu::LCD_WIDTH * 4),
+                match i % 4 {
+                    0 => "R",
+                    1 => "G",
+                    2 => "B",
+                    3 => "A",
+                    _ => unreachable!(),
+                },
+            )
+        });
     if !pixels.iter().eq(result.iter()) {
         let mut outfile = PathBuf::from(path.file_name().unwrap());
         outfile.set_extension(format!("{}.png", TestCommand::slice_str(cmds)));
