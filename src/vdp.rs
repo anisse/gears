@@ -127,7 +127,10 @@ enum MoreSettings {
         #[cfg(feature = "pattern_debug")]
         bg_num: u16,
     },
-    SpritePriority(u8), // for sprites: priority map aligned with sprite start
+    SpritePriority {
+        bg: u8,      // background priority bits
+        sprites: u8, // previous sprites priority bits
+    },
 }
 struct Bitmap<T, const N: usize> {
     bits: [T; N],
@@ -232,7 +235,7 @@ impl VdpState {
         assert!(c.x_start < CHAR_SIZE);
         assert!(c.x_end <= CHAR_SIZE);
         let mut overflow_pause = false;
-        let sprite = matches!(m, MoreSettings::SpritePriority(_));
+        let sprite = matches!(m, MoreSettings::SpritePriority { .. });
         let base = match sprite {
             false => {
                 if c.char_num >= 448 {
@@ -292,7 +295,7 @@ impl VdpState {
             let col = pix as usize - c.x_start as usize;
             let x = c.x as usize;
             let y = c.y as usize;
-            if let MoreSettings::SpritePriority(priority) = m {
+            if let MoreSettings::SpritePriority { bg: priority, .. } = m {
                 if code == 0 {
                     //transparent
                     if overflow_pause {
@@ -314,6 +317,16 @@ impl VdpState {
             /* for background (sprites already had this check) */
             if code != 0 {
                 char_bitmap |= 1 << col;
+            }
+            /* Now check whether we had any higher priority sprite rendered */
+            if let MoreSettings::SpritePriority { sprites: sp, .. } = m {
+                if sp & (1 << col) != 0 {
+                    debugln!(
+                        "Skipping sprite pixel {pix} at dest coord x={} b1 = {sp:02X}",
+                        x + col,
+                    );
+                    continue;
+                }
             }
             let (color_r, color_g, color_b) = self.rgb(pallette_base, code);
 
@@ -567,14 +580,13 @@ impl VdpState {
                     "priority for sprite {sprite:2} at {xprio:3}: {:02X}",
                     priorities.get(xprio),
                 );
-                // TODO: we should *not* render over sprites of higher priority
-                // which means we must check the collision bitmap as well
-                // but instead of *simply skipping* the pixels, we should do the proper
-                // collision check, otherwise we won't have the collision bit set
                 let bitmap = self.character_line(
                     pixels,
                     char_settings,
-                    MoreSettings::SpritePriority(priorities.get(xprio)),
+                    MoreSettings::SpritePriority {
+                        bg: priorities.get(xprio),
+                        sprites: line_bitmap_collision.get(h as usize),
+                    },
                 );
                 self.collision_check(&mut line_bitmap_collision, bitmap, h);
             }
