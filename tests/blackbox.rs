@@ -6,10 +6,20 @@ use gears::emu::{self, Button};
 
 use crate::TestCommand::*;
 
+#[derive(Debug, Clone)]
 enum TestCommand {
     WaitFrames(u32),
     PressButton(emu::Button),
     ReleaseButton(emu::Button),
+}
+impl TestCommand {
+    fn slice_str(s: &[TestCommand]) -> String {
+        s.iter()
+            .cloned()
+            .map(String::from)
+            .collect::<Vec<_>>()
+            .join("-")
+    }
 }
 impl TryFrom<&str> for TestCommand {
     type Error = String;
@@ -36,6 +46,33 @@ impl TryFrom<&str> for TestCommand {
             });
         }
         Err("empty value".to_string())
+    }
+}
+impl From<TestCommand> for String {
+    fn from(value: TestCommand) -> String {
+        match value {
+            WaitFrames(f) => format!("{f}"),
+            PressButton(b) => match b {
+                Button::Start => "S",
+                Button::One => "A",
+                Button::Two => "B",
+                Button::Up => "U",
+                Button::Down => "D",
+                Button::Left => "L",
+                Button::Right => "R",
+            }
+            .to_string(),
+            ReleaseButton(b) => match b {
+                Button::Start => "s",
+                Button::One => "a",
+                Button::Two => "b",
+                Button::Up => "u",
+                Button::Down => "d",
+                Button::Left => "l",
+                Button::Right => "r",
+            }
+            .to_string(),
+        }
     }
 }
 
@@ -89,7 +126,7 @@ fn common_test(filename: &Path, cmds: &[TestCommand], result: &[u8]) -> Result<(
     }
     if !pixels.iter().eq(result.iter()) {
         let mut outfile = PathBuf::from(path.file_name().unwrap());
-        outfile.set_extension(format!("frame-{frame}.png"));
+        outfile.set_extension(format!("{}.png", TestCommand::slice_str(cmds)));
         write_png(&pixels, &outfile)
             .map_err(|e| format!("error writing png to {}: {e}", outfile.to_string_lossy()))?;
         return Err(format!(
