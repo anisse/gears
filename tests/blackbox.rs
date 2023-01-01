@@ -170,6 +170,7 @@ fn test_roms() {
     .unwrap();
     let roms_dirs = Path::new("../roms");
     let png_dirs = Path::new("tests/roms-frames");
+    let mut res = vec![];
     for path in fs::read_dir(png_dirs).expect("test roms frames") {
         let png_name = path.expect("a file name").path();
         let mut rom_name = PathBuf::from(roms_dirs);
@@ -187,6 +188,15 @@ fn test_roms() {
             .split('-')
             .map(|c| c.try_into().expect("a test command"))
             .collect();
-        common_test(&rom_name, &frame, &rom_data).unwrap();
+        res.push(common_test(&rom_name, &frame, &rom_data));
     }
+    res.iter().for_each(|r| {
+        if let Err(s) = r {
+            println!("{s}");
+        }
+    });
+    assert!(
+        res.iter().all(Result::is_ok),
+        "Not all test frames are correct, see above"
+    );
 }
