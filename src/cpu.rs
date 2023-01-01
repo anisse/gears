@@ -416,7 +416,7 @@ fn set_conditions_sub8_base(r: &mut Regs, a: i8, b: i8, c: i8) -> u8 {
 fn set_conditions_sbc_8(r: &mut Regs, a: i8, b: i8) -> u8 {
     let c = r.F & C;
     let (tmp, ov1) = (a as u8).overflowing_sub(b as u8);
-    let (_, ov2) = (tmp as u8).overflowing_sub(c as u8);
+    let (_, ov2) = tmp.overflowing_sub(c);
     r.set_flag(Flag::C, ov1 || ov2);
 
     set_conditions_sub8_base(r, a, b, c as i8)
@@ -425,7 +425,7 @@ fn set_conditions_sbc_8(r: &mut Regs, a: i8, b: i8) -> u8 {
 fn set_conditions_adc_8(r: &mut Regs, a: i8, b: i8) -> u8 {
     let c = r.F & C;
     let (tmp, ov1) = (a as u8).overflowing_add(b as u8);
-    let (_, ov2) = (tmp as u8).overflowing_add(c as u8);
+    let (_, ov2) = tmp.overflowing_add(c);
     r.set_flag(Flag::C, ov1 || ov2);
 
     set_conditions_add8_base(r, a, b, c as i8)
@@ -469,7 +469,7 @@ fn set_conditions_add_16(r: &mut Regs, a: i16, b: i16, c: i16) -> u16 {
     copy_f53_res((res >> 8) as u8, r);
 
     let (tmp, ov1) = (a as u16).overflowing_add(b as u16);
-    let (_, ov2) = (tmp as u16).overflowing_add(c as u16);
+    let (_, ov2) = tmp.overflowing_add(c as u16);
     r.set_flag(Flag::C, ov1 || ov2);
 
     res as u16
@@ -487,7 +487,7 @@ fn set_conditions_sbc_16(r: &mut Regs, a: i16, b: i16) -> u16 {
     copy_f53_res((res >> 8) as u8, r);
 
     let (tmp, ov1) = (a as u16).overflowing_sub(b as u16);
-    let (_, ov2) = (tmp as u16).overflowing_sub(c as u16);
+    let (_, ov2) = tmp.overflowing_sub(c as u16);
     r.set_flag(Flag::C, ov1 || ov2);
 
     res as u16
@@ -1240,7 +1240,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 let addr = addr as u16 | ((s.r.A as u16) << 8);
                 s.io.out(addr, val)?;
                 // MEMPTR_low = (port + 1) & #FF,  MEMPTR_hi = A
-                let low = addr.wrapping_add(1) as u16;
+                let low = addr.wrapping_add(1);
                 s.r.MEMPTR = low & 0xFF | ((val as u16) << 8);
             } else if Operand::RegIOAddr(disas::Reg8::C) == op1 {
                 let val = get_op8(s, op2);
