@@ -545,6 +545,10 @@ impl VdpState {
         for sprite in 0_usize..64 {
             // sprite number is priority; once we have rendered eight sprites, we stop
             let v = self.vram[sprite_base + sprite].wrapping_add(1);
+            // we also stop at sprite end code
+            if v.wrapping_sub(1) == 0xD0 {
+                break;
+            }
             debugln!(
                 "Sprite {}, on dest vline: {} v: {} h: {} sprite height: {}",
                 sprite,
