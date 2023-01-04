@@ -9,17 +9,19 @@ It has a mostly complete Z80 emulator, that passes [z80test](https://github.com/
 
  - supports the game gear/master system rom banking
  - minimal interrupt support
- - Beginning of a VDP implementation, able to display a few things
- - Small UI relying on winit+pixels crates.
+ - Beginning of a VDP implementation, able to display some games
+ - Small UI relying on winit+pixels crates that supports input with keyboard and gamepad (both hardcoded bindings)
+ - A test suite for the VDP with some ROM frames to prevent regressions
 
 ## TODO
 
  - Finish that VDP
+   * still missing the horizontal interrupt (H counter, line completion)
+   * fix bug where sonic 1 map screen is scrambled
  - PSG (sound) emulation
- - Input handling in UI
  - WASM target. Dependencies should allow that
  - Support a complete game gear game
- - It's fast enough but there is a lot of margin for improvement; for example it does allocations in the emulation path which are not needed.
+ - It's fast enough but there is a lot of margin for improvement; for example it does allocations in the CPU emulation path which are not needed.
 
 ## Learned lessons
 
