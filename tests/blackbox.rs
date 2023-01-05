@@ -76,15 +76,28 @@ impl From<TestCommand> for String {
     }
 }
 
-fn write_png(frame_data: &[u8], filename: &Path) -> Result<(), io::Error> {
+fn write_png_common(
+    frame_data: &[u8],
+    filename: &Path,
+    width: u32,
+    height: u32,
+) -> Result<(), io::Error> {
     let file = File::create(filename)?;
     let mut w = BufWriter::new(file);
-    let mut encoder = png::Encoder::new(&mut w, emu::LCD_WIDTH as u32, emu::LCD_HEIGHT as u32);
+    let mut encoder = png::Encoder::new(&mut w, width, height);
     encoder.set_color(png::ColorType::Rgba);
     encoder.set_depth(png::BitDepth::Eight);
     let mut writer = encoder.write_header()?;
     writer.write_image_data(frame_data)?;
     Ok(())
+}
+fn write_png_lcd(frame_data: &[u8], filename: &Path) -> Result<(), io::Error> {
+    write_png_common(
+        frame_data,
+        filename,
+        emu::LCD_WIDTH as u32,
+        emu::LCD_HEIGHT as u32,
+    )
 }
 
 fn read_png(filename: &Path) -> Result<Vec<u8>, io::Error> {
@@ -148,7 +161,12 @@ fn common_test(filename: &Path, cmds: &[TestCommand], result: &[u8]) -> Result<(
     if !pixels.iter().eq(result.iter()) {
         let mut outfile = PathBuf::from(path.file_name().unwrap());
         outfile.set_extension(format!("{}.png", TestCommand::slice_str(cmds)));
-        write_png(&pixels, &outfile)
+        write_png_lcd(&pixels, &outfile)
+            .map_err(|e| format!("error writing png to {}: {e}", outfile.to_string_lossy()))?;
+        outfile.set_extension(format!("{}.TILESET.png", TestCommand::slice_str(cmds)));
+        let mut tiles = vec![0; 512 * 8 * 8 * 4];
+        emu.vdp_dump_tileset(&mut tiles);
+        write_png_common(&tiles, &outfile, 16 * 8, 32 * 8)
             .map_err(|e| format!("error writing png to {}: {e}", outfile.to_string_lossy()))?;
         return Err(format!(
             "Result for frame {frame} of {} is not what expected; written to {}",

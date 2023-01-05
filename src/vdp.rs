@@ -854,6 +854,34 @@ impl Vdp {
         };
         (interrupt, rendered)
     }
+
+    pub fn dump_tileset(&self, pixels: &mut [u8]) {
+        assert_eq!(pixels.len(), 32 * 16 * 8 * 8 * 4);
+        // dump all tiles in VDP RAM
+        for chr in 0..512 {
+            // 16 chars by line, 32 lines
+            let col = (chr % 16) as u8;
+            let row = (chr / 16) as u8;
+            for line in 0..8 {
+                self.state.borrow().character_line(
+                    pixels,
+                    CharSettings {
+                        char_num: chr,
+                        x: col * CHAR_SIZE,
+                        y: row * CHAR_SIZE + line,
+                        line_length: 16,
+                        src_line: line,
+                        x_start: 0,
+                        x_end: 8,
+                    },
+                    MoreSettings::BgSettings {
+                        rvh: false,
+                        rvv: false,
+                    },
+                );
+            }
+        }
+    }
     fn blank(state: &VdpState, pixels: &mut [u8], render_area: RenderArea) {
         let bc = state.rgb(32, state.reg[7]);
         debugln!("Filling with backdrop color {:?}", bc);

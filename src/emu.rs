@@ -165,6 +165,9 @@ impl Emulator {
         }
         false
     }
+    pub fn vdp_dump_tileset(&self, pixels: &mut [u8]) {
+        self.devs.pov.vdp.dump_tileset(pixels)
+    }
     pub fn press(&mut self, button: Button) {
         match button {
             Button::Start => (*self.devs.sys).set_start_button(true),
