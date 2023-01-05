@@ -84,6 +84,7 @@ struct VdpState {
     v_counter: u8,
     v_counter_jumped: bool,
     addr: u16,
+    vram_buffer: u8, // the cache for reads
     dest: Option<WriteDest>,
     vram: Vec<u8>,
     cram: Vec<u8>,
@@ -663,13 +664,19 @@ impl VdpState {
                     //dbg!("Writing to vdp reg", reg, data);
                     self.reg[reg as usize] = data;
                 }
-                0x00 | 0x40 => {
-                    // TODO: differentiate read and write setup ? This is only useful for timings
-                    // after setup
-                    // VRAM address setup
+                0x00 => {
+                    //reads
                     self.addr = data as u16 | ((val as u16 & 0x3F) << 8);
                     self.dest = Some(WriteDest::Vram);
-                    //dbg!("setup vram address", self.addr);
+                    self.vram_buffer = self.vram[self.addr as usize];
+                    self.addr = (self.addr + 1) & 0x3FFF;
+                    //dbg!("setup vram read address", self.addr);
+                }
+                0x40 => {
+                    //write
+                    self.addr = data as u16 | ((val as u16 & 0x3F) << 8);
+                    self.dest = Some(WriteDest::Vram);
+                    //dbg!("setup vram write address", self.addr);
                 }
                 0xC0 => {
                     // cram address setup
@@ -720,6 +727,7 @@ impl VdpState {
         match dest {
             Some(WriteDest::Vram) => {
                 ram[addr] = val;
+                self.vram_buffer = val;
                 self.addr = (self.addr + 1) & 0x3FFF;
             }
             Some(WriteDest::Cram) => {
@@ -756,8 +764,9 @@ impl VdpState {
                 self.vram.len()
             ));
         }
-        let val = self.vram[addr];
+        let val = self.vram_buffer;
         self.addr = (self.addr + 1) & 0x3FF;
+        self.vram_buffer = self.vram[self.addr as usize];
         Ok(val)
     }
     fn read_status(&mut self) -> Result<u8, String> {
@@ -884,6 +893,7 @@ impl Default for VdpState {
             v_counter: 0,
             v_counter_jumped: false,
             addr: 0,
+            vram_buffer: 0,
             dest: None,
             vram: vec![0; 16 * 1024],
             cram: vec![0; 32 * 2],
