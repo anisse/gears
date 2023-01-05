@@ -670,13 +670,18 @@ impl VdpState {
                     self.dest = Some(WriteDest::Vram);
                     self.vram_buffer = self.vram[self.addr as usize];
                     self.addr = (self.addr + 1) & 0x3FFF;
-                    //dbg!("setup vram read address", self.addr);
+                    /*
+                    println!(
+                        "setup vram read address to {:04X} and preloaded {:02X}",
+                        self.addr, self.vram_buffer
+                    );
+                    */
                 }
                 0x40 => {
                     //write
                     self.addr = data as u16 | ((val as u16 & 0x3F) << 8);
                     self.dest = Some(WriteDest::Vram);
-                    //dbg!("setup vram write address", self.addr);
+                    //println!("setup vram write address {:04X}", self.addr);
                 }
                 0xC0 => {
                     // cram address setup
@@ -765,8 +770,9 @@ impl VdpState {
             ));
         }
         let val = self.vram_buffer;
-        self.addr = (self.addr + 1) & 0x3FF;
         self.vram_buffer = self.vram[self.addr as usize];
+        self.addr = (self.addr + 1) & 0x3FF;
+
         Ok(val)
     }
     fn read_status(&mut self) -> Result<u8, String> {
@@ -1064,4 +1070,59 @@ fn sprite_collisions() {
     line_bitmap_collision.bits[31] = 0;
     line_bitmap_collision.bits[0] = 0xFF;
     assert!(VdpState::collision_calc(&line_bitmap_collision, 0xFF, 250));
+}
+
+#[test]
+fn split_io() {
+    use crate::io::Device;
+
+    let vdp = Vdp::default();
+    // Normal write:
+    assert_eq!(vdp.out(0xBF, 0), Ok(()));
+    assert_eq!(vdp.out(0xBF, 0x40), Ok(()));
+    assert_eq!(vdp.out(0xBE, 0xAB), Ok(()));
+
+    // Read back
+    assert_eq!(vdp.out(0xBF, 0), Ok(()));
+    assert_eq!(vdp.out(0xBF, 0), Ok(()));
+    assert_eq!(vdp.input(0xBE), Ok(0xAB));
+
+    //Reset Vdp
+    let vdp = Vdp::default();
+    // Read setup
+    assert_eq!(vdp.out(0xBF, 0), Ok(()));
+    assert_eq!(vdp.out(0xBF, 0), Ok(()));
+    // But do a write
+    assert_eq!(vdp.out(0xBE, 0x42), Ok(()));
+
+    // Re-read immediately (from the buffer)
+    assert_eq!(vdp.input(0xBE), Ok(0x42));
+    assert_eq!(vdp.input(0xBE), Ok(0));
+
+    // Now read back from 0
+    assert_eq!(vdp.out(0xBF, 0), Ok(()));
+    assert_eq!(vdp.out(0xBF, 0), Ok(()));
+    assert_eq!(vdp.input(0xBE), Ok(0));
+    assert_eq!(vdp.input(0xBE), Ok(0x42));
+
+    //Reset Vdp
+    let vdp = Vdp::default();
+    // write some data first
+    assert_eq!(vdp.out(0xBF, 0), Ok(()));
+    assert_eq!(vdp.out(0xBF, 0x40), Ok(()));
+
+    assert_eq!(vdp.out(0xBE, 0xA1), Ok(()));
+    assert_eq!(vdp.out(0xBE, 0xB2), Ok(()));
+    assert_eq!(vdp.out(0xBE, 0xC3), Ok(()));
+    assert_eq!(vdp.out(0xBE, 0xD4), Ok(()));
+
+    // then do a write setup
+    assert_eq!(vdp.out(0xBF, 0), Ok(()));
+    assert_eq!(vdp.out(0xBF, 0x40), Ok(()));
+
+    // But read instead
+    assert_eq!(vdp.input(0xBE), Ok(0xD4));
+    assert_eq!(vdp.input(0xBE), Ok(0xA1));
+    assert_eq!(vdp.input(0xBE), Ok(0xB2));
+    assert_eq!(vdp.input(0xBE), Ok(0xC3));
 }
