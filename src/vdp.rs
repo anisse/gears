@@ -453,6 +453,13 @@ impl VdpState {
                 },
             );
             if prio {
+                /*
+                debugln!(
+                    "priority {}: {:02X} ",
+                    (x as u8).wrapping_sub(ch_start_x as u8) as usize,
+                    bitmap
+                );
+                */
                 priorities.set((x as u8).wrapping_sub(ch_start_x as u8) as usize, bitmap);
             }
             x += x_end as usize - ch_start_x;
@@ -848,8 +855,8 @@ impl Vdp {
         (interrupt, rendered)
     }
     fn blank(state: &VdpState, pixels: &mut [u8], render_area: RenderArea) {
-        debugln!("Filling with backdrop color");
         let bc = state.rgb(32, state.reg[7]);
+        debugln!("Filling with backdrop color {:?}", bc);
         let ranges = if let RenderArea::VisibleOnly = render_area {
             (0..VISIBLE_PIXEL_HEIGHT, 0..VISIBLE_PIXEL_WIDTH)
         } else {
