@@ -840,8 +840,9 @@ impl Vdp {
             if state.reg[1] & REG1_BLANK != 0 {
                 rendered = VdpDisplay::ScreenDone;
             } else {
-                // we should fill screen we backdrop color
-                Self::blank(&state, pixels, render_area);
+                // we should fill screen with backdrop color
+                //Self::blank(&state, pixels, render_area);
+                //rendered = VdpDisplay::ScreenDone;
             }
         }
         if state.reg[0] & REG0_IE1 != 0 {
@@ -882,7 +883,7 @@ impl Vdp {
             }
         }
     }
-    fn blank(state: &VdpState, pixels: &mut [u8], render_area: RenderArea) {
+    fn _blank(state: &VdpState, pixels: &mut [u8], render_area: RenderArea) {
         let bc = state.rgb(32, state.reg[7]);
         debugln!("Filling with backdrop color {:?}", bc);
         let ranges = if let RenderArea::VisibleOnly = render_area {
@@ -893,7 +894,7 @@ impl Vdp {
         // consume the first range...
         for y in ranges.0 {
             // but not the other range, we'd need to use it multiple times
-            for x in (ranges.1.start)..(ranges.1.end) {
+            for x in ranges.1.clone() {
                 VdpState::pixel_set(pixels, x, y, 4, bc.0, bc.1, bc.2);
             }
         }
