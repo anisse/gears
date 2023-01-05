@@ -47,6 +47,10 @@ macro_rules! debugln {
         }
     }
 }
+
+const VDP_CMD: u16 = 0xBF;
+const VDP_DATA: u16 = 0xBE;
+
 const DEBUG: bool = false;
 const OVERFLOW_TRACK: bool = false;
 
@@ -865,8 +869,8 @@ impl io::Device for Vdp {
     fn out(&self, addr: u16, val: u8) -> Result<(), String> {
         let mut state = self.state.borrow_mut();
         match addr & 0xFF {
-            0xBF => state.write_cmd(val),
-            0xBE => state.write_ram(val),
+            VDP_CMD => state.write_cmd(val),
+            VDP_DATA => state.write_ram(val),
             _ => Err(format!(
                 "unknown VDP output address @{:04X} ({:02X} ",
                 addr, val
@@ -880,8 +884,8 @@ impl io::Device for Vdp {
                 let vcounter = state.v_counter;
                 Ok(vcounter)
             }
-            0xBF => state.read_status(),
-            0xBE => state.read_ram(),
+            VDP_CMD => state.read_status(),
+            VDP_DATA => state.read_ram(),
             _ => Err(format!("unknown VDP input address @{:04X}", addr)),
         }
     }
@@ -1078,51 +1082,51 @@ fn split_io() {
 
     let vdp = Vdp::default();
     // Normal write:
-    assert_eq!(vdp.out(0xBF, 0), Ok(()));
-    assert_eq!(vdp.out(0xBF, 0x40), Ok(()));
-    assert_eq!(vdp.out(0xBE, 0xAB), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x40), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xAB), Ok(()));
 
     // Read back
-    assert_eq!(vdp.out(0xBF, 0), Ok(()));
-    assert_eq!(vdp.out(0xBF, 0), Ok(()));
-    assert_eq!(vdp.input(0xBE), Ok(0xAB));
+    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
+    assert_eq!(vdp.input(VDP_DATA), Ok(0xAB));
 
     //Reset Vdp
     let vdp = Vdp::default();
     // Read setup
-    assert_eq!(vdp.out(0xBF, 0), Ok(()));
-    assert_eq!(vdp.out(0xBF, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
     // But do a write
-    assert_eq!(vdp.out(0xBE, 0x42), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0x42), Ok(()));
 
     // Re-read immediately (from the buffer)
-    assert_eq!(vdp.input(0xBE), Ok(0x42));
-    assert_eq!(vdp.input(0xBE), Ok(0));
+    assert_eq!(vdp.input(VDP_DATA), Ok(0x42));
+    assert_eq!(vdp.input(VDP_DATA), Ok(0));
 
     // Now read back from 0
-    assert_eq!(vdp.out(0xBF, 0), Ok(()));
-    assert_eq!(vdp.out(0xBF, 0), Ok(()));
-    assert_eq!(vdp.input(0xBE), Ok(0));
-    assert_eq!(vdp.input(0xBE), Ok(0x42));
+    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
+    assert_eq!(vdp.input(VDP_DATA), Ok(0));
+    assert_eq!(vdp.input(VDP_DATA), Ok(0x42));
 
     //Reset Vdp
     let vdp = Vdp::default();
     // write some data first
-    assert_eq!(vdp.out(0xBF, 0), Ok(()));
-    assert_eq!(vdp.out(0xBF, 0x40), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x40), Ok(()));
 
-    assert_eq!(vdp.out(0xBE, 0xA1), Ok(()));
-    assert_eq!(vdp.out(0xBE, 0xB2), Ok(()));
-    assert_eq!(vdp.out(0xBE, 0xC3), Ok(()));
-    assert_eq!(vdp.out(0xBE, 0xD4), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xA1), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xB2), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xC3), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xD4), Ok(()));
 
     // then do a write setup
-    assert_eq!(vdp.out(0xBF, 0), Ok(()));
-    assert_eq!(vdp.out(0xBF, 0x40), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x40), Ok(()));
 
     // But read instead
-    assert_eq!(vdp.input(0xBE), Ok(0xD4));
-    assert_eq!(vdp.input(0xBE), Ok(0xA1));
-    assert_eq!(vdp.input(0xBE), Ok(0xB2));
-    assert_eq!(vdp.input(0xBE), Ok(0xC3));
+    assert_eq!(vdp.input(VDP_DATA), Ok(0xD4));
+    assert_eq!(vdp.input(VDP_DATA), Ok(0xA1));
+    assert_eq!(vdp.input(VDP_DATA), Ok(0xB2));
+    assert_eq!(vdp.input(VDP_DATA), Ok(0xC3));
 }
