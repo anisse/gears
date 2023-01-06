@@ -861,13 +861,22 @@ impl Vdp {
         // dump all tiles in VDP RAM
         for chr in 0..512 {
             // 16 chars by line, 32 lines
-            let col = (chr % 16) as u8;
-            let row = (chr / 16) as u8;
+            let col;
+            let row;
+            // TODO: sprite base might be at 0, so this arbitrary limit might not be correct
+            // anyway...
+            if chr >= 256 && self.state.borrow().reg[1] & REG1_SIZE != 0 {
+                col = ((chr % 32) / 2) as u8;
+                row = (((chr / 32) * 2) + chr % 2) as u8;
+            } else {
+                col = (chr % 16) as u8;
+                row = (chr / 16) as u8;
+            }
             for line in 0..8 {
                 self.state.borrow().character_line(
                     pixels,
                     CharSettings {
-                        char_num: chr,
+                        char_num: chr % 256,
                         x: col * CHAR_SIZE,
                         y: row * CHAR_SIZE + line,
                         line_length: 16,
@@ -875,9 +884,13 @@ impl Vdp {
                         x_start: 0,
                         x_end: 8,
                     },
-                    MoreSettings::BgSettings {
-                        rvh: false,
-                        rvv: false,
+                    if chr < 256 {
+                        MoreSettings::BgSettings {
+                            rvh: false,
+                            rvv: false,
+                        }
+                    } else {
+                        MoreSettings::SpritePriority { bg: 0, sprites: 0 }
                     },
                 );
             }
