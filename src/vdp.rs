@@ -742,6 +742,12 @@ impl VdpState {
         }
         match dest {
             Some(WriteDest::Vram) => {
+                /*
+                println!(
+                    "Writing to vram address {addr} <--- {val} (old: {})",
+                    ram[addr]
+                );
+                */
                 ram[addr] = val;
                 self.vram_buffer = val;
                 self.addr = (self.addr + 1) & 0x3FFF;
@@ -781,6 +787,12 @@ impl VdpState {
             ));
         }
         let val = self.vram_buffer;
+        /*
+        println!(
+            "Reading from vram address {addr} : {val} (effective: {})",
+            self.vram[addr]
+        );
+        */
         self.vram_buffer = self.vram[self.addr as usize];
         self.addr = (self.addr + 1) & 0x3FFF;
 
