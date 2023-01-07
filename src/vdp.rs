@@ -50,6 +50,8 @@ macro_rules! debugln {
 
 const VDP_CMD: u16 = 0xBF;
 const VDP_DATA: u16 = 0xBE;
+const VRAM_SIZE: u16 = 0x4000;
+const CRAM_SIZE: u16 = 0x40;
 
 const DEBUG: bool = false;
 const OVERFLOW_TRACK: bool = false;
@@ -677,10 +679,10 @@ impl VdpState {
                 }
                 0x00 => {
                     //reads
-                    self.addr = data as u16 | ((val as u16 & 0x3F) << 8);
+                    self.addr = (data as u16 | ((val as u16) << 8)) % VRAM_SIZE;
                     self.dest = Some(WriteDest::Vram);
                     self.vram_buffer = self.vram[self.addr as usize];
-                    self.addr = (self.addr + 1) & 0x3FFF;
+                    self.addr = (self.addr + 1) % VRAM_SIZE;
                     /*
                     println!(
                         "setup vram read address to {:04X} and preloaded {:02X}",
@@ -690,7 +692,7 @@ impl VdpState {
                 }
                 0x40 => {
                     //write
-                    self.addr = data as u16 | ((val as u16 & 0x3F) << 8);
+                    self.addr = (data as u16 | ((val as u16) << 8)) % VRAM_SIZE;
                     self.dest = Some(WriteDest::Vram);
                     //println!("setup vram write address {:04X}", self.addr);
                 }
@@ -702,7 +704,7 @@ impl VdpState {
                     if data >= 64 {
                         println!("VDP cram data write: {} >= 64", val);
                     }
-                    self.addr = data as u16 & 0x3F;
+                    self.addr = data as u16 % CRAM_SIZE;
                     self.dest = Some(WriteDest::Cram);
                     //println!("setup cram address: {:02X}", data);
                 }
@@ -750,7 +752,7 @@ impl VdpState {
                 */
                 ram[addr] = val;
                 self.vram_buffer = val;
-                self.addr = (self.addr + 1) & 0x3FFF;
+                self.addr = (self.addr + 1) % VRAM_SIZE;
             }
             Some(WriteDest::Cram) => {
                 if addr & 1 == 0 {
@@ -761,7 +763,7 @@ impl VdpState {
                     ram[addr] = val & 0x0F;
                     //println!("Written to CRAM: {:02X}{:02X}", ram[addr], ram[addr - 1]);
                 }
-                self.addr = (self.addr + 1) & 0x3F;
+                self.addr = (self.addr + 1) % CRAM_SIZE;
             }
             None => unreachable!(),
         }
@@ -794,7 +796,7 @@ impl VdpState {
         );
         */
         self.vram_buffer = self.vram[self.addr as usize];
-        self.addr = (self.addr + 1) & 0x3FFF;
+        self.addr = (self.addr + 1) % VRAM_SIZE;
 
         Ok(val)
     }
