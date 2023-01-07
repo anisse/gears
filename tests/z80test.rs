@@ -9,7 +9,19 @@ use gears::{cpu, io, mem};
 #[test]
 #[ignore]
 fn z80full() {
-    let prog = include_bytes!("z80test/z80full.tap");
+    z80common(include_bytes!("z80test/z80full.tap"))
+}
+#[test]
+#[ignore]
+fn z80ccf() {
+    z80common(include_bytes!("z80test/z80ccf.tap"))
+}
+#[test]
+#[ignore]
+fn z80memptr() {
+    z80common(include_bytes!("z80test/z80memptr.tap"))
+}
+fn z80common(prog: &[u8]) {
     let cache = gears::cpu::DisasCache::init();
 
     let mut state = cpu::init();
