@@ -5,6 +5,23 @@ use crate::io;
 #[derive(Debug, PartialEq, Eq, Default)]
 pub struct System {
     start_button: RefCell<bool>,
+    region: Region,
+}
+
+#[derive(Debug, PartialEq, Eq, Default)]
+enum Region {
+    #[allow(dead_code)]
+    Japan,
+    #[default]
+    World,
+}
+impl From<&Region> for u8 {
+    fn from(value: &Region) -> Self {
+        match value {
+            Region::Japan => 0,
+            Region::World => 1 << 6,
+        }
+    }
 }
 
 impl System {
@@ -41,7 +58,7 @@ impl io::Device for System {
 
     fn input(&self, addr: u16) -> Result<u8, String> {
         match addr & 0xFF {
-            0x0 => Ok((!(*self.start_button.borrow() as u8) << 7) | 0x6F),
+            0x0 => Ok((!(*self.start_button.borrow() as u8) << 7) | u8::from(&self.region)),
             _ => Err(format!(
                 "unknown system port output write address @{:04X}",
                 addr
