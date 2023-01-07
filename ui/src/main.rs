@@ -57,6 +57,7 @@ fn main() -> Result<(), String> {
     let mut emu = emu::Emulator::init(data, true);
 
     let mut run = true;
+    let mut step = false;
     event_loop.run(move |event, _, control_flow| {
         // Draw the current frame
         match event {
@@ -86,6 +87,11 @@ fn main() -> Result<(), String> {
                             run = !run;
                         }
                     }
+                    Some(VirtualKeyCode::LControl) => {
+                        if input.state == ElementState::Pressed {
+                            step = true;
+                        }
+                    }
                     _ => handle_key(&mut emu, input),
                 },
                 WindowEvent::Resized(size) => {
@@ -100,12 +106,13 @@ fn main() -> Result<(), String> {
                     handle_joystick_event(&mut emu, event);
                 }
 
-                if run {
+                if run || step {
                     loop {
                         if emu.step(pixels.get_frame()) {
                             break;
                         }
                     }
+                    step = false;
                 }
                 window.request_redraw();
             }
