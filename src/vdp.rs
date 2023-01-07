@@ -782,7 +782,7 @@ impl VdpState {
         }
         let val = self.vram_buffer;
         self.vram_buffer = self.vram[self.addr as usize];
-        self.addr = (self.addr + 1) & 0x3FF;
+        self.addr = (self.addr + 1) & 0x3FFF;
 
         Ok(val)
     }
@@ -1178,4 +1178,53 @@ fn split_io() {
     assert_eq!(vdp.input(VDP_DATA), Ok(0xA1));
     assert_eq!(vdp.input(VDP_DATA), Ok(0xB2));
     assert_eq!(vdp.input(VDP_DATA), Ok(0xC3));
+}
+
+#[test]
+fn read_wrap() {
+    use crate::io::Device;
+    let vdp = Vdp::default();
+
+    // write some data first
+    assert_eq!(vdp.out(VDP_CMD, 0xFE), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x7F), Ok(()));
+
+    assert_eq!(vdp.out(VDP_DATA, 0xA1), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xB2), Ok(()));
+
+    // address 0 (we are not testing write wrapping)
+    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x40), Ok(()));
+
+    assert_eq!(vdp.out(VDP_DATA, 0xC3), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xD4), Ok(()));
+
+    // read the data
+    assert_eq!(vdp.out(VDP_CMD, 0xFE), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x3F), Ok(()));
+
+    assert_eq!(vdp.input(VDP_DATA), Ok(0xA1));
+    assert_eq!(vdp.input(VDP_DATA), Ok(0xB2));
+    assert_eq!(vdp.input(VDP_DATA), Ok(0xC3));
+    assert_eq!(vdp.input(VDP_DATA), Ok(0xD4));
+
+    // Now the bug we had: we don't want wrapping at 1024
+    let vdp = Vdp::default();
+    // write some data first
+    assert_eq!(vdp.out(VDP_CMD, 0xFE), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x43), Ok(()));
+
+    assert_eq!(vdp.out(VDP_DATA, 0xA1), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xB2), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xC3), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xD4), Ok(()));
+
+    // read the data
+    assert_eq!(vdp.out(VDP_CMD, 0xFE), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x03), Ok(()));
+
+    assert_eq!(vdp.input(VDP_DATA), Ok(0xA1));
+    assert_eq!(vdp.input(VDP_DATA), Ok(0xB2));
+    assert_eq!(vdp.input(VDP_DATA), Ok(0xC3));
+    assert_eq!(vdp.input(VDP_DATA), Ok(0xD4));
 }
