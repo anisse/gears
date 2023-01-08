@@ -4,6 +4,7 @@ use gears::cpu::RegPair;
 use gears::{cpu, io, mem};
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 enum EventType {
     MemoryRead { value: u8 },
     MemoryWrite { value: u8 },
@@ -14,6 +15,7 @@ enum EventType {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 struct Event {
     time: u16,
     address: u16,
@@ -283,12 +285,12 @@ fn fuse_tests() {
 
     for t in tests.iter() {
         let mut state = cpu::State::default();
-        state.r = t.start_regs.clone();
+        state.r = t.start_regs;
         state.halted = t.start_halted;
         let mut data = mem::Memory::init(mem::Mapper::ZX64K); // This test suite is for machines with more RAM
         setup_memory(&t.memory_values, &mut data);
         let mut end_state = cpu::State::default();
-        end_state.r = t.end_regs.clone();
+        end_state.r = t.end_regs;
         end_state.halted = t.end_halted;
         end_state.mem = data.clone();
         setup_memory(&t.changed_mem_values, &mut end_state.mem);
