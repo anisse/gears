@@ -683,6 +683,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         s.pending_interrupt = false;
         s.r.IFF1 = false;
         s.r.IFF2 = false;
+        s.halted = false;
         return run_op(s, &interrupt_op(0x38));
     }
     let mut op_len: usize = op.tstates.iter().sum::<u8>() as usize;
@@ -1403,6 +1404,7 @@ pub fn interrupt_mode_1(s: &mut State) -> Result<usize, String> {
     if s.r.IFF1 {
         s.r.IFF1 = false;
         s.r.IFF2 = false;
+        s.halted = false;
         run_op(s, &interrupt_op(0x38))
     } else {
         s.pending_interrupt = true;
