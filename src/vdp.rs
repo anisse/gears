@@ -89,6 +89,7 @@ struct VdpState {
     reg: [u8; 11],
     v_counter: u8,
     v_counter_jumped: bool,
+    line_interrupt_counter: u8,
     addr: u16,
     vram_buffer: u8, // the cache for reads
     dest: Option<WriteDest>,
@@ -674,7 +675,7 @@ impl VdpState {
                     if reg > 10 {
                         panic!("Unexpected high VDP register {:02X}", reg)
                     }
-                    //dbg!("Writing to vdp reg", reg, data);
+                    //println!("Writing to vdp reg {reg} {data:02X}");
                     self.reg[reg as usize] = data;
                 }
                 0x00 => {
@@ -833,6 +834,9 @@ impl Vdp {
         if state.v_counter == 0 {
             state.vertical_scroll = state.reg[9];
             state.v_counter_jumped = false;
+            if state.reg[10] != 0 {
+                state.line_interrupt_counter = state.reg[10] - 1;
+            }
         }
         if state.v_counter == 0xDA && !state.v_counter_jumped {
             state.v_counter_jumped = true;
@@ -859,14 +863,19 @@ impl Vdp {
                 //rendered = VdpDisplay::ScreenDone;
             }
         }
-        if state.reg[0] & REG0_IE1 != 0 {
-            println!("H counter interrupt (line completion) should be enabled");
+        if state.line_interrupt_counter != 0 {
+            state.line_interrupt_counter -= 1;
         }
-        let interrupt = if state.status & ST_I != 0 && state.reg[1] & REG1_IE != 0 {
-            VdpInt::InterruptGenerated
-        } else {
-            VdpInt::NoInterrupt
-        };
+        let line_interrupt = state.reg[0] & REG0_IE1 != 0 && state.line_interrupt_counter == 0;
+        let interrupt =
+            if (state.status & ST_I != 0 && state.reg[1] & REG1_IE != 0) || line_interrupt {
+                VdpInt::InterruptGenerated
+            } else {
+                VdpInt::NoInterrupt
+            };
+        if state.line_interrupt_counter == 0 {
+            state.line_interrupt_counter = state.reg[10];
+        }
         (interrupt, rendered)
     }
 
@@ -945,6 +954,7 @@ impl io::Device for Vdp {
         match addr & 0xFF {
             0x7E => {
                 let vcounter = state.v_counter;
+                //println!("v counter read: {vcounter:02X}");
                 Ok(vcounter)
             }
             VDP_CMD => state.read_status(),
@@ -965,6 +975,7 @@ impl Default for VdpState {
             reg: [0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 1],
             v_counter: 0,
             v_counter_jumped: false,
+            line_interrupt_counter: 0,
             addr: 0,
             vram_buffer: 0,
             dest: None,
