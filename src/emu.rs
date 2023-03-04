@@ -21,6 +21,8 @@ pub enum Button {
 pub const LCD_HEIGHT: usize = vdp::VISIBLE_PIXEL_HEIGHT;
 pub const LCD_WIDTH: usize = vdp::VISIBLE_PIXEL_WIDTH;
 
+const CPU_CYCLES_PER_LINE: usize = 228;
+
 impl From<Button> for joystick::Button {
     fn from(val: Button) -> Self {
         match val {
@@ -77,6 +79,7 @@ pub struct Emulator {
     cpu: cpu::State,
     devs: Devices,
     render_area: vdp::RenderArea,
+    over_cycles: usize,
 }
 
 struct Devices {
@@ -109,6 +112,7 @@ impl Emulator {
             } else {
                 vdp::RenderArea::EffectiveArea
             },
+            over_cycles: 0,
         };
         emu.cpu.mem = mem::Memory::init(mem::Mapper::SegaGG {
             rom,
@@ -159,7 +163,14 @@ impl Emulator {
             //println!("VDP sent an interrupt !");
             cpu::interrupt_mode_1(&mut self.cpu).unwrap();
         }
-        cpu::run_cached(&self.cache, &mut self.cpu, 227, false).unwrap();
+        let cycles = cpu::run_cached(
+            &self.cache,
+            &mut self.cpu,
+            CPU_CYCLES_PER_LINE - self.over_cycles,
+            false,
+        )
+        .unwrap();
+        self.over_cycles += cycles - CPU_CYCLES_PER_LINE;
         if let vdp::VdpDisplay::ScreenDone = render {
             return true;
         }

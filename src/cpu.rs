@@ -1412,9 +1412,9 @@ pub fn interrupt_mode_1(s: &mut State) -> Result<usize, String> {
     }
 }
 
-pub fn run(s: &mut State, tstates_len: usize, debug: bool) -> Result<(), String> {
-    let mut tstates_len = tstates_len;
-    while tstates_len > 0 {
+pub fn run(s: &mut State, tstates_len: usize, debug: bool) -> Result<usize, String> {
+    let mut tstates_ran = 0;
+    while tstates_ran < tstates_len {
         // TODO: split into m states, fetch etc
         let disas_target = s.mem.fetch_range_safe(s.r.PC, 4);
         if let Some(op) = disas::disas(disas_target) {
@@ -1422,13 +1422,12 @@ pub fn run(s: &mut State, tstates_len: usize, debug: bool) -> Result<(), String>
                 println!("{:04X}: {:?}", s.r.PC, op);
                 //println!("{}", s.r);
             }
-            let op_len = run_op(s, &op)?;
-            tstates_len = usize::saturating_sub(tstates_len, op_len);
+            tstates_ran += run_op(s, &op)?;
         } else {
             return Err(format!("Unknown instruction(s)) {:02X?}", disas_target));
         }
     }
-    Ok(())
+    Ok(tstates_ran)
 }
 pub use disas::DisasCache;
 pub fn run_cached(
@@ -1436,22 +1435,21 @@ pub fn run_cached(
     s: &mut State,
     tstates_len: usize,
     debug: bool,
-) -> Result<(), String> {
-    let mut tstates_len = tstates_len;
-    while tstates_len > 0 {
+) -> Result<usize, String> {
+    let mut tstates_ran = 0;
+    while tstates_ran < tstates_len {
         // TODO: split into m states, fetch etc
         let disas_target = s.mem.fetch_range_safe(s.r.PC, 4);
         if let Some(op) = c.disas(disas_target) {
             if debug {
                 println!("{:04X}: {:?}", s.r.PC, op);
             }
-            let op_len = run_op(s, &op)?;
-            tstates_len = usize::saturating_sub(tstates_len, op_len);
+            tstates_ran += run_op(s, &op)?;
         } else {
             return Err(format!("Unknown instruction(s)) {:02X?}", disas_target));
         }
     }
-    Ok(())
+    Ok(tstates_ran)
 }
 #[cfg(test)]
 mod tests {
