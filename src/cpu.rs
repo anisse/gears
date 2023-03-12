@@ -1404,6 +1404,9 @@ pub fn interrupt_mode_1(s: &mut State) -> Result<usize, String> {
     if s.r.IFF1 {
         s.r.IFF1 = false;
         s.r.IFF2 = false;
+        if s.halted {
+            s.r.PC += 1;
+        }
         s.halted = false;
         run_op(s, &interrupt_op(0x38))
     } else {
