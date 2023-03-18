@@ -858,7 +858,7 @@ impl Vdp {
             let line = state.v_counter;
             state.render_line(pixels, line, render_area);
         }
-        if state.v_counter == VCOUNTER_VBLANK_LINE {
+        if state.v_counter == VCOUNTER_VBLANK_LINE + 1 {
             state.status |= ST_I;
             if state.reg[1] & REG1_BLANK != 0 {
                 rendered = VdpDisplay::ScreenDone;
