@@ -16,8 +16,7 @@ It has a mostly complete Z80 emulator, that passes [z80test](https://github.com/
 ## TODO
 
  - Finish that VDP
-   * still missing the horizontal interrupt (H counter, line completion)
-   * fix bug where sonic 1 map screen is scrambled
+   * still missing horizontal interrupt testing (H counter, line completion)
  - PSG (sound) emulation
  - WASM target. Dependencies should allow that
  - Support a complete game gear game
