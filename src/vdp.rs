@@ -53,6 +53,11 @@ const VDP_DATA: u16 = 0xBE;
 const VRAM_SIZE: u16 = 0x4000;
 const CRAM_SIZE: u16 = 0x40;
 
+const VCOUNTER_READ: u16 = 0x7E;
+const HCOUNTER_READ: u16 = 0x7F;
+
+const VCOUNTER_VBLANK_LINE: u8 = 0xC0;
+
 const DEBUG: bool = false;
 const OVERFLOW_TRACK: bool = false;
 
@@ -853,7 +858,7 @@ impl Vdp {
             let line = state.v_counter;
             state.render_line(pixels, line, render_area);
         }
-        if state.v_counter == 0xC0 {
+        if state.v_counter == VCOUNTER_VBLANK_LINE {
             state.status |= ST_I;
             if state.reg[1] & REG1_BLANK != 0 {
                 rendered = VdpDisplay::ScreenDone;
@@ -952,10 +957,14 @@ impl io::Device for Vdp {
     fn input(&self, addr: u16) -> Result<u8, String> {
         let mut state = self.state.borrow_mut();
         match addr & 0xFF {
-            0x7E => {
+            VCOUNTER_READ => {
                 let vcounter = state.v_counter;
                 //println!("v counter read: {vcounter:02X}");
                 Ok(vcounter)
+            }
+            HCOUNTER_READ => {
+                panic!("Unimplemented H COUNTER read !");
+                //Ok(0x50)
             }
             VDP_CMD => state.read_status(),
             VDP_DATA => state.read_ram(),
