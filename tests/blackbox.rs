@@ -163,7 +163,7 @@ fn common_test(filename: &Path, cmds: &[TestCommand], result: &[u8]) -> Result<(
         outfile.set_extension(format!("{}.png", TestCommand::slice_str(cmds)));
         write_png_lcd(&pixels, &outfile)
             .map_err(|e| format!("error writing png to {}: {e}", outfile.to_string_lossy()))?;
-        outfile.set_extension(format!("{}.TILESET.png", TestCommand::slice_str(cmds)));
+        outfile.set_extension("TILESET.png");
         let mut tiles = vec![0; 512 * 8 * 8 * 4];
         emu.vdp_dump_tileset(&mut tiles);
         write_png_common(&tiles, &outfile, 16 * 8, 32 * 8)
