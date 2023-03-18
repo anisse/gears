@@ -137,6 +137,7 @@ fn common_test(filename: &Path, cmds: &[TestCommand], result: &[u8]) -> Result<(
             ReleaseButton(b) => emu.release(*b),
         }
     }
+    /*
     pixels
         .iter()
         .zip(result.iter())
@@ -158,6 +159,7 @@ fn common_test(filename: &Path, cmds: &[TestCommand], result: &[u8]) -> Result<(
                 },
             )
         });
+    */
     if !pixels.iter().eq(result.iter()) {
         let mut outfile = PathBuf::from(path.file_name().unwrap());
         outfile.set_extension(format!("{}.png", TestCommand::slice_str(cmds)));
