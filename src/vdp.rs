@@ -40,11 +40,35 @@ flag!(PatternName,
     PNAME_PRI => 4,
 );
 
+// Let's abuse our register definition macro for a debug bitfield
+flag!(Debug,
+    DBG_RENDERING => 0,
+    DBG_VRAM_IO => 1,
+    DBG_REG_ACCESS => 2,
+    DBG_OVERFLOW => 3,
+);
+
 macro_rules! debugln {
-    ($($rest:tt)*) => {
-        if DEBUG {
+    ($mask:ident, $($rest:tt)*) => {
+        if DEBUG & $mask != 0 {
             std::println!($($rest)*)
         }
+    }
+}
+
+macro_rules! debugrd {
+    ($($rest:tt)*) => {
+        debugln!(DBG_RENDERING, $($rest)*)
+    }
+}
+macro_rules! debugio {
+    ($($rest:tt)*) => {
+        debugln!(DBG_VRAM_IO, $($rest)*)
+    }
+}
+macro_rules! debugreg {
+    ($($rest:tt)*) => {
+        debugln!(DBG_REG_ACCESS, $($rest)*)
     }
 }
 
@@ -58,7 +82,7 @@ const HCOUNTER_READ: u16 = 0x7F;
 
 const VCOUNTER_VBLANK_LINE: u8 = 0xC0;
 
-const DEBUG: bool = false;
+const DEBUG: u8 = 0; //DBG_VRAM_IO;
 const OVERFLOW_TRACK: bool = false;
 
 const SCROLL_SCREEN_WIDTH: usize = 32;
@@ -254,15 +278,20 @@ impl VdpState {
         let base = match sprite {
             false => {
                 if c.char_num >= 448 {
+                    // TODO: remove overflow tracking code
                     // TODO: dump those overflow chars
                     let visible = c.x + c.x_end > VISIBLE_AREA_START_X as u8
                         && c.x + c.x_start < VISIBLE_AREA_END_X as u8
                         && c.y >= VISIBLE_AREA_START_Y as u8
                         && c.y < VISIBLE_AREA_END_Y as u8;
                     if OVERFLOW_TRACK && visible {
-                        println!(
+                        debugln!(
+                            DBG_OVERFLOW,
                             "char overflow: {}, x {} y {} visible ? {}",
-                            c.char_num, c.x, c.y, visible,
+                            c.char_num,
+                            c.x,
+                            c.y,
+                            visible,
                         );
                         overflow_pause = true;
                     }
@@ -280,7 +309,7 @@ impl VdpState {
             false => 0,
             true => 32,
         };
-        debugln!(
+        debugrd!(
             "{} char {}: @{:04X} : {} {}x{} (char line length: {}) from ({}->{})x{}",
             if sprite { "Sprite" } else { "BG" },
             c.char_num,
@@ -320,7 +349,7 @@ impl VdpState {
                 }
 
                 if priority & (1 << col) != 0 {
-                    debugln!(
+                    debugrd!(
                         "Skipping prio sprite pixel {} at dest coord x={} b1 = {:02X}",
                         pix,
                         x + col,
@@ -336,7 +365,7 @@ impl VdpState {
             /* Now check whether we had any higher priority sprite rendered */
             if let MoreSettings::SpritePriority { sprites: sp, .. } = m {
                 if sp & (1 << col) != 0 {
-                    debugln!(
+                    debugrd!(
                         "Skipping sprite pixel {pix} at dest coord x={} b1 = {sp:02X}",
                         x + col,
                     );
@@ -430,7 +459,7 @@ impl VdpState {
             let palette1 = b1 & PNAME_CPT != 0;
             let prio = b1 & PNAME_PRI != 0;
             if character != 0 {
-                debugln!(
+                debugrd!(
                     "BG src {}x{} dest {}x{} Pattern: {:03X} @{:04X} (base @{:04X} character {:03X} revh {} revv {} pallette1 {} prio {}",
                     src_x, scroll_start_y - ch_start_y, x, line,
                     ch, addr, pattern_base,
@@ -475,7 +504,7 @@ impl VdpState {
                 break;
             }
         }
-        debugln!("L{line:3}priority map: {:?}", priorities);
+        debugrd!("L{line:3}priority map: {:?}", priorities);
     }
     fn sprite_double_size_src_line(double_size: bool, char_num: u16, ldiff: u8) -> (u16, u8) {
         if !double_size {
@@ -569,7 +598,7 @@ impl VdpState {
             if v.wrapping_sub(1) == 0xD0 {
                 break;
             }
-            debugln!(
+            debugrd!(
                 "Sprite {}, on dest vline: {} v: {} h: {} sprite height: {}",
                 sprite,
                 vcoord_line,
@@ -602,7 +631,7 @@ impl VdpState {
                     continue;
                 }
                 let xprio = char_settings.x.wrapping_sub(char_settings.x_start) as usize;
-                debugln!(
+                debugrd!(
                     "priority for sprite {sprite:2} at {xprio:3}: {:02X}",
                     priorities.get(xprio),
                 );
@@ -680,7 +709,7 @@ impl VdpState {
                     if reg > 10 {
                         panic!("Unexpected high VDP register {:02X}", reg)
                     }
-                    //println!("Writing to vdp reg {reg} {data:02X}");
+                    debugreg!("Writing to vdp reg {reg} {data:02X}");
                     self.reg[reg as usize] = data;
                 }
                 0x00 => {
@@ -689,26 +718,25 @@ impl VdpState {
                     self.dest = Some(WriteDest::Vram);
                     self.vram_buffer = self.vram[self.addr as usize];
                     self.addr = (self.addr + 1) % VRAM_SIZE;
-                    /*
-                    println!(
+                    debugio!(
                         "setup vram read address to {:04X} and preloaded {:02X}",
-                        self.addr, self.vram_buffer
+                        self.addr,
+                        self.vram_buffer
                     );
-                    */
                 }
                 0x40 => {
                     //write
                     self.addr = (data as u16 | ((val as u16) << 8)) % VRAM_SIZE;
                     self.dest = Some(WriteDest::Vram);
-                    //println!("setup vram write address {:04X}", self.addr);
+                    debugio!("setup vram write address {:04X}", self.addr);
                 }
                 0xC0 => {
                     // cram address setup
                     if val != 0xC0 {
-                        println!("VDP cram address setup: {} != 0xC0", val);
+                        debugio!("VDP cram address setup: {} != 0xC0", val);
                     }
                     if data >= 64 {
-                        println!("VDP cram data write: {} >= 64", val);
+                        debugio!("VDP cram data write: {} >= 64", val);
                     }
                     self.addr = data as u16 % CRAM_SIZE;
                     self.dest = Some(WriteDest::Cram);
@@ -750,24 +778,27 @@ impl VdpState {
         }
         match dest {
             Some(WriteDest::Vram) => {
-                /*
-                println!(
-                    "Writing to vram address {addr} <--- {val} (old: {})",
+                debugio!(
+                    "Writing to vram address {addr:04X} <--- {val:02X} (old: {:02X})",
                     ram[addr]
                 );
-                */
                 ram[addr] = val;
                 self.vram_buffer = val;
                 self.addr = (self.addr + 1) % VRAM_SIZE;
             }
             Some(WriteDest::Cram) => {
                 if addr & 1 == 0 {
-                    //println!("Upper CRAM byte set: {:02X}", val);
+                    debugio!("Upper CRAM byte set: {:02X}", val);
                     self.cram_byte1 = Some(val);
                 } else {
                     ram[addr - 1] = cram_byte1.unwrap();
                     ram[addr] = val & 0x0F;
-                    //println!("Written to CRAM: {:02X}{:02X}", ram[addr], ram[addr - 1]);
+                    debugio!(
+                        "Written to CRAM {:02X} <--- {:02X}{:02X}",
+                        addr - 1,
+                        ram[addr],
+                        ram[addr - 1]
+                    );
                 }
                 self.addr = (self.addr + 1) % CRAM_SIZE;
             }
@@ -795,12 +826,10 @@ impl VdpState {
             ));
         }
         let val = self.vram_buffer;
-        /*
-        println!(
+        debugio!(
             "Reading from vram address {addr} : {val} (effective: {})",
             self.vram[addr]
         );
-        */
         self.vram_buffer = self.vram[self.addr as usize];
         self.addr = (self.addr + 1) % VRAM_SIZE;
 
@@ -926,7 +955,7 @@ impl Vdp {
     }
     fn _blank(state: &VdpState, pixels: &mut [u8], render_area: RenderArea) {
         let bc = state.rgb(32, state.reg[7]);
-        debugln!("Filling with backdrop color {:?}", bc);
+        debugrd!("Filling with backdrop color {:?}", bc);
         let ranges = if let RenderArea::VisibleOnly = render_area {
             (0..VISIBLE_PIXEL_HEIGHT, 0..VISIBLE_PIXEL_WIDTH)
         } else {
@@ -959,7 +988,7 @@ impl io::Device for Vdp {
         match addr & 0xFF {
             VCOUNTER_READ => {
                 let vcounter = state.v_counter;
-                //println!("v counter read: {vcounter:02X}");
+                debugreg!("v counter read: {vcounter:02X}");
                 Ok(vcounter)
             }
             HCOUNTER_READ => {
