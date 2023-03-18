@@ -1445,7 +1445,11 @@ pub fn run_cached(
         let disas_target = s.mem.fetch_range_safe(s.r.PC, 4);
         if let Some(op) = c.disas(disas_target) {
             if debug {
-                println!("{:04X}: {:?}", s.r.PC, op);
+                if s.halted {
+                    print!(".");
+                } else {
+                    print!("\n{:04X}: {:?} ", s.r.PC, op);
+                }
             }
             tstates_ran += run_op(s, &op)?;
         } else {
