@@ -159,8 +159,9 @@ struct CharSettings {
 #[derive(Debug, PartialEq)]
 enum MoreSettings {
     BgSettings {
-        rvh: bool, // character is reversed horizontally
-        rvv: bool, // character is reversed vertically
+        rvh: bool,      // character is reversed horizontally
+        rvv: bool,      // character is reversed vertically
+        palette1: bool, // character uses palette 1 instead of 0
         #[cfg(feature = "pattern_debug")]
         bg_num: u16,
     },
@@ -305,10 +306,12 @@ impl VdpState {
                 ((self.reg[6] as usize) & 0x4) << 11
             }
         };
-        let palette_base = match sprite {
-            false => 0,
-            true => 32,
-        };
+        let palette_base =
+            if sprite || matches!(m, MoreSettings::BgSettings {palette1, ..} if palette1) {
+                32
+            } else {
+                0
+            };
         debugrd!(
             "{} char {}: @{:04X} : {} {}x{} (char line length: {}) from ({}->{})x{}",
             if sprite { "Sprite" } else { "BG" },
@@ -485,6 +488,7 @@ impl VdpState {
                 MoreSettings::BgSettings {
                     rvh,
                     rvv,
+                    palette1,
                     #[cfg(feature = "pattern_debug")]
                     bg_num: ch,
                 },
@@ -945,6 +949,7 @@ impl Vdp {
                         MoreSettings::BgSettings {
                             rvh: false,
                             rvv: false,
+                            palette1: false,
                         }
                     } else {
                         MoreSettings::SpritePriority { bg: 0, sprites: 0 }
