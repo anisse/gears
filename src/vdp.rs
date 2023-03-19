@@ -305,7 +305,7 @@ impl VdpState {
                 ((self.reg[6] as usize) & 0x4) << 11
             }
         };
-        let pallette_base = match sprite {
+        let palette_base = match sprite {
             false => 0,
             true => 32,
         };
@@ -314,7 +314,7 @@ impl VdpState {
             if sprite { "Sprite" } else { "BG" },
             c.char_num,
             base,
-            pallette_base,
+            palette_base,
             c.x,
             c.y,
             c.line_length,
@@ -372,7 +372,7 @@ impl VdpState {
                     continue;
                 }
             }
-            let (color_r, color_g, color_b) = self.rgb(pallette_base, code);
+            let (color_r, color_g, color_b) = self.rgb(palette_base, code);
 
             let line_length = c.line_length as usize * CHAR_SIZE as usize;
             let pix_size = 4; // 4 bytes per pixels, one for each component
