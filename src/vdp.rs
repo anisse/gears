@@ -772,6 +772,9 @@ impl VdpState {
             Some(WriteDest::Cram) => &mut self.cram,
             None => return Err("No VDP write dest".to_string()),
         };
+        if let Some(b1) = self.cmd_byte1 {
+            debugio!("Warning! Writing to {dest:?} with half-setup address lower byte {b1:02X}");
+        }
         if addr > ram.len() {
             return Err(format!(
                 "VDP access to {:?} address too high: {:04X} / {:04X}",
