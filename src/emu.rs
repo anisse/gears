@@ -1,4 +1,6 @@
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 use crate::cpu;
 use crate::io;
@@ -37,6 +39,7 @@ impl From<Button> for joystick::Button {
     }
 }
 
+pub type AudioCallback = Box<dyn FnMut(&mut [f32]) + Send + 'static>;
 struct DebugIO {}
 impl io::Device for DebugIO {
     fn out(&self, addr: u16, val: u8) -> Result<(), String> {
@@ -80,6 +83,7 @@ pub struct Emulator {
     devs: Devices,
     render_area: vdp::RenderArea,
     over_cycles: usize,
+    audio_phase: std::sync::Arc<std::sync::Mutex<usize>>,
 }
 
 struct Devices {
@@ -113,6 +117,7 @@ impl Emulator {
                 vdp::RenderArea::EffectiveArea
             },
             over_cycles: 0,
+            audio_phase: Arc::new(Mutex::new(0)),
         };
         emu.cpu.mem = mem::Memory::init(mem::Mapper::SegaGG {
             rom,
@@ -190,5 +195,38 @@ impl Emulator {
             Button::Start => (*self.devs.sys).set_start_button(false),
             _ => (*self.devs.joy).set_button(button.into(), false),
         }
+    }
+    pub fn audio_callback(&mut self) -> AudioCallback {
+        let audio_ctx = Arc::clone(&self.audio_phase);
+        Box::new(move |data: &mut [f32]| Emulator::audio_step(audio_ctx.clone(), data))
+    }
+    //TODO: add sample rate, format, channels
+    fn audio_step(audio_phase: Arc<Mutex<usize>>, data: &mut [f32]) {
+        const SAMPLE_RATE: usize = 44100;
+        let channels = 2;
+        let mut audio_phase = audio_phase.lock().unwrap();
+        const fn gcd(mut a: usize, mut b: usize) -> usize {
+            while a != b {
+                if a > b {
+                    a -= b;
+                } else {
+                    b -= a;
+                }
+            }
+            a
+        }
+        const fn lcm(a: usize, b: usize) -> usize {
+            a / gcd(a, b) * b
+        }
+        const FREQ: usize = 440;
+        for (i, s) in data.iter_mut().enumerate() {
+            let val = ((*audio_phase + i) * (FREQ) * 2) / (SAMPLE_RATE * channels);
+            *s = (val % 2) as f32 / 3.0 - 1.0 / 6.0;
+        }
+        *audio_phase += data.len();
+        const PHASEM: usize = lcm(FREQ, SAMPLE_RATE); // XXX: this does not take channels
+                                                      // into account
+        *audio_phase %= PHASEM;
+        //println!("{data:?}");
     }
 }

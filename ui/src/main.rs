@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use gilrs::Gilrs;
 use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
@@ -55,6 +56,8 @@ fn main() -> Result<(), String> {
     }
 
     let mut emu = emu::Emulator::init(data, true);
+    let audio_stream = audio_init(emu.audio_callback())?;
+    audio_stream.play().unwrap();
 
     let mut run = true;
     let mut step = false;
@@ -62,10 +65,9 @@ fn main() -> Result<(), String> {
         // Draw the current frame
         match event {
             Event::RedrawRequested(_) => {
-                //emulator.draw(pixels.get_frame());
                 if pixels
                     .render()
-                    .map_err(|e| format!("pixels.render() failed: {e}"))
+                    .map_err(|e| println!("pixels.render() failed: {e}"))
                     .is_err()
                 {
                     *control_flow = ControlFlow::Exit;
@@ -92,7 +94,9 @@ fn main() -> Result<(), String> {
                             step = true;
                         }
                     }
-                    _ => handle_key(&mut emu, input),
+                    _ => {
+                        handle_key(&mut emu, input);
+                    }
                 },
                 WindowEvent::Resized(size) => {
                     pixels.resize_surface(size.width, size.height);
@@ -161,4 +165,61 @@ fn handle_key(emu: &mut emu::Emulator, input: &winit::event::KeyboardInput) {
         ElementState::Released => emu::Emulator::release,
     };
     emu_action(emu, button)
+}
+
+fn audio_init(mut audio_cb: emu::AudioCallback) -> Result<cpal::Stream, String> {
+    let audio_host = cpal::default_host();
+    let audio_device = audio_host
+        .default_output_device()
+        .ok_or_else(|| "cannot get default audio output device".to_string())?;
+    /*
+    let audio_configs = audio_device.supported_output_configs().map_err(|e| {
+        format!(
+            "no supported config for device {:?}: {e}",
+            audio_device.name()
+        )
+    })?;
+    println!(
+        "default out conf: {:?}",
+        audio_device.default_output_config()
+    );
+    */
+    let audio_config = audio_device
+        .default_output_config()
+        .map_err(|e| format!("output config error: {e}"))?;
+    let channels = audio_config.channels() as usize;
+    let sample_rate = audio_config.sample_rate().0 as usize;
+    if sample_rate != 44100 {
+        return Err(format!("Unsupported sample_rate: {sample_rate}"));
+    }
+    if channels != 2 {
+        return Err(format!("Only two channels are supported, not: {channels}"));
+    }
+    let supported_buffer_size = audio_config.buffer_size().clone();
+    println!("Possible sizes: {supported_buffer_size:?}");
+    let mut stream_config: cpal::StreamConfig = audio_config.into();
+    let default_buffer_size = 736; // ~ 16ms buffer, about a frame. This is a manually rounded-up
+                                   // buffer
+    stream_config.buffer_size = cpal::BufferSize::Fixed(match supported_buffer_size {
+        cpal::SupportedBufferSize::Range { min, .. } => {
+            if min > default_buffer_size {
+                min
+            } else {
+                default_buffer_size
+            }
+        }
+        cpal::SupportedBufferSize::Unknown => default_buffer_size,
+    } as cpal::FrameCount);
+    let audio_stream = audio_device
+        .build_output_stream(
+            &stream_config,
+            move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                audio_cb(data);
+            },
+            move |_err| {},
+            None,
+        )
+        .map_err(|e| format!("could not start stream: {e}"))?;
+
+    Ok(audio_stream)
 }
