@@ -39,8 +39,7 @@ fn main() -> Result<(), String> {
         .map_err(|e| format!("pixels buffer init: {e}"))?
     };
 
-    let mut gilrs =
-        Gilrs::new().map_err(|e| format!("cannot init gilrs gamepad library: {}", e))?;
+    let mut gilrs = Gilrs::new().map_err(|e| format!("cannot init gilrs gamepad library: {e}"))?;
 
     let args: Vec<String> = env::args().collect();
     let file = args.get(1).expect("needs an argument");
@@ -58,10 +57,14 @@ fn main() -> Result<(), String> {
 
     let mut emu = emu::Emulator::init(data, true);
     let audio_stream = audio_init(emu.audio_callback())?;
-    audio_stream.play().unwrap();
+    audio_stream
+        .play()
+        .map_err(|e| format!("cannot play stream: {e}"))?;
 
-    let mut run = true;
-    let mut step = false;
+    let mut state = EmuLoop {
+        running: true,
+        stepping: false,
+    };
     event_loop.run(move |event, _, control_flow| {
         // Draw the current frame
         match event {
@@ -87,12 +90,12 @@ fn main() -> Result<(), String> {
                     }
                     Some(VirtualKeyCode::Space) => {
                         if input.state == ElementState::Pressed {
-                            run = !run;
+                            state.running = !state.running;
                         }
                     }
                     Some(VirtualKeyCode::LControl) => {
                         if input.state == ElementState::Pressed {
-                            step = true;
+                            state.stepping = true;
                         }
                     }
                     _ => {
@@ -106,25 +109,21 @@ fn main() -> Result<(), String> {
             },
             Event::MainEventsCleared => {
                 // Update internal state and request a redraw
-                //println!("Stepping");
-                while let Some(gilrs::Event { event, .. }) = gilrs.next_event() {
-                    handle_joystick_event(&mut emu, event);
+                joystick_events(&mut emu, &mut gilrs);
+                if state.main_events_cleared(&mut emu, &mut pixels) {
+                    window.request_redraw();
                 }
-
-                if run || step {
-                    loop {
-                        if emu.step(pixels.get_frame()) {
-                            break;
-                        }
-                    }
-                    step = false;
-                }
-                window.request_redraw();
             }
             _ => {}
         }
         print!("");
     });
+}
+
+fn joystick_events(emu: &mut emu::Emulator, gilrs: &mut Gilrs) {
+    while let Some(gilrs::Event { event, .. }) = gilrs.next_event() {
+        handle_joystick_event(emu, event);
+    }
 }
 
 fn handle_joystick_event(emu: &mut emu::Emulator, ev: gilrs::EventType) {
@@ -223,4 +222,24 @@ fn audio_init(mut audio_cb: emu::AudioCallback) -> Result<cpal::Stream, String> 
         .map_err(|e| format!("could not start stream: {e}"))?;
 
     Ok(audio_stream)
+}
+
+struct EmuLoop {
+    running: bool,
+    stepping: bool,
+}
+
+impl EmuLoop {
+    fn main_events_cleared(&mut self, emu: &mut emu::Emulator, pixels: &mut Pixels) -> bool {
+        if self.running || self.stepping {
+            loop {
+                if emu.step(pixels.get_frame()) {
+                    break;
+                }
+            }
+            self.stepping = false;
+            return true;
+        }
+        false
+    }
 }
