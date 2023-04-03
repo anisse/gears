@@ -16,13 +16,10 @@ use winit::window::WindowBuilder;
 
 use gears::emu;
 
-const WIDTH: u32 = 20 * 8;
-const HEIGHT: u32 = 18 * 8;
-
 fn main() -> Result<(), String> {
     let event_loop = EventLoop::new();
     let window = {
-        let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
+        let size = LogicalSize::new(emu::LCD_WIDTH as f64, emu::LCD_HEIGHT as f64);
         WindowBuilder::new()
             .with_title("Gears")
             .with_inner_size(size)
@@ -34,8 +31,12 @@ fn main() -> Result<(), String> {
     let mut pixels = {
         let window_size = window.inner_size();
         let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
-        Pixels::new(WIDTH, HEIGHT, surface_texture)
-            .map_err(|e| format!("pixels buffer init: {e}"))?
+        Pixels::new(
+            emu::LCD_WIDTH as u32,
+            emu::LCD_HEIGHT as u32,
+            surface_texture,
+        )
+        .map_err(|e| format!("pixels buffer init: {e}"))?
     };
 
     let mut gilrs =
