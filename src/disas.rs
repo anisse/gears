@@ -504,7 +504,7 @@ fn disas_one_byte_mask(ins: u8, opcode: &mut OpCode) -> bool {
             let reg = decode_operand_reg_qq((ins >> 4) & 0x3);
             opcode.ins = Instruction::POP;
             opcode.op1 = Some(Operand::Reg16(reg));
-            opcode.tstates.extend_from_slice(&[4, 4, 3]);
+            opcode.tstates.extend_from_slice(&[4, 3, 3]);
             return true;
         }
         0xC5 => {
@@ -512,7 +512,7 @@ fn disas_one_byte_mask(ins: u8, opcode: &mut OpCode) -> bool {
             let reg = decode_operand_reg_qq((ins >> 4) & 0x3);
             opcode.ins = Instruction::PUSH;
             opcode.op1 = Some(Operand::Reg16(reg));
-            opcode.tstates.extend_from_slice(&[4, 4, 3]);
+            opcode.tstates.extend_from_slice(&[5, 3, 3]);
             return true;
         }
         _ => {}
@@ -820,6 +820,7 @@ fn disas_dd_fd_prefix(ins: &[u8], opcode: &mut OpCode) -> bool {
                 /* Manual fix for LD (IX+d), n */
                 if let Some(Operand::Imm8(ref mut v)) = opcode.op2 {
                     *v = ins[3];
+                    opcode.tstates.remove(5);
                     //opcode.data[3] = ins[3];
                 }
                 return true;
@@ -1084,7 +1085,7 @@ fn disas_two_bytes(ins: &[u8], opcode: &mut OpCode) -> bool {
             };
             opcode
                 .tstates
-                .extend_from_slice(if opcode.op1 == Some(Operand::RegAddr(Reg16::HL)) {
+                .extend_from_slice(if opcode.op2 == Some(Operand::RegAddr(Reg16::HL)) {
                     if insw & 0xFFC0 == 0xCB40 {
                         &[4, 4, 4]
                     } else {

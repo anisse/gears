@@ -293,6 +293,7 @@ fn fuse_tests() {
         end_state.r = t.end_regs;
         end_state.halted = t.end_halted;
         end_state.mem = data.clone();
+        end_state.cycle_counter = t.tstate_ran as u32;
         setup_memory(&t.changed_mem_values, &mut end_state.mem);
         state.mem = data;
         state.io = io::IO::default();

@@ -115,7 +115,7 @@ pub struct State {
     pub mem: mem::Memory,
     pub io: io::IO,
     pending_interrupt: bool,
-    cycle_counter: u32,
+    pub cycle_counter: u32,
 }
 
 impl Regs {
