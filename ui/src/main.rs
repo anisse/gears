@@ -55,8 +55,13 @@ fn main() -> Result<(), String> {
         panic!("Could not read {}: {}", path.display(), why);
     }
 
-    let mut emu = emu::Emulator::init(data, true);
-    let audio_stream = audio_init(emu.audio_callback())?;
+    let (audio_device, stream_config) = audio_init()?;
+    let mut emu = emu::Emulator::init(
+        data,
+        true,
+        emu::AudioConf::new(stream_config.channels, stream_config.sample_rate.0)?,
+    );
+    let audio_stream = audio_init_stream(audio_device, stream_config, emu.audio_callback())?;
     audio_stream
         .play()
         .map_err(|e| format!("cannot play stream: {e}"))?;
@@ -167,7 +172,7 @@ fn handle_key(emu: &mut emu::Emulator, input: &winit::event::KeyboardInput) {
     emu_action(emu, button)
 }
 
-fn audio_init(mut audio_cb: emu::AudioCallback) -> Result<cpal::Stream, String> {
+fn audio_init() -> Result<(cpal::Device, cpal::StreamConfig), String> {
     let audio_host = cpal::default_host();
     let audio_device = audio_host
         .default_output_device()
@@ -210,6 +215,13 @@ fn audio_init(mut audio_cb: emu::AudioCallback) -> Result<cpal::Stream, String> 
         }
         cpal::SupportedBufferSize::Unknown => default_buffer_size,
     } as cpal::FrameCount);
+    Ok((audio_device, stream_config))
+}
+fn audio_init_stream(
+    audio_device: cpal::Device,
+    stream_config: cpal::StreamConfig,
+    mut audio_cb: emu::AudioCallback,
+) -> Result<cpal::Stream, String> {
     let audio_stream = audio_device
         .build_output_stream(
             &stream_config,

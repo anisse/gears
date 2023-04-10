@@ -121,7 +121,7 @@ fn common_test(filename: &Path, cmds: &[TestCommand], result: &[u8]) -> Result<(
     let mut data: Vec<u8> = vec![];
     file.read_to_end(&mut data)
         .map_err(|why| format!("Could not read {}: {}", path.display(), why))?;
-    let mut emu = emu::Emulator::init(data, true);
+    let mut emu = emu::Emulator::init(data, true, emu::AudioConf::new(2, 44100)?);
     let mut pixels = vec![0; emu::LCD_WIDTH * emu::LCD_HEIGHT * 4];
     assert_eq!(pixels.len(), result.len());
     let mut frame = 0;

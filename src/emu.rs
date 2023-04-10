@@ -1,11 +1,11 @@
 use std::rc::Rc;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use crate::cpu;
 use crate::io;
 use crate::joystick;
 use crate::mem;
+use crate::psg;
 use crate::system;
 use crate::vdp;
 
@@ -54,18 +54,8 @@ impl io::Device for DebugIO {
     }
 }
 
-struct Psg {}
-impl io::Device for Psg {
-    fn out(&self, _addr: u16, _val: u8, _: u32) -> Result<(), String> {
-        //println!("Ignored PSG write. @{:04X} {:02X}", _addr, _val);
-        Ok(())
-    }
-    fn input(&self, addr: u16, _: u32) -> Result<u8, String> {
-        panic!("Unsupported PSG read @{:04X}", addr);
-    }
-}
 struct PsgOrVdp {
-    psg: Rc<Psg>,
+    psg: Arc<psg::Psg>,
     vdp: Rc<vdp::Vdp>,
 }
 impl io::Device for PsgOrVdp {
@@ -77,13 +67,15 @@ impl io::Device for PsgOrVdp {
     }
 }
 
+pub use psg::AudioConf;
+
 pub struct Emulator {
     cache: cpu::DisasCache,
     cpu: cpu::State,
     devs: Devices,
     render_area: vdp::RenderArea,
     over_cycles: usize,
-    audio_phase: std::sync::Arc<std::sync::Mutex<usize>>,
+    audio_conf: AudioConf,
 }
 
 struct Devices {
@@ -99,14 +91,14 @@ impl Devices {
             sys: Rc::new(system::System::default()),
             joy: Rc::new(joystick::Joystick::default()),
             pov: Rc::new(PsgOrVdp {
-                psg: Rc::new(Psg {}),
+                psg: Arc::new(psg::Psg::default()),
                 vdp: Rc::new(vdp::Vdp::default()),
             }),
         }
     }
 }
 impl Emulator {
-    pub fn init(rom: Vec<u8>, visible_only: bool) -> Self {
+    pub fn init(rom: Vec<u8>, visible_only: bool, audio_conf: AudioConf) -> Self {
         let mut emu = Self {
             cache: cpu::DisasCache::init(),
             cpu: cpu::init(),
@@ -117,7 +109,7 @@ impl Emulator {
                 vdp::RenderArea::EffectiveArea
             },
             over_cycles: 0,
-            audio_phase: Arc::new(Mutex::new(0)),
+            audio_conf,
         };
         emu.cpu.mem = mem::Memory::init(mem::Mapper::SegaGG {
             rom,
@@ -153,7 +145,7 @@ impl Emulator {
             0x06,
             0x06,
             0xFF00,
-            Rc::clone(&self.devs.pov.psg) as Rc<dyn io::Device>,
+            Rc::new(Arc::clone(&self.devs.pov.psg)) as Rc<dyn io::Device>,
         );
         self.cpu.io.register(
             0,
@@ -197,36 +189,11 @@ impl Emulator {
         }
     }
     pub fn audio_callback(&mut self) -> AudioCallback {
-        let audio_ctx = Arc::clone(&self.audio_phase);
-        Box::new(move |data: &mut [f32]| Emulator::audio_step(audio_ctx.clone(), data))
-    }
-    //TODO: add sample rate, format, channels
-    fn audio_step(audio_phase: Arc<Mutex<usize>>, data: &mut [f32]) {
-        const SAMPLE_RATE: usize = 44100;
-        let channels = 2;
-        let mut audio_phase = audio_phase.lock().unwrap();
-        const fn gcd(mut a: usize, mut b: usize) -> usize {
-            while a != b {
-                if a > b {
-                    a -= b;
-                } else {
-                    b -= a;
-                }
-            }
-            a
-        }
-        const fn lcm(a: usize, b: usize) -> usize {
-            a / gcd(a, b) * b
-        }
-        const FREQ: usize = 440;
-        for (i, s) in data.iter_mut().enumerate() {
-            let val = ((*audio_phase + i) * (FREQ) * 2) / (SAMPLE_RATE * channels);
-            *s = (val % 2) as f32 / 3.0 - 1.0 / 6.0;
-        }
-        *audio_phase += data.len();
-        const PHASEM: usize = lcm(FREQ, SAMPLE_RATE); // XXX: this does not take channels
-                                                      // into account
-        *audio_phase %= PHASEM;
-        //println!("{data:?}");
+        let psg = Arc::clone(&self.devs.pov.psg);
+        let audio_conf = self.audio_conf.clone();
+        Box::new(move |dest: &mut [f32]| {
+            psg.synth_audio_f32(dest, audio_conf.clone())
+                .expect("synth audio failed");
+        })
     }
 }
