@@ -30,7 +30,7 @@ impl System {
     }
 }
 impl io::Device for System {
-    fn out(&self, addr: u16, val: u8) -> Result<(), String> {
+    fn out(&self, addr: u16, val: u8, _: u32) -> Result<(), String> {
         match addr & 0xFF {
             0x0 => {
                 panic!("System write: @{:04X} {:02X}", addr, val);
@@ -56,7 +56,7 @@ impl io::Device for System {
         }
     }
 
-    fn input(&self, addr: u16) -> Result<u8, String> {
+    fn input(&self, addr: u16, _: u32) -> Result<u8, String> {
         match addr & 0xFF {
             0x0 => Ok((!(*self.start_button.borrow() as u8) << 7) | u8::from(&self.region)),
             _ => Err(format!(

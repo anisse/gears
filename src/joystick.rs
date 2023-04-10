@@ -41,7 +41,7 @@ impl Joystick {
     }
 }
 impl io::Device for Joystick {
-    fn out(&self, addr: u16, val: u8) -> Result<(), String> {
+    fn out(&self, addr: u16, val: u8, _: u32) -> Result<(), String> {
         match addr & 0xFF {
             0xDC => {
                 panic!("Joystick write: @{:04X} {:02X}", addr, val);
@@ -53,7 +53,7 @@ impl io::Device for Joystick {
         }
     }
 
-    fn input(&self, addr: u16) -> Result<u8, String> {
+    fn input(&self, addr: u16, _: u32) -> Result<u8, String> {
         match addr & 0xFF {
             0xDC => Ok(self.get_dc()),
             0xDD => Ok(self.get_dd()),

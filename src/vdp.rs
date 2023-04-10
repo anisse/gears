@@ -980,7 +980,7 @@ impl Vdp {
 }
 
 impl io::Device for Vdp {
-    fn out(&self, addr: u16, val: u8) -> Result<(), String> {
+    fn out(&self, addr: u16, val: u8, _: u32) -> Result<(), String> {
         let mut state = self.state.borrow_mut();
         match addr & 0xFF {
             VDP_CMD => state.write_cmd(val),
@@ -991,7 +991,7 @@ impl io::Device for Vdp {
             )),
         }
     }
-    fn input(&self, addr: u16) -> Result<u8, String> {
+    fn input(&self, addr: u16, _: u32) -> Result<u8, String> {
         let mut state = self.state.borrow_mut();
         match addr & 0xFF {
             VCOUNTER_READ => {
@@ -1042,7 +1042,7 @@ fn run_step() {
     let vdp = Vdp::default();
     let mut pixels = vec![0; 32 * 8 * 28 * 8 * 4];
     vdp.step(&mut pixels, RenderArea::EffectiveArea);
-    assert_eq!(vdp.input(0x7E), Ok(1_u8),);
+    assert_eq!(vdp.input(0x7E, 0), Ok(1_u8),);
 }
 
 #[test]
@@ -1202,53 +1202,53 @@ fn split_io() {
 
     let vdp = Vdp::default();
     // Normal write:
-    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
-    assert_eq!(vdp.out(VDP_CMD, 0x40), Ok(()));
-    assert_eq!(vdp.out(VDP_DATA, 0xAB), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x40, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xAB, 0), Ok(()));
 
     // Read back
-    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
-    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
-    assert_eq!(vdp.input(VDP_DATA), Ok(0xAB));
+    assert_eq!(vdp.out(VDP_CMD, 0, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0, 0), Ok(()));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0xAB));
 
     //Reset Vdp
     let vdp = Vdp::default();
     // Read setup
-    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
-    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0, 0), Ok(()));
     // But do a write
-    assert_eq!(vdp.out(VDP_DATA, 0x42), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0x42, 0), Ok(()));
 
     // Re-read immediately (from the buffer)
-    assert_eq!(vdp.input(VDP_DATA), Ok(0x42));
-    assert_eq!(vdp.input(VDP_DATA), Ok(0));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0x42));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0));
 
     // Now read back from 0
-    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
-    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
-    assert_eq!(vdp.input(VDP_DATA), Ok(0));
-    assert_eq!(vdp.input(VDP_DATA), Ok(0x42));
+    assert_eq!(vdp.out(VDP_CMD, 0, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0, 0), Ok(()));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0x42));
 
     //Reset Vdp
     let vdp = Vdp::default();
     // write some data first
-    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
-    assert_eq!(vdp.out(VDP_CMD, 0x40), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x40, 0), Ok(()));
 
-    assert_eq!(vdp.out(VDP_DATA, 0xA1), Ok(()));
-    assert_eq!(vdp.out(VDP_DATA, 0xB2), Ok(()));
-    assert_eq!(vdp.out(VDP_DATA, 0xC3), Ok(()));
-    assert_eq!(vdp.out(VDP_DATA, 0xD4), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xA1, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xB2, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xC3, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xD4, 0), Ok(()));
 
     // then do a write setup
-    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
-    assert_eq!(vdp.out(VDP_CMD, 0x40), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x40, 0), Ok(()));
 
     // But read instead
-    assert_eq!(vdp.input(VDP_DATA), Ok(0xD4));
-    assert_eq!(vdp.input(VDP_DATA), Ok(0xA1));
-    assert_eq!(vdp.input(VDP_DATA), Ok(0xB2));
-    assert_eq!(vdp.input(VDP_DATA), Ok(0xC3));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0xD4));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0xA1));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0xB2));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0xC3));
 }
 
 #[test]
@@ -1257,45 +1257,45 @@ fn read_wrap() {
     let vdp = Vdp::default();
 
     // write some data first
-    assert_eq!(vdp.out(VDP_CMD, 0xFE), Ok(()));
-    assert_eq!(vdp.out(VDP_CMD, 0x7F), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0xFE, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x7F, 0), Ok(()));
 
-    assert_eq!(vdp.out(VDP_DATA, 0xA1), Ok(()));
-    assert_eq!(vdp.out(VDP_DATA, 0xB2), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xA1, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xB2, 0), Ok(()));
 
     // address 0 (we are not testing write wrapping)
-    assert_eq!(vdp.out(VDP_CMD, 0), Ok(()));
-    assert_eq!(vdp.out(VDP_CMD, 0x40), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x40, 0), Ok(()));
 
-    assert_eq!(vdp.out(VDP_DATA, 0xC3), Ok(()));
-    assert_eq!(vdp.out(VDP_DATA, 0xD4), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xC3, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xD4, 0), Ok(()));
 
     // read the data
-    assert_eq!(vdp.out(VDP_CMD, 0xFE), Ok(()));
-    assert_eq!(vdp.out(VDP_CMD, 0x3F), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0xFE, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x3F, 0), Ok(()));
 
-    assert_eq!(vdp.input(VDP_DATA), Ok(0xA1));
-    assert_eq!(vdp.input(VDP_DATA), Ok(0xB2));
-    assert_eq!(vdp.input(VDP_DATA), Ok(0xC3));
-    assert_eq!(vdp.input(VDP_DATA), Ok(0xD4));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0xA1));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0xB2));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0xC3));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0xD4));
 
     // Now the bug we had: we don't want wrapping at 1024
     let vdp = Vdp::default();
     // write some data first
-    assert_eq!(vdp.out(VDP_CMD, 0xFE), Ok(()));
-    assert_eq!(vdp.out(VDP_CMD, 0x43), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0xFE, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x43, 0), Ok(()));
 
-    assert_eq!(vdp.out(VDP_DATA, 0xA1), Ok(()));
-    assert_eq!(vdp.out(VDP_DATA, 0xB2), Ok(()));
-    assert_eq!(vdp.out(VDP_DATA, 0xC3), Ok(()));
-    assert_eq!(vdp.out(VDP_DATA, 0xD4), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xA1, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xB2, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xC3, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_DATA, 0xD4, 0), Ok(()));
 
     // read the data
-    assert_eq!(vdp.out(VDP_CMD, 0xFE), Ok(()));
-    assert_eq!(vdp.out(VDP_CMD, 0x03), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0xFE, 0), Ok(()));
+    assert_eq!(vdp.out(VDP_CMD, 0x03, 0), Ok(()));
 
-    assert_eq!(vdp.input(VDP_DATA), Ok(0xA1));
-    assert_eq!(vdp.input(VDP_DATA), Ok(0xB2));
-    assert_eq!(vdp.input(VDP_DATA), Ok(0xC3));
-    assert_eq!(vdp.input(VDP_DATA), Ok(0xD4));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0xA1));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0xB2));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0xC3));
+    assert_eq!(vdp.input(VDP_DATA, 0), Ok(0xD4));
 }

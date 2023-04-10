@@ -95,10 +95,10 @@ fn z80common(prog: &[u8]) {
 struct ZxSpectrumIODevice {}
 
 impl io::Device for ZxSpectrumIODevice {
-    fn out(&self, _: u16, _: u8) -> std::result::Result<(), std::string::String> {
+    fn out(&self, _: u16, _: u8, _: u32) -> std::result::Result<(), std::string::String> {
         Ok(())
     }
-    fn input(&self, addr: u16) -> std::result::Result<u8, std::string::String> {
+    fn input(&self, addr: u16, _: u32) -> std::result::Result<u8, std::string::String> {
         Ok((addr >> 8) as u8)
     }
 }

@@ -115,6 +115,7 @@ pub struct State {
     pub mem: mem::Memory,
     pub io: io::IO,
     pending_interrupt: bool,
+    cycle_counter: u32,
 }
 
 impl Regs {
@@ -579,7 +580,7 @@ fn input_block(s: &mut State, inc: i8) -> Result<(), String> {
     let hl = s.r.get_regpair(RegPair::HL);
     let addr = s.r.get_regpair(RegPair::BC);
     set_conditions_io_block_base(&mut s.r);
-    let val = s.io.input(addr)?;
+    let val = s.io.input(addr, s.cycle_counter)?;
     s.mem.set_u8(hl, val);
     let c = s.r.C.wrapping_add(inc as u8);
     set_conditions_io_block(&mut s.r, val, c);
@@ -594,7 +595,7 @@ fn output_block(s: &mut State, inc: i8) -> Result<(), String> {
     let hl = s.r.get_regpair(RegPair::HL);
     let val = s.mem.fetch_u8(hl);
     let addr = s.r.get_regpair(RegPair::BC);
-    s.io.out(addr, val)?;
+    s.io.out(addr, val, s.cycle_counter)?;
     set_conditions_io_block_base(&mut s.r);
     s.r.set_regpair(RegPair::HL, hl.wrapping_add(inc as u16));
     let l = s.r.L;
@@ -1239,14 +1240,14 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                     _ => s.r.A,
                 };
                 let addr = addr as u16 | ((s.r.A as u16) << 8);
-                s.io.out(addr, val)?;
+                s.io.out(addr, val, s.cycle_counter)?;
                 // MEMPTR_low = (port + 1) & #FF,  MEMPTR_hi = A
                 let low = addr.wrapping_add(1);
                 s.r.MEMPTR = low & 0xFF | ((val as u16) << 8);
             } else if Operand::RegIOAddr(disas::Reg8::C) == op1 {
                 let val = get_op8(s, op2);
                 let addr = s.r.get_regpair(RegPair::BC);
-                s.io.out(addr, val)?;
+                s.io.out(addr, val, s.cycle_counter)?;
 
                 // MEMPTR = BC + 1
                 s.r.MEMPTR = addr.wrapping_add(1);
@@ -1263,13 +1264,13 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                 let low = addr.wrapping_add(1) as u16;
                 let addr = addr as u16 | ((s.r.A as u16) << 8);
                 s.r.MEMPTR = low & 0xFF | ((s.r.A as u16) << 8);
-                let val = s.io.input(addr)?;
+                let val = s.io.input(addr, s.cycle_counter)?;
                 set_op8(s, op1, val);
             } else if Operand::RegIOAddr(disas::Reg8::C) == op2 {
                 // MEMPTR = BC + 1
                 let addr = s.r.get_regpair(RegPair::BC);
                 s.r.MEMPTR = addr.wrapping_add(1);
-                let val = s.io.input(addr)?;
+                let val = s.io.input(addr, s.cycle_counter)?;
                 if op.op3 != Some(Operand::IgnoreIO) {
                     set_op8(s, op1, val);
                 }
@@ -1386,6 +1387,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         s.r.PC += op.length as u16;
     }
 
+    s.cycle_counter += op_len as u32;
     Ok(op_len)
 }
 

@@ -42,12 +42,12 @@ impl From<Button> for joystick::Button {
 pub type AudioCallback = Box<dyn FnMut(&mut [f32]) + Send + 'static>;
 struct DebugIO {}
 impl io::Device for DebugIO {
-    fn out(&self, addr: u16, val: u8) -> Result<(), String> {
+    fn out(&self, addr: u16, val: u8, _: u32) -> Result<(), String> {
         println!("Unknown I/O write: @{:04X} {:02X} ", addr, val);
         panic!();
         //Ok(())
     }
-    fn input(&self, addr: u16) -> Result<u8, String> {
+    fn input(&self, addr: u16, _: u32) -> Result<u8, String> {
         println!("Unknown I/O read: @{:04X}, sending 0", addr);
         panic!();
         //Ok(0)
@@ -56,11 +56,11 @@ impl io::Device for DebugIO {
 
 struct Psg {}
 impl io::Device for Psg {
-    fn out(&self, _addr: u16, _val: u8) -> Result<(), String> {
+    fn out(&self, _addr: u16, _val: u8, _: u32) -> Result<(), String> {
         //println!("Ignored PSG write. @{:04X} {:02X}", _addr, _val);
         Ok(())
     }
-    fn input(&self, addr: u16) -> Result<u8, String> {
+    fn input(&self, addr: u16, _: u32) -> Result<u8, String> {
         panic!("Unsupported PSG read @{:04X}", addr);
     }
 }
@@ -69,11 +69,11 @@ struct PsgOrVdp {
     vdp: Rc<vdp::Vdp>,
 }
 impl io::Device for PsgOrVdp {
-    fn out(&self, addr: u16, val: u8) -> Result<(), String> {
-        self.psg.out(addr, val)
+    fn out(&self, addr: u16, val: u8, cycle: u32) -> Result<(), String> {
+        self.psg.out(addr, val, cycle)
     }
-    fn input(&self, addr: u16) -> Result<u8, String> {
-        self.vdp.input(addr)
+    fn input(&self, addr: u16, cycle: u32) -> Result<u8, String> {
+        self.vdp.input(addr, cycle)
     }
 }
 

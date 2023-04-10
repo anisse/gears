@@ -1,9 +1,8 @@
 use std::{fmt::Debug, rc::Rc};
 
 pub trait Device {
-    // XXX: maybe use upper 8 bits of address bus ? we don't need it for now
-    fn out(&self, addr: u16, val: u8) -> Result<(), String>;
-    fn input(&self, addr: u16) -> Result<u8, String>;
+    fn out(&self, addr: u16, val: u8, cycle: u32) -> Result<(), String>;
+    fn input(&self, addr: u16, cycle: u32) -> Result<u8, String>;
 }
 
 #[derive(Clone)]
@@ -31,21 +30,21 @@ impl IO {
             dev,
         });
     }
-    pub fn out(&self, addr: u16, val: u8) -> Result<(), String> {
+    pub fn out(&self, addr: u16, val: u8, cycle: u32) -> Result<(), String> {
         let dev = self
             .devs
             .iter()
             .find(|&x| addr & !x.ignore_mask >= x.start && addr & !x.ignore_mask <= x.end)
             .ok_or(format!("Out address {:04X} to unknown device", addr))?;
-        dev.dev.out(addr, val)
+        dev.dev.out(addr, val, cycle)
     }
-    pub fn input(&self, addr: u16) -> Result<u8, String> {
+    pub fn input(&self, addr: u16, cycle: u32) -> Result<u8, String> {
         let dev = self
             .devs
             .iter()
             .find(|&x| addr & !x.ignore_mask >= x.start && addr & !x.ignore_mask <= x.end)
             .ok_or(format!("In address {:04X} to unknown device", addr))?;
-        dev.dev.input(addr)
+        dev.dev.input(addr, cycle)
     }
 }
 
