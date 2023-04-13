@@ -6,11 +6,43 @@ const PSG_CMD: u16 = 0x7F;
 const PSG_STEREO: u16 = 0x06;
 const CPU_CLOCK_HZ: u32 = 3579545;
 
+const REG_MASK: u8 = 0b1000_0000;
+
+const REG_TONE_MASK: u8 = 0b1001_0000;
+const REG_TONE_FREQ: u8 = 0b1000_0000;
+const REG_TONE_LEVEL: u8 = 0b1001_0000;
+const REG_TONE_NUM_MASK: u8 = 0b0110_0000;
+const REG_TONE_0: u8 = 0b0000_0000;
+const REG_TONE_1: u8 = 0b0010_0000;
+const REG_TONE_2: u8 = 0b0100_0000;
+
+const REG_NOISE_MASK: u8 = 0b1111_0000;
+const REG_NOISE: u8 = 0b1110_0000;
+const REG_NOISE_TYPE_MASK: u8 = 0b0000_0100;
+const REG_NOISE_NF_MASK: u8 = 0b0000_0011;
+
+const REG_LATCH_MASK: u8 = 0b0111_0000;
+
+#[derive(Default)]
+enum Latch {
+    #[default]
+    Tone0Freq = 0 << 4,
+    Tone0Level = 1 << 4,
+    Tone1Freq = 2 << 4,
+    Tone1Level = 3 << 4,
+    Tone2Freq = 4 << 4,
+    Tone2Level = 5 << 4,
+    NoiseCtrl = 6 << 4,
+    NoiseLevel = 7 << 4,
+}
+
 #[derive(Default)]
 struct Tone {
     freq: usize,
     phase: usize,
     level: u16,
+    right: bool,
+    left: bool,
 }
 
 impl Tone {
@@ -44,6 +76,8 @@ impl Tone {
 #[derive(Default)]
 struct Noise {
     state: u16,
+    right: bool,
+    left: bool,
     //TODO: type ?
 }
 
@@ -51,7 +85,7 @@ struct Noise {
 pub struct Synth {
     tone: [Tone; 3],
     noise: Noise,
-    left_right: u8,
+    latch: Latch,
 }
 
 #[derive(Debug, Clone)]
@@ -74,24 +108,58 @@ impl AudioConf {
     }
 }
 
+impl Synth {
+    fn update_stereo(&mut self, channels: u8) {
+        for (i, t) in self.tone.iter_mut().enumerate() {
+            t.right = (channels & (1 << i)) != 0;
+            t.left = (channels & (1 << (i + 4))) != 0;
+        }
+        self.noise.right = (channels & (1 << 3)) != 0;
+        self.noise.left = (channels & (1 << (3 + 4))) != 0;
+    }
+    fn update_reg(&mut self, cmd: u16) {}
+    fn audio_f32(&mut self, dest: &mut [f32], audio_conf: AudioConf) {
+        self.tone[0].freq = 440;
+        self.tone[0].gen(dest, audio_conf);
+    }
+}
+
 impl PsgState {
     fn synth_audio_f32(&mut self, dest: &mut [f32], audio_conf: AudioConf) {
-        /*
-        for cmd in self.cmds {
+        let mut current_sample = 0;
+        while let Some(cmd) = self.cmds.pop() {
             match cmd {
-                Cmd::Wait(_) => todo!(),
-                Cmd::Write(_) => todo!(),
-                Cmd::WriteStereo(_) => todo!(),
+                Cmd::Write(val) => {}
+                Cmd::WriteStereo(val) => self.synth.update_stereo(val),
+                Cmd::Wait(cycles) => {
+                    // synth
+                    let samples: usize =
+                        (cycles * audio_conf.sample_rate * audio_conf.channels as u32) as usize
+                            / CPU_CLOCK_HZ as usize;
+                    let end = if current_sample + samples > dest.len() {
+                        self.cmds
+                            .push(Cmd::Wait((samples - (dest.len() - current_sample)) as u32));
+                        dest.len()
+                    } else {
+                        current_sample + samples
+                    };
+                    self.synth
+                        .audio_f32(&mut dest[current_sample..end], audio_conf.clone());
+                    current_sample = end;
+                }
+            }
+            if current_sample == dest.len() {
+                break;
             }
         }
-        */
-        self.synth.tone[0].freq = 440;
-        self.synth.tone[0].gen(dest, audio_conf);
+        if current_sample < dest.len() {
+            self.synth
+                .audio_f32(&mut dest[current_sample..], audio_conf);
+        }
 
-        println!("Got {} cmds", self.cmds.len());
-        self.cmds.clear();
+        println!("{} cmds remaining", self.cmds.len());
+        //self.cmds.clear();
     }
-    fn render_samples_f32_dual_channel(&mut self, dest: &mut [f32]) {}
 }
 
 // Intentionnally structured a bit like the VGM file

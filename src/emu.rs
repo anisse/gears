@@ -188,7 +188,7 @@ impl Emulator {
             _ => (*self.devs.joy).set_button(button.into(), false),
         }
     }
-    pub fn audio_callback(&mut self) -> AudioCallback {
+    pub fn audio_callback(&self) -> AudioCallback {
         let psg = Arc::clone(&self.devs.pov.psg);
         let audio_conf = self.audio_conf.clone();
         Box::new(move |dest: &mut [f32]| {
