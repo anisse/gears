@@ -7,7 +7,10 @@ const PSG_STEREO: u16 = 0x06;
 const CPU_CLOCK_HZ: u32 = 3579545;
 
 const REG_MASK: u8 = 0b1000_0000;
+const REG_DATA_MASK: u8 = 0b0000_1111;
+const DATA_MASK: u8 = 0b0011_1111;
 
+/*
 const REG_TONE_MASK: u8 = 0b1001_0000;
 const REG_TONE_FREQ: u8 = 0b1000_0000;
 const REG_TONE_LEVEL: u8 = 0b1001_0000;
@@ -16,10 +19,11 @@ const REG_TONE_0: u8 = 0b0000_0000;
 const REG_TONE_1: u8 = 0b0010_0000;
 const REG_TONE_2: u8 = 0b0100_0000;
 
-const REG_NOISE_MASK: u8 = 0b1111_0000;
+const REG_NOISE_MASK: u8 = 0b1110_0000;
 const REG_NOISE: u8 = 0b1110_0000;
 const REG_NOISE_TYPE_MASK: u8 = 0b0000_0100;
 const REG_NOISE_NF_MASK: u8 = 0b0000_0011;
+*/
 
 const REG_LATCH_MASK: u8 = 0b0111_0000;
 
@@ -27,20 +31,36 @@ const REG_LATCH_MASK: u8 = 0b0111_0000;
 enum Latch {
     #[default]
     Tone0Freq = 0 << 4,
-    Tone0Level = 1 << 4,
+    Tone0Attn = 1 << 4,
     Tone1Freq = 2 << 4,
-    Tone1Level = 3 << 4,
+    Tone1Attn = 3 << 4,
     Tone2Freq = 4 << 4,
-    Tone2Level = 5 << 4,
+    Tone2Attn = 5 << 4,
     NoiseCtrl = 6 << 4,
-    NoiseLevel = 7 << 4,
+    NoiseAttn = 7 << 4,
+}
+use Latch::*;
+impl From<u8> for Latch {
+    fn from(value: u8) -> Self {
+        match (value & REG_LATCH_MASK) >> 4 {
+            0 => Tone0Freq,
+            1 => Tone0Attn,
+            2 => Tone1Freq,
+            3 => Tone1Attn,
+            4 => Tone2Freq,
+            5 => Tone2Attn,
+            6 => NoiseCtrl,
+            7 => NoiseAttn,
+            _ => unreachable!(),
+        }
+    }
 }
 
 #[derive(Default)]
 struct Tone {
     freq: usize,
     phase: usize,
-    level: u16,
+    attenuation: u8,
     right: bool,
     left: bool,
 }
@@ -71,14 +91,34 @@ impl Tone {
         self.phase %= phasem;
         //println!("{data:?}");
     }
+    fn update_level(&mut self, level: u8) {
+        self.attenuation = level & REG_DATA_MASK;
+    }
+    fn update_freq(&mut self, level: u8) {}
+    fn update_freq_data(&mut self, level: u8) {}
+}
+
+#[derive(Default)]
+enum NoiseType {
+    #[default]
+    White,
+    Periodic,
 }
 
 #[derive(Default)]
 struct Noise {
     state: u16,
+    attenuation: u8,
     right: bool,
     left: bool,
-    //TODO: type ?
+    typ: NoiseType,
+}
+
+impl Noise {
+    fn update_level(&mut self, level: u8) {
+        self.attenuation = level & REG_DATA_MASK;
+    }
+    fn ctrl(&mut self, ctrl: u8) {}
 }
 
 #[derive(Default)]
@@ -117,7 +157,38 @@ impl Synth {
         self.noise.right = (channels & (1 << 3)) != 0;
         self.noise.left = (channels & (1 << (3 + 4))) != 0;
     }
-    fn update_reg(&mut self, cmd: u16) {}
+    fn cmd(&mut self, cmd: u8) {
+        if cmd & REG_MASK != 0 {
+            self.update_reg(cmd);
+        } else {
+            self.update_data(cmd);
+        }
+    }
+    fn update_reg(&mut self, cmd: u8) {
+        self.latch = Latch::from(cmd);
+        match self.latch {
+            Tone0Freq => self.tone[0].update_freq(cmd),
+            Tone0Attn => self.tone[0].update_level(cmd),
+            Tone1Freq => self.tone[1].update_freq(cmd),
+            Tone1Attn => self.tone[1].update_level(cmd),
+            Tone2Freq => self.tone[2].update_freq(cmd),
+            Tone2Attn => self.tone[2].update_level(cmd),
+            NoiseCtrl => self.noise.ctrl(cmd),
+            NoiseAttn => self.noise.update_level(cmd),
+        }
+    }
+    fn update_data(&mut self, cmd: u8) {
+        match self.latch {
+            Tone0Freq => self.tone[0].update_freq_data(cmd),
+            Tone0Attn => self.tone[0].update_level(cmd),
+            Tone1Freq => self.tone[1].update_freq_data(cmd),
+            Tone1Attn => self.tone[1].update_level(cmd),
+            Tone2Freq => self.tone[2].update_freq_data(cmd),
+            Tone2Attn => self.tone[2].update_level(cmd),
+            NoiseCtrl => self.noise.ctrl(cmd),
+            NoiseAttn => self.noise.update_level(cmd),
+        }
+    }
     fn audio_f32(&mut self, dest: &mut [f32], audio_conf: AudioConf) {
         self.tone[0].freq = 440;
         self.tone[0].gen(dest, audio_conf);
@@ -129,7 +200,7 @@ impl PsgState {
         let mut current_sample = 0;
         while let Some(cmd) = self.cmds.pop() {
             match cmd {
-                Cmd::Write(val) => {}
+                Cmd::Write(val) => self.synth.cmd(val),
                 Cmd::WriteStereo(val) => self.synth.update_stereo(val),
                 Cmd::Wait(cycles) => {
                     // synth
