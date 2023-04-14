@@ -4,7 +4,7 @@ use crate::io;
 
 const PSG_CMD: u16 = 0x7F;
 const PSG_STEREO: u16 = 0x06;
-const CPU_CLOCK_HZ: u32 = 3579545;
+const CPU_CLOCK_HZ: usize = 3579545;
 
 const REG_MASK: u8 = 0b1000_0000;
 const REG_DATA_MASK: u8 = 0b0000_1111;
@@ -146,6 +146,12 @@ impl AudioConf {
             )),
         }
     }
+    fn cycles_to_samples(&self, cycles: u32) -> usize {
+        (cycles as usize * self.sample_rate as usize * self.channels as usize) / CPU_CLOCK_HZ
+    }
+    fn samples_to_cycles(&self, samples: usize) -> u32 {
+        ((samples * CPU_CLOCK_HZ) / ((self.sample_rate * self.channels as u32) as usize)) as u32
+    }
 }
 
 impl Synth {
@@ -204,12 +210,11 @@ impl PsgState {
                 Cmd::WriteStereo(val) => self.synth.update_stereo(val),
                 Cmd::Wait(cycles) => {
                     // synth
-                    let samples: usize =
-                        (cycles * audio_conf.sample_rate * audio_conf.channels as u32) as usize
-                            / CPU_CLOCK_HZ as usize;
+                    let samples = audio_conf.cycles_to_samples(cycles);
                     let end = if current_sample + samples > dest.len() {
-                        self.cmds
-                            .push(Cmd::Wait((samples - (dest.len() - current_sample)) as u32));
+                        self.cmds.push(Cmd::Wait(
+                            audio_conf.samples_to_cycles(samples - (dest.len() - current_sample)),
+                        ));
                         dest.len()
                     } else {
                         current_sample + samples
@@ -278,7 +283,7 @@ impl io::Device for Arc<Psg> {
                 };
                 state.prev_cycle = cycle;
                 // Ignore any wait smaller than half a sample at 44100Hz
-                if elapsed_cycles >= (CPU_CLOCK_HZ / 44100 / 2) {
+                if elapsed_cycles >= (CPU_CLOCK_HZ as u32 / 44100 / 2) {
                     state.cmds.push(Cmd::Wait(elapsed_cycles));
                 }
                 state.cmds.push(match addr & 0xFF {
