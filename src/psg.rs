@@ -9,6 +9,7 @@ const CPU_CLOCK_HZ: usize = 3579545;
 const REG_MASK: u8 = 0b1000_0000;
 const REG_DATA_MASK: u8 = 0b0000_1111;
 const DATA_MASK: u8 = 0b0011_1111;
+const DATA_SHIFT: usize = 4;
 
 /*
 const REG_TONE_MASK: u8 = 0b1001_0000;
@@ -58,8 +59,9 @@ impl From<u8> for Latch {
 
 #[derive(Default)]
 struct Tone {
-    freq: usize,
     phase: usize,
+    freq: usize,
+    freq_div: u16,
     attenuation: u8,
     right: bool,
     left: bool,
@@ -80,6 +82,9 @@ impl Tone {
         const fn lcm(a: usize, b: usize) -> usize {
             a / gcd(a, b) * b
         }
+        if self.freq == 0 {
+            return;
+        }
         for (i, s) in data.iter_mut().enumerate() {
             let val = ((self.phase + i) * (self.freq) * 2)
                 / (conf.sample_rate as usize * conf.channels as usize);
@@ -94,8 +99,37 @@ impl Tone {
     fn update_level(&mut self, level: u8) {
         self.attenuation = level & REG_DATA_MASK;
     }
-    fn update_freq(&mut self, level: u8) {}
-    fn update_freq_data(&mut self, level: u8) {}
+    fn update_freq(&mut self, level: u8) {
+        self.freq_div &= (DATA_MASK as u16) << DATA_SHIFT;
+        self.freq_div |= (level as u16) & REG_DATA_MASK as u16;
+        self.freq();
+    }
+    fn update_freq_data(&mut self, level: u8) {
+        self.freq_div &= REG_DATA_MASK as u16;
+        self.freq_div |= (level as u16) << DATA_SHIFT;
+        self.freq();
+    }
+    fn freq(&mut self) {
+        if self.freq_div == 0 {
+            self.freq = 0;
+            return;
+        }
+        self.freq = CPU_CLOCK_HZ / (32 * self.freq_div as usize);
+    }
+}
+#[test]
+fn freq_440() {
+    let mut t = Tone {
+        freq_div: 0x0fe,
+        ..Default::default()
+    };
+    t.freq();
+    assert_eq!(t.freq, 440);
+    t.freq = 0;
+    t.freq_div = 0xFFFF;
+    t.update_freq(0b1000_1110);
+    t.update_freq_data(0b0000_1111);
+    assert_eq!(t.freq, 440);
 }
 
 #[derive(Default)]
@@ -196,7 +230,7 @@ impl Synth {
         }
     }
     fn audio_f32(&mut self, dest: &mut [f32], audio_conf: AudioConf) {
-        self.tone[0].freq = 440;
+        //self.tone[0].freq = 440;
         self.tone[0].gen(dest, audio_conf);
     }
 }
