@@ -85,13 +85,14 @@ impl Tone {
         const fn lcm(a: usize, b: usize) -> usize {
             a / gcd(a, b) * b
         }
-        if self.freq == 0 {
+        if self.freq == 0 || self.attenuation == 0x0F {
             return;
         }
         for (i, s) in data.iter_mut().enumerate() {
             let val = ((self.phase + i) * (self.freq) * 2)
                 / (conf.sample_rate as usize * conf.channels as usize);
             *s = (val % 2) as f32 / 3.0 - 1.0 / 6.0;
+            *s *= 1.0 / (0x0F - self.attenuation) as f32;
         }
         self.phase += data.len();
         let phasem: usize = lcm(self.freq, conf.sample_rate as usize); // XXX: this does not take channels
