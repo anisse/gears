@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::VecDeque,
+    sync::{Arc, Mutex},
+};
 
 use crate::io;
 
@@ -238,7 +241,7 @@ impl Synth {
 impl PsgState {
     fn synth_audio_f32(&mut self, dest: &mut [f32], audio_conf: AudioConf) {
         let mut current_sample = 0;
-        while let Some(cmd) = self.cmds.pop() {
+        while let Some(cmd) = self.cmds.pop_front() {
             match cmd {
                 Cmd::Write(val) => self.synth.cmd(val),
                 Cmd::WriteStereo(val) => self.synth.update_stereo(val),
@@ -246,7 +249,7 @@ impl PsgState {
                     // synth
                     let samples = audio_conf.cycles_to_samples(cycles);
                     let end = if current_sample + samples > dest.len() {
-                        self.cmds.push(Cmd::Wait(
+                        self.cmds.push_back(Cmd::Wait(
                             audio_conf.samples_to_cycles(samples - (dest.len() - current_sample)),
                         ));
                         dest.len()
@@ -282,7 +285,7 @@ pub(crate) enum Cmd {
 
 #[derive(Default)]
 struct PsgState {
-    cmds: Vec<Cmd>,
+    cmds: VecDeque<Cmd>,
     synth: Synth,
     prev_cycle: u32,
 }
@@ -318,9 +321,9 @@ impl io::Device for Arc<Psg> {
                 state.prev_cycle = cycle;
                 // Ignore any wait smaller than half a sample at 44100Hz
                 if elapsed_cycles >= (CPU_CLOCK_HZ as u32 / 44100 / 2) {
-                    state.cmds.push(Cmd::Wait(elapsed_cycles));
+                    state.cmds.push_back(Cmd::Wait(elapsed_cycles));
                 }
-                state.cmds.push(match addr & 0xFF {
+                state.cmds.push_back(match addr & 0xFF {
                     PSG_CMD => Cmd::Write(val),
                     PSG_STEREO => Cmd::WriteStereo(val),
                     _ => unreachable!(),
