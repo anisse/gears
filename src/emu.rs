@@ -74,7 +74,7 @@ pub struct Emulator {
     cpu: cpu::State,
     devs: Devices,
     render_area: vdp::RenderArea,
-    over_cycles: usize,
+    over_cycles: isize,
     audio_conf: AudioConf,
 }
 
@@ -163,11 +163,11 @@ impl Emulator {
         let cycles = cpu::run_cached(
             &self.cache,
             &mut self.cpu,
-            CPU_CYCLES_PER_LINE - self.over_cycles,
+            (CPU_CYCLES_PER_LINE as isize - self.over_cycles) as usize,
             false,
         )
         .unwrap();
-        self.over_cycles += cycles - CPU_CYCLES_PER_LINE;
+        self.over_cycles += cycles as isize - CPU_CYCLES_PER_LINE as isize;
         if let vdp::VdpDisplay::ScreenDone = render {
             return true;
         }

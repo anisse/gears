@@ -27,7 +27,8 @@ harness = false
 [profile.release]
 #strip = "symbols"
 #lto = true
-debug=true
+debug = true
+overflow-checks = true
 
 [workspace]
 members = [
