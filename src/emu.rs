@@ -1,5 +1,6 @@
 use std::rc::Rc;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use crate::cpu;
 use crate::io;
@@ -76,6 +77,7 @@ pub struct Emulator {
     render_area: vdp::RenderArea,
     over_cycles: isize,
     audio_conf: AudioConf,
+    running: Arc<Mutex<bool>>, // TODO: atomic
 }
 
 struct Devices {
@@ -110,6 +112,7 @@ impl Emulator {
             },
             over_cycles: 0,
             audio_conf,
+            running: Default::default(),
         };
         emu.cpu.mem = mem::Memory::init(mem::Mapper::SegaGG {
             rom,
@@ -191,9 +194,25 @@ impl Emulator {
     pub fn audio_callback(&self) -> AudioCallback {
         let psg = Arc::clone(&self.devs.pov.psg);
         let audio_conf = self.audio_conf.clone();
+        let running = self.running.clone();
         Box::new(move |dest: &mut [f32]| {
-            psg.synth_audio_f32(dest, audio_conf.clone())
-                .expect("synth audio failed");
+            if *running.lock().unwrap() {
+                psg.synth_audio_f32(dest, audio_conf.clone())
+                    .expect("synth audio failed");
+            } else {
+                // go back to zero, for silence
+                let len = dest.len();
+                if len == 0 {
+                    return;
+                }
+                let start = *dest.last().unwrap();
+                for (i, sample) in dest.iter_mut().enumerate() {
+                    *sample = start * ((len - i - 1) as f32) / len as f32;
+                }
+            }
         })
+    }
+    pub fn run(&self, running: bool) {
+        *self.running.lock().unwrap() = running;
     }
 }

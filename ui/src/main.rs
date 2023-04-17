@@ -115,6 +115,7 @@ fn main() -> Result<(), String> {
             Event::MainEventsCleared => {
                 // Update internal state and request a redraw
                 joystick_events(&mut emu, &mut gilrs);
+                emu.run(state.running || state.stepping);
                 if state.main_events_cleared(&mut emu, &mut pixels) {
                     window.request_redraw();
                 }
