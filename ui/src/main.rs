@@ -246,7 +246,7 @@ impl EmuLoop {
     fn main_events_cleared(&mut self, emu: &mut emu::Emulator, pixels: &mut Pixels) -> bool {
         if self.running || self.stepping {
             loop {
-                if emu.step(pixels.get_frame()) {
+                if emu.step(pixels.frame_mut()) {
                     break;
                 }
             }
