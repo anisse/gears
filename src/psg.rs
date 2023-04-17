@@ -243,10 +243,23 @@ impl PsgState {
     fn synth_audio_f32(&mut self, dest: &mut [f32], audio_conf: AudioConf) {
         let mut current_sample = 0;
         while let Some(cmd) = self.cmds.pop_front() {
+            if !matches!(cmd, Cmd::Wait(_)) {
+                self.empty_cycles = 0;
+            }
             match cmd {
                 Cmd::Write(val) => self.synth.cmd(val),
                 Cmd::WriteStereo(val) => self.synth.update_stereo(val),
                 Cmd::Wait(cycles) => {
+                    // First check that we didn't have any empty_cycles to consume
+                    if self.empty_cycles > 0 && cycles <= self.empty_cycles {
+                        println!(
+                            "consuming {cycles} empty cycles out of {}",
+                            self.empty_cycles
+                        );
+                        self.empty_cycles -= cycles;
+                        continue;
+                    }
+                    let cycles = cycles - self.empty_cycles;
                     // synth
                     let samples = audio_conf.cycles_to_samples(cycles);
                     let end = if current_sample + samples > dest.len() {
@@ -269,15 +282,21 @@ impl PsgState {
         if current_sample < dest.len() {
             self.synth
                 .audio_f32(&mut dest[current_sample..], audio_conf);
+            self.empty_cycles += (dest.len() - current_sample) as u32;
         }
 
-        println!("{} cmds remaining", self.cmds.len());
+        println!(
+            "{} empty cycles, {} cmds remaining: {:?}",
+            self.empty_cycles,
+            self.cmds.len(),
+            self.cmds.get(0)
+        );
         //self.cmds.clear();
     }
 }
 
 // Intentionnally structured a bit like the VGM file
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) enum Cmd {
     Write(u8),
     WriteStereo(u8),
@@ -289,6 +308,7 @@ struct PsgState {
     cmds: VecDeque<Cmd>,
     synth: Synth,
     prev_cycle: u32,
+    empty_cycles: u32,
 }
 #[derive(Default)]
 pub struct Psg {
