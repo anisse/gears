@@ -13,6 +13,7 @@ const REG_MASK: u8 = 0b1000_0000;
 const REG_DATA_MASK: u8 = 0b0000_1111;
 const DATA_MASK: u8 = 0b0011_1111;
 const DATA_SHIFT: usize = 4;
+const ATTENUATION_MAX: u8 = REG_DATA_MASK;
 
 /*
 const REG_TONE_MASK: u8 = 0b1001_0000;
@@ -60,31 +61,45 @@ impl From<u8> for Latch {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy, Debug)]
+enum TonePolarity {
+    #[default]
+    Neg = -1,
+    Pos = 1,
+}
+impl TonePolarity {
+    fn flip(&mut self) {
+        // XXX: maybe faster with math ?
+        *self = match self {
+            TonePolarity::Neg => TonePolarity::Pos,
+            TonePolarity::Pos => TonePolarity::Neg,
+        }
+    }
+}
+
 struct Tone {
-    phase: usize,
-    freq: usize,
-    freq_div: u16,
+    reg: u16,
+    counter: u16,
+    polarity: TonePolarity,
     attenuation: u8,
     right: bool,
     left: bool,
 }
-
+impl Default for Tone {
+    fn default() -> Self {
+        Self {
+            reg: 0,
+            counter: 0,
+            polarity: Default::default(),
+            attenuation: ATTENUATION_MAX,
+            right: true,
+            left: true,
+        }
+    }
+}
 impl Tone {
+    /*
     fn gen(&mut self, data: &mut [f32], conf: AudioConf) {
-        const fn gcd(mut a: usize, mut b: usize) -> usize {
-            while a != b {
-                if a > b {
-                    a -= b;
-                } else {
-                    b -= a;
-                }
-            }
-            a
-        }
-        const fn lcm(a: usize, b: usize) -> usize {
-            a / gcd(a, b) * b
-        }
         if self.freq == 0 || self.attenuation == 0x0F {
             return;
         }
@@ -100,40 +115,95 @@ impl Tone {
         self.phase %= phasem;
         //println!("{data:?}");
     }
+    */
     fn update_level(&mut self, level: u8) {
         self.attenuation = level & REG_DATA_MASK;
     }
     fn update_freq(&mut self, level: u8) {
-        self.freq_div &= (DATA_MASK as u16) << DATA_SHIFT;
-        self.freq_div |= (level as u16) & REG_DATA_MASK as u16;
-        self.freq();
+        self.reg &= (DATA_MASK as u16) << DATA_SHIFT;
+        self.reg |= (level as u16) & REG_DATA_MASK as u16;
     }
     fn update_freq_data(&mut self, level: u8) {
-        self.freq_div &= REG_DATA_MASK as u16;
-        self.freq_div |= (level as u16) << DATA_SHIFT;
-        self.freq();
+        self.reg &= REG_DATA_MASK as u16;
+        self.reg |= (level as u16) << DATA_SHIFT;
     }
-    fn freq(&mut self) {
-        if self.freq_div == 0 {
-            self.freq = 0;
+    fn freq(&mut self) -> Option<usize> {
+        if self.reg == 0 {
+            None
+        } else {
+            Some(CPU_CLOCK_HZ / (32 * self.reg as usize))
+        }
+    }
+    fn attenuation_mul(&self) -> f32 {
+        // from 0 to 28dB attenuation
+        // >>> for i in range(0, 29, 2):
+        // print(10.0 ** (-i / 10.0))
+        [
+            1.0,
+            0.6309573444801932,
+            0.3981071705534972,
+            0.251188643150958,
+            0.15848931924611134,
+            0.1,
+            0.06309573444801933,
+            0.039810717055349734,
+            0.025118864315095794,
+            0.015848931924611134,
+            0.01,
+            0.00630957344480193,
+            0.003981071705534973,
+            0.0025118864315095794,
+            0.001584893192461114,
+            0.0,
+        ][(self.attenuation & 0xF) as usize]
+    }
+    // Set next internal state, advancing the clock by a number of cycles
+    fn update_state(&mut self, cycles: u32) {
+        let psg_cycles = cycles / 16;
+        if (self.counter as u32) > psg_cycles {
+            self.counter -= psg_cycles as u16;
             return;
         }
-        self.freq = CPU_CLOCK_HZ / (32 * self.freq_div as usize);
+        if self.reg == 0 {
+            return;
+        }
+        let psg_cycles = psg_cycles - self.counter as u32;
+        if (psg_cycles / self.reg as u32) % 2 == 0 {
+            self.polarity.flip();
+        }
+        self.counter = (self.reg as u32 - (psg_cycles % self.reg as u32)) as u16;
+    }
+    fn next_f32_frame(&mut self, dest: &mut [f32], conf: AudioConf) {
+        self.update_state(conf.samples_to_cycles_mono(1));
+        let sample = self.polarity as i32 as f32 * 0.25 * self.attenuation_mul();
+        /*
+        println!(
+            "Sample: {sample}, attenuation: {}, polarity: {:?}, reg: {}, counter: {}",
+            self.attenuation, self.polarity, self.reg, self.counter
+        );
+        */
+        if conf.channels == 2 && dest.len() == 2 {
+            dest[0] = if self.left { sample } else { 0.0 };
+            dest[1] = if self.right { sample } else { 0.0 };
+            return;
+        }
+        for s in dest.iter_mut() {
+            *s = sample;
+        }
     }
 }
 #[test]
 fn freq_440() {
     let mut t = Tone {
-        freq_div: 0x0fe,
+        reg: 0x0fe,
         ..Default::default()
     };
     t.freq();
-    assert_eq!(t.freq, 440);
-    t.freq = 0;
-    t.freq_div = 0xFFFF;
+    assert_eq!(t.freq(), Some(440));
+    t.reg = 0xFFFF;
     t.update_freq(0b1000_1110);
     t.update_freq_data(0b0000_1111);
-    assert_eq!(t.freq, 440);
+    assert_eq!(t.freq(), Some(440));
 }
 
 #[derive(Default)]
@@ -184,11 +254,14 @@ impl AudioConf {
             )),
         }
     }
-    fn cycles_to_samples(&self, cycles: u32) -> usize {
+    const fn cycles_to_samples(&self, cycles: u32) -> usize {
         (cycles as usize * self.sample_rate as usize * self.channels as usize) / CPU_CLOCK_HZ
     }
-    fn samples_to_cycles(&self, samples: usize) -> u32 {
+    const fn samples_to_cycles(&self, samples: usize) -> u32 {
         ((samples * CPU_CLOCK_HZ) / ((self.sample_rate * self.channels as u32) as usize)) as u32
+    }
+    const fn samples_to_cycles_mono(&self, samples: usize) -> u32 {
+        ((samples * CPU_CLOCK_HZ) / (self.sample_rate as usize)) as u32
     }
 }
 
@@ -234,8 +307,10 @@ impl Synth {
         }
     }
     fn audio_f32(&mut self, dest: &mut [f32], audio_conf: AudioConf) {
-        //self.tone[0].freq = 440;
-        self.tone[0].gen(dest, audio_conf);
+        for frame in dest.chunks_mut(audio_conf.channels.into()) {
+            // for now only tone 0
+            self.tone[0].next_f32_frame(frame, audio_conf.clone());
+        }
     }
 }
 
@@ -363,4 +438,18 @@ impl io::Device for Arc<Psg> {
     fn input(&self, addr: u16, _: u32) -> Result<u8, String> {
         panic!("Unsupported PSG read @{:04X}", addr);
     }
+}
+
+const fn gcd(mut a: usize, mut b: usize) -> usize {
+    while a != b {
+        if a > b {
+            a -= b;
+        } else {
+            b -= a;
+        }
+    }
+    a
+}
+const fn lcm(a: usize, b: usize) -> usize {
+    a / gcd(a, b) * b
 }
