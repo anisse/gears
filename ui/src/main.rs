@@ -204,8 +204,8 @@ fn audio_init() -> Result<(cpal::Device, cpal::StreamConfig), String> {
     let supported_buffer_size = audio_config.buffer_size().clone();
     println!("Possible sizes: {supported_buffer_size:?}");
     let mut stream_config: cpal::StreamConfig = audio_config.into();
-    let default_buffer_size = 736; // ~ 16ms buffer, about a frame. This is a manually rounded-up
-                                   // buffer
+    let default_buffer_size = 1472; // ~ 16ms buffer, about a frame. This is a manually rounded-up
+                                    // buffer
     stream_config.buffer_size = cpal::BufferSize::Fixed(match supported_buffer_size {
         cpal::SupportedBufferSize::Range { min, .. } => {
             if min > default_buffer_size {
