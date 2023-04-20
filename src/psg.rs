@@ -338,9 +338,9 @@ impl PsgState {
                     // synth
                     let samples = audio_conf.cycles_to_samples(cycles);
                     let end = if current_sample + samples > dest.len() {
-                        self.cmds.push_back(Cmd::Wait(
-                            audio_conf.samples_to_cycles(samples - (dest.len() - current_sample)),
-                        ));
+                        let remaining = samples - (dest.len() - current_sample);
+                        self.cmds
+                            .push_front(Cmd::Wait(audio_conf.samples_to_cycles(remaining)));
                         dest.len()
                     } else {
                         current_sample + samples
