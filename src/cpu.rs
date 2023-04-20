@@ -827,9 +827,9 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
                         s.r.MEMPTR = s.r.get_regpair(RegPair::from(reg)) + 1
                     }
                 } else if let Operand::Address(addr) = op1 {
-                    s.r.MEMPTR = addr + 1
+                    s.r.MEMPTR = addr.wrapping_add(1);
                 } else if let Operand::Address(addr) = op2 {
-                    s.r.MEMPTR = addr + 1
+                    s.r.MEMPTR = addr.wrapping_add(1);
                 }
             }
         }
