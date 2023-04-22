@@ -15,21 +15,6 @@ const DATA_MASK: u8 = 0b0011_1111;
 const DATA_SHIFT: usize = 4;
 const ATTENUATION_MAX: u8 = REG_DATA_MASK;
 
-/*
-const REG_TONE_MASK: u8 = 0b1001_0000;
-const REG_TONE_FREQ: u8 = 0b1000_0000;
-const REG_TONE_LEVEL: u8 = 0b1001_0000;
-const REG_TONE_NUM_MASK: u8 = 0b0110_0000;
-const REG_TONE_0: u8 = 0b0000_0000;
-const REG_TONE_1: u8 = 0b0010_0000;
-const REG_TONE_2: u8 = 0b0100_0000;
-
-const REG_NOISE_MASK: u8 = 0b1110_0000;
-const REG_NOISE: u8 = 0b1110_0000;
-const REG_NOISE_TYPE_MASK: u8 = 0b0000_0100;
-const REG_NOISE_NF_MASK: u8 = 0b0000_0011;
-*/
-
 const REG_LATCH_MASK: u8 = 0b0111_0000;
 
 #[derive(Default)]
@@ -98,24 +83,6 @@ impl Default for Tone {
     }
 }
 impl Tone {
-    /*
-    fn gen(&mut self, data: &mut [f32], conf: AudioConf) {
-        if self.freq == 0 || self.attenuation == 0x0F {
-            return;
-        }
-        for (i, s) in data.iter_mut().enumerate() {
-            let val = ((self.phase + i) * (self.freq) * 2)
-                / (conf.sample_rate as usize * conf.channels as usize);
-            *s = (val % 2) as f32 / 3.0 - 1.0 / 6.0;
-            *s *= 1.0 / (0x0F - self.attenuation) as f32;
-        }
-        self.phase += data.len();
-        let phasem: usize = lcm(self.freq, conf.sample_rate as usize); // XXX: this does not take channels
-                                                                       // into account
-        self.phase %= phasem;
-        //println!("{data:?}");
-    }
-    */
     fn update_level(&mut self, level: u8) {
         self.attenuation = level & REG_DATA_MASK;
     }
@@ -438,18 +405,4 @@ impl io::Device for Arc<Psg> {
     fn input(&self, addr: u16, _: u32) -> Result<u8, String> {
         panic!("Unsupported PSG read @{:04X}", addr);
     }
-}
-
-const fn gcd(mut a: usize, mut b: usize) -> usize {
-    while a != b {
-        if a > b {
-            a -= b;
-        } else {
-            b -= a;
-        }
-    }
-    a
-}
-const fn lcm(a: usize, b: usize) -> usize {
-    a / gcd(a, b) * b
 }
