@@ -382,19 +382,18 @@ impl io::Device for Arc<Psg> {
                     u32::MAX - (state.prev_cycle - cycle)
                 };
                 state.prev_cycle = cycle;
-                // Ignore any wait smaller than half a sample at 44100Hz
-                if elapsed_cycles >= (CPU_CLOCK_HZ as u32 / 44100 / 2) {
-                    state.cmds.push_back(Cmd::Wait(elapsed_cycles));
-                }
+                state.cmds.push_back(Cmd::Wait(elapsed_cycles));
                 state.cmds.push_back(match addr & 0xFF {
                     PSG_CMD => Cmd::Write(val),
                     PSG_STEREO => Cmd::WriteStereo(val),
                     _ => unreachable!(),
                 });
+                /*
                 println!(
                     "PSG Write @{addr:04X}: <{elapsed_cycles}> --> [{val}] (len: {})",
                     state.cmds.len()
                 );
+                */
                 Ok(())
             }
             _ => Err(format!(
