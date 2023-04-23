@@ -1280,12 +1280,8 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
             }
         }
         Instruction::EXX => {
-            // waiting for https://github.com/rust-lang/rust/issues/71126
             fn swap(a: &mut u8, b: &mut u8) {
-                let tmp1 = *a;
-                let tmp2 = *b;
-                *a = tmp2;
-                *b = tmp1;
+                (*a, *b) = (*b, *a);
             }
             swap(&mut s.r.B, &mut s.r.Bp);
             swap(&mut s.r.C, &mut s.r.Cp);
