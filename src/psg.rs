@@ -150,12 +150,12 @@ impl Tone {
         );
         */
         if conf.channels == 2 && dest.len() == 2 {
-            dest[0] = if self.left { sample } else { 0.0 };
-            dest[1] = if self.right { sample } else { 0.0 };
+            dest[0] += if self.left { sample } else { 0.0 };
+            dest[1] += if self.right { sample } else { 0.0 };
             return;
         }
         for s in dest.iter_mut() {
-            *s = sample;
+            *s += sample;
         }
     }
 }
@@ -276,7 +276,10 @@ impl Synth {
     fn audio_f32(&mut self, dest: &mut [f32], audio_conf: AudioConf) {
         for frame in dest.chunks_mut(audio_conf.channels.into()) {
             // for now only tone 0
-            self.tone[0].next_f32_frame(frame, audio_conf.clone());
+            frame.fill_with(Default::default);
+            self.tone
+                .iter_mut()
+                .for_each(|t| t.next_f32_frame(frame, audio_conf.clone()));
         }
     }
 }
