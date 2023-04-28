@@ -2,79 +2,8 @@ use std::fs::{self, File};
 use std::io::{self, prelude::*, BufWriter};
 use std::path::{Path, PathBuf};
 
-use gears::emu::{self, Button};
-
-use crate::TestCommand::*;
-
-#[derive(Debug, Clone)]
-enum TestCommand {
-    WaitFrames(u32),
-    PressButton(emu::Button),
-    ReleaseButton(emu::Button),
-}
-impl TestCommand {
-    fn slice_str(s: &[TestCommand]) -> String {
-        s.iter()
-            .cloned()
-            .map(String::from)
-            .collect::<Vec<_>>()
-            .join("-")
-    }
-}
-impl TryFrom<&str> for TestCommand {
-    type Error = String;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        if let Some(c) = value.chars().next() {
-            return Ok(match c {
-                '0'..='9' => WaitFrames(value.parse().map_err(|e| format!("not int: {e}"))?),
-                'S' => PressButton(Button::Start),
-                's' => ReleaseButton(Button::Start),
-                'A' => PressButton(Button::One),
-                'a' => ReleaseButton(Button::One),
-                'B' => PressButton(Button::Two),
-                'b' => ReleaseButton(Button::Two),
-                'U' => PressButton(Button::Up),
-                'u' => ReleaseButton(Button::Up),
-                'D' => PressButton(Button::Down),
-                'd' => ReleaseButton(Button::Down),
-                'L' => PressButton(Button::Left),
-                'l' => ReleaseButton(Button::Left),
-                'R' => PressButton(Button::Right),
-                'r' => ReleaseButton(Button::Right),
-                _ => return Err(format!("Unexpected char {c}")),
-            });
-        }
-        Err("empty value".to_string())
-    }
-}
-impl From<TestCommand> for String {
-    fn from(value: TestCommand) -> String {
-        match value {
-            WaitFrames(f) => format!("{f}"),
-            PressButton(b) => match b {
-                Button::Start => "S",
-                Button::One => "A",
-                Button::Two => "B",
-                Button::Up => "U",
-                Button::Down => "D",
-                Button::Left => "L",
-                Button::Right => "R",
-            }
-            .to_string(),
-            ReleaseButton(b) => match b {
-                Button::Start => "s",
-                Button::One => "a",
-                Button::Two => "b",
-                Button::Up => "u",
-                Button::Down => "d",
-                Button::Left => "l",
-                Button::Right => "r",
-            }
-            .to_string(),
-        }
-    }
-}
+use gears::emu;
+use gears::emu::testcmd::TestCommand;
 
 fn write_png_common(
     frame_data: &[u8],
@@ -124,19 +53,7 @@ fn common_test(filename: &Path, cmds: &[TestCommand], result: &[u8]) -> Result<(
     let mut emu = emu::Emulator::init(data, true, emu::AudioConf::new(2, 44100)?);
     let mut pixels = vec![0; emu::LCD_WIDTH * emu::LCD_HEIGHT * 4];
     assert_eq!(pixels.len(), result.len());
-    let mut frame = 0;
-    for cmd in cmds.iter() {
-        match cmd {
-            WaitFrames(f) => {
-                for _ in 0..*f {
-                    while !emu.step(&mut pixels) {}
-                }
-                frame += *f
-            }
-            PressButton(b) => emu.press(*b),
-            ReleaseButton(b) => emu.release(*b),
-        }
-    }
+    let frame = emu.run_commands(&mut pixels, cmds);
     /*
     pixels
         .iter()
@@ -184,7 +101,7 @@ fn test_roms() {
     let pixels = vec![0; emu::LCD_HEIGHT * emu::LCD_WIDTH * 4];
     common_test(
         Path::new("../roms/Sonic The Hedgehog (World) (Rev 1).gg"),
-        &[WaitFrames(0)],
+        &[TestCommand::WaitFrames(0)],
         &pixels,
     )
     .unwrap();
@@ -204,11 +121,8 @@ fn test_roms() {
         rom_name.push(basename[0]);
         rom_name.set_extension("gg");
         let rom_data = read_png(&png_name).expect("reading png");
-        let frame: Vec<_> = basename[1]
-            .split('-')
-            .map(|c| c.try_into().expect("a test command"))
-            .collect();
-        res.push(common_test(&rom_name, &frame, &rom_data));
+        let cmds = TestCommand::new_vec(basename[1]).expect("a test command");
+        res.push(common_test(&rom_name, &cmds, &rom_data));
     }
     res.iter().for_each(|r| {
         if let Err(s) = r {

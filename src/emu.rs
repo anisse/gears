@@ -1,3 +1,5 @@
+pub mod testcmd;
+
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -9,6 +11,8 @@ use crate::mem;
 use crate::psg;
 use crate::system;
 use crate::vdp;
+
+use testcmd::TestCommand;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Button {
@@ -214,5 +218,21 @@ impl Emulator {
     }
     pub fn run(&self, running: bool) {
         *self.running.lock().unwrap() = running;
+    }
+    pub fn run_commands(&mut self, pixels: &mut [u8], cmds: &[testcmd::TestCommand]) -> u32 {
+        let mut frame = 0;
+        for cmd in cmds.iter() {
+            match cmd {
+                TestCommand::WaitFrames(f) => {
+                    for _ in 0..*f {
+                        while !self.step(pixels) {}
+                    }
+                    frame += *f
+                }
+                TestCommand::PressButton(b) => self.press(*b),
+                TestCommand::ReleaseButton(b) => self.release(*b),
+            }
+        }
+        frame
     }
 }
