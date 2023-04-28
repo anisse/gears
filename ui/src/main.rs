@@ -15,6 +15,7 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 
 use gears::emu;
+use gears::emu::testcmd;
 
 fn main() -> Result<(), String> {
     let event_loop = EventLoop::new();
@@ -43,6 +44,7 @@ fn main() -> Result<(), String> {
 
     let args: Vec<String> = env::args().collect();
     let file = args.get(1).expect("needs an argument");
+    let cmds = testcmd::TestCommand::new_vec(args.get(2).unwrap_or(&String::new()))?;
     let path = Path::new(file);
 
     let mut file = match File::open(path) {
@@ -61,6 +63,7 @@ fn main() -> Result<(), String> {
         true,
         emu::AudioConf::new(stream_config.channels, stream_config.sample_rate.0)?,
     );
+    emu.run_commands(pixels.frame_mut(), &cmds);
     let audio_stream = audio_init_stream(audio_device, stream_config, emu.audio_callback())?;
     audio_stream
         .play()
