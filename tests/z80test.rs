@@ -21,6 +21,11 @@ fn z80ccf() {
 fn z80memptr() {
     z80common(include_bytes!("z80test/z80memptr.tap"))
 }
+#[test]
+#[ignore]
+fn z80doc() {
+    z80common(include_bytes!("z80test/z80doc.tap"))
+}
 fn z80common(prog: &[u8]) {
     let cache = gears::cpu::DisasCache::init();
 
