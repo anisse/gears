@@ -143,6 +143,7 @@ pub enum VdpInt {
 pub enum VdpDisplay {
     NoDisplay,
     ScreenDone,
+    ScreenDoneNoRefresh,
 }
 
 #[derive(Debug, PartialEq)]
@@ -899,9 +900,8 @@ impl Vdp {
             if state.reg[1] & REG1_BLANK != 0 {
                 rendered = VdpDisplay::ScreenDone;
             } else {
-                // we should fill screen with backdrop color
-                //Self::blank(&state, pixels, render_area);
-                //rendered = VdpDisplay::ScreenDone;
+                // should we fill screen with backdrop color ?
+                rendered = VdpDisplay::ScreenDoneNoRefresh;
             }
         }
         if state.line_interrupt_counter != 0 {
