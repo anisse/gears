@@ -8,6 +8,7 @@ authors = ["Anisse Astier <anisse@astier.eu>"]
 pixels = "0.12.1"
 gilrs = "0.10.1"
 cpal = "0.15.2"
+wgpu = "0.15"
 
 [dependencies.winit]
 version = "0.28.3"

@@ -32,11 +32,13 @@ fn main() -> Result<(), String> {
     let mut pixels = {
         let window_size = window.inner_size();
         let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
-        Pixels::new(
+        pixels::PixelsBuilder::new(
             emu::LCD_WIDTH as u32,
             emu::LCD_HEIGHT as u32,
             surface_texture,
         )
+        .present_mode(wgpu::PresentMode::AutoVsync)
+        .build()
         .map_err(|e| format!("pixels buffer init: {e}"))?
     };
 
