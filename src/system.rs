@@ -49,6 +49,7 @@ impl io::Device for System {
                 );
                 Ok(())
             }
+            _ => Ok(()),
             _ => Err(format!(
                 "unknown system port output write address @{:04X} {:02X}",
                 addr, val
@@ -59,10 +60,8 @@ impl io::Device for System {
     fn input(&self, addr: u16, _: u32) -> Result<u8, String> {
         match addr & 0xFF {
             0x0 => Ok((!(*self.start_button.borrow() as u8) << 7) | u8::from(&self.region)),
-            _ => Err(format!(
-                "unknown system port output write address @{:04X}",
-                addr
-            )),
+            _ => Ok(0),
+            _ => Err(format!("unknown system port input address @{:04X}", addr)),
         }
     }
 }
