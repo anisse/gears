@@ -34,3 +34,4 @@ I also wrote the following updates:
  * [Talks and emulation: with some emulator progress](https://anisse.astier.eu/talks-emulation.html)
  * [December 2022: rendering bug(s), missing features](https://anisse.astier.eu/gears-update-2023-01.html)
  * [January 2023: fixing the map bug, VDP writes, tilesets and regions](https://anisse.astier.eu/gears-update-2023-02.html)
+ * [February to April 2023: interrupts, VDP palette, and audio](https://anisse.astier.eu/gears-update-2023-03.html)
