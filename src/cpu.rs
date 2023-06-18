@@ -1,6 +1,7 @@
 use crate::disas;
 use crate::disas::{Instruction, OpSize, Operand};
 use crate::io;
+use crate::io::Device;
 use crate::mem;
 use std::fmt;
 
@@ -113,7 +114,7 @@ pub struct State {
     q: FChanged,
     pub halted: bool,
     pub mem: mem::Memory,
-    pub io: io::IO,
+    pub io: io::RcDevice,
     pending_interrupt: bool,
     pub cycle_counter: u32,
 }

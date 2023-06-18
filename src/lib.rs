@@ -1,4 +1,5 @@
 pub mod cpu;
+mod devices;
 mod disas;
 pub mod emu;
 pub mod io;

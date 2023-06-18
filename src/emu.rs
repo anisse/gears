@@ -5,11 +5,11 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use crate::cpu;
+use crate::devices;
 use crate::io;
 use crate::joystick;
 use crate::mem;
 use crate::psg;
-use crate::system;
 use crate::vdp;
 
 use testcmd::TestCommand;
@@ -45,70 +45,24 @@ impl From<Button> for joystick::Button {
 }
 
 pub type AudioCallback = Box<dyn FnMut(&mut [f32]) + Send + 'static>;
-struct DebugIO {}
-impl io::Device for DebugIO {
-    fn out(&self, addr: u16, val: u8, _: u32) -> Result<(), String> {
-        println!("Unknown I/O write: @{:04X} {:02X} ", addr, val);
-        //panic!();
-        Ok(())
-    }
-    fn input(&self, addr: u16, _: u32) -> Result<u8, String> {
-        println!("Unknown I/O read: @{:04X}, sending 0", addr);
-        //panic!();
-        Ok(0)
-    }
-}
-
-struct PsgOrVdp {
-    psg: Arc<psg::Psg>,
-    vdp: Rc<vdp::Vdp>,
-}
-impl io::Device for PsgOrVdp {
-    fn out(&self, addr: u16, val: u8, cycle: u32) -> Result<(), String> {
-        self.psg.out(addr, val, cycle)
-    }
-    fn input(&self, addr: u16, cycle: u32) -> Result<u8, String> {
-        self.vdp.input(addr, cycle)
-    }
-}
-
 pub use psg::AudioConf;
 
 pub struct Emulator {
     cache: cpu::DisasCache,
     cpu: cpu::State,
-    devs: Devices,
+    devs: Rc<devices::Devices>,
     render_area: vdp::RenderArea,
     over_cycles: isize,
     audio_conf: AudioConf,
     running: Arc<Mutex<bool>>, // TODO: atomic
 }
 
-struct Devices {
-    dbg_io: Rc<DebugIO>,
-    sys: Rc<system::System>,
-    joy: Rc<joystick::Joystick>,
-    pov: Rc<PsgOrVdp>,
-}
-impl Devices {
-    pub fn new() -> Self {
-        Self {
-            dbg_io: Rc::new(DebugIO {}),
-            sys: Rc::new(system::System::default()),
-            joy: Rc::new(joystick::Joystick::default()),
-            pov: Rc::new(PsgOrVdp {
-                psg: Arc::new(psg::Psg::default()),
-                vdp: Rc::new(vdp::Vdp::default()),
-            }),
-        }
-    }
-}
 impl Emulator {
     pub fn init(rom: Vec<u8>, visible_only: bool, audio_conf: AudioConf) -> Self {
         let mut emu = Self {
             cache: cpu::DisasCache::init(),
             cpu: cpu::init(),
-            devs: Devices::new(),
+            devs: Rc::new(devices::Devices::new()),
             render_area: if visible_only {
                 vdp::RenderArea::VisibleOnly
             } else {
@@ -122,44 +76,8 @@ impl Emulator {
             rom,
             backup_ram: None,
         });
-        emu.cpu.io = io::IO::new();
-        emu.register();
+        emu.cpu.io = io::RcDevice::new(emu.devs.clone());
         emu
-    }
-    fn register(&mut self) {
-        let vdp: Rc<dyn io::Device> = Rc::clone(&self.devs.pov.vdp) as Rc<dyn io::Device>;
-        self.cpu.io.register(0x7E, 0x7E, 0xFF00, Rc::clone(&vdp));
-        self.cpu.io.register(0xBE, 0xBF, 0xFF01, vdp);
-        self.cpu.io.register(
-            0,
-            5,
-            0xFF00,
-            Rc::clone(&self.devs.sys) as Rc<dyn io::Device>,
-        );
-        self.cpu.io.register(
-            0xDC,
-            0xDD,
-            0xFF00,
-            Rc::clone(&self.devs.joy) as Rc<dyn io::Device>,
-        );
-        self.cpu.io.register(
-            0x7F,
-            0x7F,
-            0xFF00,
-            Rc::clone(&self.devs.pov) as Rc<dyn io::Device>,
-        );
-        self.cpu.io.register(
-            0x06,
-            0x06,
-            0xFF00,
-            Rc::new(Arc::clone(&self.devs.pov.psg)) as Rc<dyn io::Device>,
-        );
-        self.cpu.io.register(
-            0,
-            0,
-            0xFFFF,
-            Rc::clone(&self.devs.dbg_io) as Rc<dyn io::Device>,
-        );
     }
     pub fn step(&mut self, pixels: &mut [u8]) -> bool {
         let (int, render) = self.devs.pov.vdp.step(pixels, self.render_area);
@@ -185,14 +103,14 @@ impl Emulator {
     }
     pub fn press(&mut self, button: Button) {
         match button {
-            Button::Start => (*self.devs.sys).set_start_button(true),
-            _ => (*self.devs.joy).set_button(button.into(), true),
+            Button::Start => self.devs.sys.set_start_button(true),
+            _ => self.devs.joy.set_button(button.into(), true),
         }
     }
     pub fn release(&mut self, button: Button) {
         match button {
-            Button::Start => (*self.devs.sys).set_start_button(false),
-            _ => (*self.devs.joy).set_button(button.into(), false),
+            Button::Start => self.devs.sys.set_start_button(false),
+            _ => self.devs.joy.set_button(button.into(), false),
         }
     }
     pub fn audio_callback(&self) -> AudioCallback {
