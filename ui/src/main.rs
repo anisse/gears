@@ -113,7 +113,9 @@ fn main() -> Result<(), String> {
                     }
                 },
                 WindowEvent::Resized(size) => {
-                    pixels.resize_surface(size.width, size.height);
+                    pixels
+                        .resize_surface(size.width, size.height)
+                        .unwrap_or_else(|e| print!("Unable to resize pixel surface: {e}"));
                 }
                 _ => {}
             },
