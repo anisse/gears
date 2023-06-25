@@ -1,10 +1,10 @@
 #![deny(clippy::all)]
 #![forbid(unsafe_code)]
 
-use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::{env, time};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use gilrs::Gilrs;
@@ -37,7 +37,7 @@ fn main() -> Result<(), String> {
             emu::LCD_HEIGHT as u32,
             surface_texture,
         )
-        .present_mode(wgpu::PresentMode::AutoVsync)
+        .present_mode(wgpu::PresentMode::AutoNoVsync)
         .build()
         .map_err(|e| format!("pixels buffer init: {e}"))?
     };
@@ -71,10 +71,7 @@ fn main() -> Result<(), String> {
         .play()
         .map_err(|e| format!("cannot play stream: {e}"))?;
 
-    let mut state = EmuLoop {
-        running: true,
-        stepping: false,
-    };
+    let mut state = EmuLoop::default();
     event_loop.run(move |event, _, control_flow| {
         // Draw the current frame
         match event {
@@ -244,22 +241,118 @@ fn audio_init_stream(
     Ok(audio_stream)
 }
 
+#[derive(Debug)]
 struct EmuLoop {
     running: bool,
     stepping: bool,
+    state: RunState,
+    skip_next: bool,
+
+    current_time: time::Instant, //TODO: maybe use https://github.com/sebcrozet/instant for WASM
+    accumulator: time::Duration,
+}
+
+impl Default for EmuLoop {
+    fn default() -> Self {
+        Self {
+            running: true,
+            stepping: false,
+            skip_next: false,
+            state: RunState::Run,
+
+            current_time: time::Instant::now(),
+            accumulator: time::Duration::from_secs(0),
+        }
+    }
+}
+
+#[derive(Debug)]
+enum RunState {
+    Run,
+    Render,
+    Sleep,
 }
 
 impl EmuLoop {
+    const FRAME_DURATION: time::Duration =
+        time::Duration::from_nanos((1.0 / 60.0 * 1_000_000_000.0) as u64);
     fn main_events_cleared(&mut self, emu: &mut emu::Emulator, pixels: &mut Pixels) -> bool {
-        if self.running || self.stepping {
-            loop {
-                if emu.step(pixels.frame_mut()) {
-                    break;
+        /*
+        print!(
+            "{:#?} {:#?} state {:?} => ",
+            self.current_time.elapsed(),
+            self.accumulator,
+            self.state
+        );
+        */
+        self.state = self.should_run_or_sleep();
+        /*
+        println!(
+            "{:?} {:#?} {:#?}",
+            self.state,
+            self.current_time.elapsed(),
+            self.accumulator
+        );
+        */
+        match self.state {
+            RunState::Run => {
+                if !self.running && !self.stepping {
+                    return false;
+                }
+                loop {
+                    match emu.step(pixels.frame_mut()) {
+                        emu::DisplayRefresh::NoDisplay => {}
+                        emu::DisplayRefresh::ScreenDone => break,
+                        emu::DisplayRefresh::ScreenDoneNoRefresh => {
+                            self.skip_next = true;
+                            break;
+                        }
+                    }
+                }
+                self.stepping = false;
+            }
+            RunState::Render => {
+                if self.skip_next {
+                    self.skip_next = false;
+                    return false;
+                }
+                return true;
+            }
+            RunState::Sleep => {
+                const SLEEP_TIME: time::Duration = time::Duration::from_millis(1);
+                const EPOLL_TIMEOUT: time::Duration = SLEEP_TIME;
+                // Workaround winit/mio polling using epoll with a timeout of 1ms, so take that
+                // into account for sleeping in case there is no event (most often)
+                if self.accumulator + SLEEP_TIME + EPOLL_TIMEOUT < Self::FRAME_DURATION {
+                    std::thread::sleep(SLEEP_TIME);
                 }
             }
-            self.stepping = false;
-            return true;
         }
         false
+    }
+
+    fn should_run_or_sleep(&mut self) -> RunState {
+        match self.state {
+            RunState::Run => {
+                if self.accumulator >= Self::FRAME_DURATION {
+                    self.accumulator -= Self::FRAME_DURATION;
+                }
+                if self.accumulator >= Self::FRAME_DURATION {
+                    return RunState::Run; // frame skip
+                }
+                RunState::Render
+            }
+            RunState::Render => RunState::Sleep,
+            RunState::Sleep => {
+                let new_time = time::Instant::now();
+                let elapsed_time = new_time.duration_since(self.current_time);
+                self.current_time = new_time;
+                self.accumulator += elapsed_time;
+                if self.accumulator >= Self::FRAME_DURATION {
+                    return RunState::Run;
+                }
+                RunState::Sleep
+            }
+        }
     }
 }

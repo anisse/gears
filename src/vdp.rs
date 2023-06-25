@@ -140,7 +140,7 @@ pub enum VdpInt {
 }
 
 #[derive(Debug)]
-pub enum VdpDisplay {
+pub enum DisplayRefresh {
     NoDisplay,
     ScreenDone,
     ScreenDoneNoRefresh,
@@ -869,10 +869,10 @@ impl Vdp {
         }
         std::fs::rename("temp.ppm", filename).unwrap();
     }
-    pub fn step(&self, pixels: &mut [u8], render_area: RenderArea) -> (VdpInt, VdpDisplay) {
+    pub fn step(&self, pixels: &mut [u8], render_area: RenderArea) -> (VdpInt, DisplayRefresh) {
         let mut state = self.state.borrow_mut();
         state.v_counter = state.v_counter.wrapping_add(1);
-        let mut rendered = VdpDisplay::NoDisplay;
+        let mut rendered = DisplayRefresh::NoDisplay;
         if state.v_counter == 0 {
             state.vertical_scroll = state.reg[9];
             state.v_counter_jumped = false;
@@ -898,10 +898,10 @@ impl Vdp {
         if state.v_counter == VCOUNTER_VBLANK_LINE + 1 {
             state.status |= ST_I;
             if state.reg[1] & REG1_BLANK != 0 {
-                rendered = VdpDisplay::ScreenDone;
+                rendered = DisplayRefresh::ScreenDone;
             } else {
                 // should we fill screen with backdrop color ?
-                rendered = VdpDisplay::ScreenDoneNoRefresh;
+                rendered = DisplayRefresh::ScreenDoneNoRefresh;
             }
         }
         if state.line_interrupt_counter != 0 {

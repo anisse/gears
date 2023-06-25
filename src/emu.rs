@@ -46,6 +46,7 @@ impl From<Button> for joystick::Button {
 
 pub type AudioCallback = Box<dyn FnMut(&mut [f32]) + Send + 'static>;
 pub use psg::AudioConf;
+pub use vdp::DisplayRefresh;
 
 pub struct Emulator {
     cache: cpu::DisasCache,
@@ -79,7 +80,7 @@ impl Emulator {
         emu.cpu.io = io::RcDevice::new(emu.devs.clone());
         emu
     }
-    pub fn step(&mut self, pixels: &mut [u8]) -> bool {
+    pub fn step(&mut self, pixels: &mut [u8]) -> DisplayRefresh {
         let (int, render) = self.devs.pov.vdp.step(pixels, self.render_area);
         if let vdp::VdpInt::InterruptGenerated = int {
             //println!("VDP sent an interrupt !");
@@ -93,10 +94,7 @@ impl Emulator {
         )
         .unwrap();
         self.over_cycles += cycles as isize - CPU_CYCLES_PER_LINE as isize;
-        if let vdp::VdpDisplay::ScreenDone = render {
-            return true;
-        }
-        false
+        render
     }
     pub fn vdp_dump_tileset(&self, pixels: &mut [u8]) {
         self.devs.pov.vdp.dump_tileset(pixels)
@@ -143,7 +141,12 @@ impl Emulator {
             match cmd {
                 TestCommand::WaitFrames(f) => {
                     for _ in 0..*f {
-                        while !self.step(pixels) {}
+                        loop {
+                            // TODO: also take ScreenDoneNoRefresh into account
+                            if let DisplayRefresh::ScreenDone = self.step(pixels) {
+                                break;
+                            }
+                        }
                     }
                     frame += *f
                 }
