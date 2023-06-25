@@ -313,7 +313,7 @@ impl DisasCache {
 
         for (i, c) in dc.cache.iter_mut().enumerate() {
             let opcode = disas(&[i as u8]);
-            if opcode == None {
+            if opcode.is_none() {
                 continue;
             }
             if let Some(op) = opcode {
