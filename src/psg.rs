@@ -325,9 +325,9 @@ impl PsgState {
             }
         }
         if current_sample < dest.len() {
+            self.empty_cycles += audio_conf.samples_to_cycles(dest.len() - current_sample);
             self.synth
                 .audio_f32(&mut dest[current_sample..], audio_conf);
-            self.empty_cycles += (dest.len() - current_sample) as u32;
         }
 
         println!(
