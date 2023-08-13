@@ -224,6 +224,9 @@ impl AudioConf {
     const fn cycles_to_samples(&self, cycles: u32) -> usize {
         (cycles as usize * self.sample_rate as usize * self.channels as usize) / CPU_CLOCK_HZ
     }
+    fn cycles_to_ms(&self, cycles: u32) -> f32 {
+        (self.cycles_to_samples(cycles) as f32 * 1000.0) / self.sample_rate as f32
+    }
     const fn samples_to_cycles(&self, samples: usize) -> u32 {
         ((samples * CPU_CLOCK_HZ) / ((self.sample_rate * self.channels as u32) as usize)) as u32
     }
@@ -325,18 +328,30 @@ impl PsgState {
             }
         }
         if current_sample < dest.len() {
+            /*println!(
+                "filling {} samples or {}ms",
+                dest.len() - current_sample,
+                audio_conf.cycles_to_ms(audio_conf.samples_to_cycles(dest.len() - current_sample)),
+            );*/
             self.empty_cycles += audio_conf.samples_to_cycles(dest.len() - current_sample);
             self.synth
-                .audio_f32(&mut dest[current_sample..], audio_conf);
+                .audio_f32(&mut dest[current_sample..], audio_conf.clone());
         }
 
         println!(
-            "{} empty cycles, {} cmds remaining: {:?}",
+            "{} empty cycles, {} cmds remaining: {} cycles or {}ms",
             self.empty_cycles,
             self.cmds.len(),
-            self.cmds.get(0)
+            self.wait_cycles(),
+            audio_conf.cycles_to_ms(self.wait_cycles()),
         );
         //self.cmds.clear();
+    }
+    fn wait_cycles(&self) -> u32 {
+        self.cmds
+            .iter()
+            .filter_map(|c| if let Cmd::Wait(x) = c { Some(x) } else { None })
+            .sum::<u32>()
     }
 }
 
@@ -367,6 +382,18 @@ impl Psg {
             .map_err(|e| format!("cannot lock self: {e}"))?;
         state.synth_audio_f32(dest, audio_conf);
         Ok(())
+    }
+    pub fn debug_frame(&self) -> Result<(), String> {
+        println!("EOF wait cycles in queue: {}", self.wait_cycles()?);
+        Ok(())
+    }
+    fn wait_cycles(&self) -> Result<u32, String> {
+        let state = self
+            .state
+            .lock()
+            .map_err(|e| format!("cannot lock self: {e}"))?;
+
+        Ok(state.wait_cycles())
     }
 }
 impl io::Device for Arc<Psg> {
