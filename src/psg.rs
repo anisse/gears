@@ -49,7 +49,7 @@ impl From<u8> for Latch {
 #[derive(Default, Clone, Copy, Debug)]
 enum TonePolarity {
     #[default]
-    Neg = -1,
+    Neg = 0,
     Pos = 1,
 }
 impl TonePolarity {
