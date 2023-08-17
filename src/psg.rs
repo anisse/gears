@@ -307,7 +307,7 @@ impl PsgState {
                         self.empty_cycles -= cycles;
                         continue;
                     }
-                    let cycles = cycles - self.empty_cycles;
+                    let cycles = cycles - self.empty_cycles + self.remaining_cycles;
                     // synth
                     let samples = audio_conf.cycles_to_samples(cycles);
                     let end = if current_sample + samples > dest.len() {
@@ -318,6 +318,8 @@ impl PsgState {
                     } else {
                         current_sample + samples
                     };
+                    self.remaining_cycles = cycles - audio_conf.samples_to_cycles(samples);
+                    self.empty_cycles = 0;
                     self.synth
                         .audio_f32(&mut dest[current_sample..end], audio_conf.clone());
                     current_sample = end;
@@ -369,6 +371,8 @@ struct PsgState {
     synth: Synth,
     prev_cycle: u32,
     empty_cycles: u32,
+    remaining_cycles: u32, // basically the opposite of empty_cycles, maybe we should merge the two in a
+                           // single signed value
 }
 #[derive(Default)]
 pub struct Psg {
