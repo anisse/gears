@@ -224,6 +224,12 @@ impl AudioConf {
     const fn cycles_to_samples(&self, cycles: u32) -> usize {
         (cycles as usize * self.sample_rate as usize * self.channels as usize) / CPU_CLOCK_HZ
     }
+    const fn cycles_to_frames(&self, cycles: u32) -> usize {
+        (cycles as usize * self.sample_rate as usize) / CPU_CLOCK_HZ
+    }
+    const fn frames_to_samples(&self, frames: usize) -> usize {
+        frames * self.channels as usize
+    }
     fn cycles_to_ms(&self, cycles: u32) -> f32 {
         (self.cycles_to_samples(cycles) as f32 * 1000.0) / self.sample_rate as f32
     }
@@ -309,7 +315,8 @@ impl PsgState {
                     }
                     let cycles = cycles - self.empty_cycles + self.remaining_cycles;
                     // synth
-                    let samples = audio_conf.cycles_to_samples(cycles);
+                    let frames = audio_conf.cycles_to_frames(cycles);
+                    let samples = audio_conf.frames_to_samples(frames);
                     let end = if current_sample + samples > dest.len() {
                         let remaining = samples - (dest.len() - current_sample);
                         self.cmds
