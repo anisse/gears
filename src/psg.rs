@@ -141,7 +141,7 @@ impl Tone {
         self.counter = (self.reg as u32 - (psg_cycles % self.reg as u32)) as u16;
     }
     fn next_f32_frame(&mut self, dest: &mut [f32], conf: AudioConf) {
-        self.update_state(conf.samples_to_cycles_mono(1));
+        self.update_state(conf.samples_to_frames(1));
         let sample = self.polarity as i32 as f32 * 0.25 * self.attenuation_mul();
         /*
         println!(
@@ -236,7 +236,7 @@ impl AudioConf {
     const fn samples_to_cycles(&self, samples: usize) -> u32 {
         ((samples * CPU_CLOCK_HZ) / ((self.sample_rate * self.channels as u32) as usize)) as u32
     }
-    const fn samples_to_cycles_mono(&self, samples: usize) -> u32 {
+    const fn samples_to_frames(&self, samples: usize) -> u32 {
         ((samples * CPU_CLOCK_HZ) / (self.sample_rate as usize)) as u32
     }
 }
