@@ -216,6 +216,11 @@ impl AudioConf {
                 channels,
                 sample_rate,
             }),
+            (1, 44100) => Ok(Self {
+                // for tests
+                channels,
+                sample_rate,
+            }),
             _ => Err(format!(
                 "Unsupported channels={channels}/sample_rate={sample_rate}"
             )),
