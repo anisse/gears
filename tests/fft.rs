@@ -36,21 +36,35 @@ fn square_wave(freq: f32, sample_rate: u32, duration_secs: u32) -> Vec<f32> {
     buffer
 }
 
-fn top_frequencies(len: usize, sample_rate: u32, spectrum: &[Complex<f32>]) -> Vec<(f32, f32)> {
+fn top_frequencies_iter(
+    len: usize,
+    sample_rate: u32,
+    spectrum: &[Complex<f32>],
+) -> impl Iterator<Item = (f32, f32)> + '_ {
     fn scale(f: f32, len: usize) -> f32 {
         f * (1.0 / (len as f32).sqrt())
     }
-    let mut top = Vec::new();
-    for (i, num) in spectrum.iter().enumerate() {
-        let re = scale(num.re, len);
-        let im = scale(num.im, len);
-        let mag = (re * re + im * im).sqrt();
-        let freq = i as f32 * sample_rate as f32 / len as f32;
-        if mag > 1.0 {
-            top.push((freq, mag))
-        }
-    }
-    top
+    spectrum
+        .iter()
+        .enumerate()
+        .map(move |(i, num)| {
+            let re = scale(num.re, len);
+            let im = scale(num.im, len);
+            let mag = (re * re + im * im).sqrt();
+            let freq = i as f32 * sample_rate as f32 / len as f32;
+            (freq, mag)
+        })
+        .filter(|num| num.1 > 1.0)
+}
+fn top_frequencies(len: usize, sample_rate: u32, spectrum: &[Complex<f32>]) -> Vec<(f32, f32)> {
+    top_frequencies_iter(len, sample_rate, spectrum).collect()
+}
+fn top_freqs_sorted(len: usize, sample_rate: u32, spectrum: &[Complex<f32>]) -> Vec<(f32, f32)> {
+    let mut freqs: Vec<(f32, f32)> = top_frequencies_iter(len, sample_rate, spectrum)
+        .skip(1) // 0 bin
+        .collect();
+    freqs.sort_by(|a, b| b.1.partial_cmp(&a.1).expect("orderable floats"));
+    freqs
 }
 
 fn sine_wave_fft(
@@ -180,16 +194,15 @@ fn test_psg_single_freq() {
     // make a vector for storing the spectrum
     let mut spectrum = r2c.make_output_vec();
     r2c.process(&mut samples, &mut spectrum).unwrap();
-    let top = top_frequencies(LEN, SAMPLE_RATE, &spectrum);
+    let top = top_freqs_sorted(LEN, SAMPLE_RATE, &spectrum);
     dbg!(&top[..5]);
-    assert_eq!(top[0].0, 0.0); // first 0Hz bin
     assert!(top.len() > 1);
     /*
     assert!(
-        (top[1].0 - 440.4).abs() < 0.005,
+        (top[0].0 - 440.4).abs() < 0.005,
         "440 Hz detected as {}, magnitude {}",
-        top[1].0,
-        top[1].1
+        top[0].0,
+        top[0].1
     );
     */
 }
