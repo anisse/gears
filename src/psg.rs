@@ -65,6 +65,7 @@ impl TonePolarity {
 struct Tone {
     reg: u16,
     counter: u16,
+    remaining_millicycles: u16,
     polarity: TonePolarity,
     attenuation: u8,
     right: bool,
@@ -75,6 +76,7 @@ impl Default for Tone {
         Self {
             reg: 0,
             counter: 0,
+            remaining_millicycles: 0,
             polarity: Default::default(),
             attenuation: ATTENUATION_MAX,
             right: true,
@@ -125,8 +127,7 @@ impl Tone {
         ][(self.attenuation & 0xF) as usize]
     }
     // Set next internal state, advancing the clock by a number of cycles
-    fn update_state(&mut self, cycles: u32) {
-        let psg_cycles = cycles / 16;
+    fn update_state(&mut self, psg_cycles: u32) {
         if (self.counter as u32) > psg_cycles {
             self.counter -= psg_cycles as u16;
             return;
@@ -141,7 +142,13 @@ impl Tone {
         self.counter = (self.reg as u32 - (psg_cycles % self.reg as u32)) as u16;
     }
     fn next_f32_frame(&mut self, dest: &mut [f32], conf: AudioConf) {
-        self.update_state(conf.samples_to_frames(1));
+        // Work on millicycles to absorb precision issues
+        // For some reason using powers of 2 (512, 1024, 2048…) instead 1000 to raise precesion
+        // does not yield very good results when testing the FFT of 440.4Hz
+        let psg_millicycles = conf.frames_to_psg_cycles(1000) + self.remaining_millicycles as u32;
+        let psg_cycles = psg_millicycles / 1000;
+        self.remaining_millicycles = (psg_millicycles % 1000) as u16;
+        self.update_state(psg_cycles);
         let sample = self.polarity as i32 as f32 * 0.25 * self.attenuation_mul();
         /*
         println!(
@@ -241,8 +248,8 @@ impl AudioConf {
     const fn samples_to_cycles(&self, samples: usize) -> u32 {
         ((samples * CPU_CLOCK_HZ) / ((self.sample_rate * self.channels as u32) as usize)) as u32
     }
-    const fn samples_to_frames(&self, samples: usize) -> u32 {
-        ((samples * CPU_CLOCK_HZ) / (self.sample_rate as usize)) as u32
+    const fn frames_to_psg_cycles(&self, frames: usize) -> u32 {
+        ((frames * CPU_CLOCK_HZ) / (self.sample_rate as usize * 16)) as u32
     }
 }
 

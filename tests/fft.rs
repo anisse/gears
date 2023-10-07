@@ -197,12 +197,10 @@ fn test_psg_single_freq() {
     let top = top_freqs_sorted(LEN, SAMPLE_RATE, &spectrum);
     dbg!(&top[..5]);
     assert!(top.len() > 1);
-    /*
     assert!(
         (top[0].0 - 440.4).abs() < 0.005,
         "440 Hz detected as {}, magnitude {}",
         top[0].0,
         top[0].1
     );
-    */
 }
