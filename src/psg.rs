@@ -96,6 +96,7 @@ impl Tone {
         self.reg &= REG_DATA_MASK as u16;
         self.reg |= (level as u16) << DATA_SHIFT;
     }
+    #[allow(dead_code)] // used in test
     fn freq(&mut self) -> Option<usize> {
         if self.reg == 0 {
             None
@@ -107,6 +108,7 @@ impl Tone {
         // from 0 to 28dB attenuation
         // >>> for i in range(0, 29, 2):
         // print(10.0 ** (-i / 10.0))
+        #[allow(clippy::excessive_precision)] // in case we want to change to higher-precision type
         [
             1.0,
             0.6309573444801932,
