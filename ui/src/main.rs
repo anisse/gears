@@ -37,7 +37,7 @@ fn main() -> Result<(), String> {
             emu::LCD_HEIGHT as u32,
             surface_texture,
         )
-        .present_mode(wgpu::PresentMode::AutoNoVsync)
+        .present_mode(pixels::wgpu::PresentMode::AutoNoVsync)
         .build()
         .map_err(|e| format!("pixels buffer init: {e}"))?
     };

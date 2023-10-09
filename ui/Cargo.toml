@@ -5,13 +5,13 @@ edition = "2021"
 authors = ["Anisse Astier <anisse@astier.eu>"]
 
 [dependencies]
-pixels = "0.12.1"
-gilrs = "0.10.1"
+pixels = "0.13.0"
+gilrs = "0.10.2"
 cpal = "0.15.2"
-wgpu = "0.15"
+wgpu = "0.17"
 
 [dependencies.winit]
-version = "0.28.3"
+version = "0.28.7"
 default-features = false
 features = ["wayland-dlopen", "wayland"]
 
