@@ -308,6 +308,13 @@ impl Synth {
         }
     }
     fn audio_f32(&mut self, dest: &mut [f32], audio_conf: AudioConf) {
+        if dest.len() % (audio_conf.channels as usize) != 0 {
+            println!(
+                "Wrong frame alignement, not multiple of channels: {} vs {} channels",
+                dest.len(),
+                audio_conf.channels
+            )
+        }
         for frame in dest.chunks_mut(audio_conf.channels.into()) {
             // for now only tone 0
             frame.fill_with(Default::default);
