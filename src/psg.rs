@@ -246,7 +246,7 @@ impl AudioConf {
             )),
         }
     }
-    const fn cycles_to_samples(&self, cycles: u32) -> usize {
+    const fn cycles_to_samples(&self, cycles: u64) -> usize {
         (cycles as usize * self.sample_rate as usize * self.channels as usize) / CPU_CLOCK_HZ
     }
     const fn cycles_to_frames(&self, cycles: u32) -> usize {
@@ -255,7 +255,7 @@ impl AudioConf {
     const fn frames_to_samples(&self, frames: usize) -> usize {
         frames * self.channels as usize
     }
-    fn cycles_to_ms(&self, cycles: u32) -> f32 {
+    fn cycles_to_ms(&self, cycles: u64) -> f32 {
         (self.cycles_to_samples(cycles) as f32 * 1000.0) / self.sample_rate as f32
     }
     const fn samples_to_cycles(&self, samples: usize) -> u32 {
@@ -376,7 +376,8 @@ impl PsgState {
             /*println!(
                 "filling {} samples or {}ms",
                 dest.len() - current_sample,
-                audio_conf.cycles_to_ms(audio_conf.samples_to_cycles(dest.len() - current_sample)),
+                audio_conf
+                    .cycles_to_ms(audio_conf.samples_to_cycles(dest.len() - current_sample) as u64),
             );*/
             self.empty_cycles += audio_conf.samples_to_cycles(dest.len() - current_sample);
             self.synth
@@ -393,11 +394,17 @@ impl PsgState {
         );
         */
     }
-    fn wait_cycles(&self) -> u32 {
+    fn wait_cycles(&self) -> u64 {
         self.cmds
             .iter()
-            .filter_map(|c| if let Cmd::Wait(x) = c { Some(x) } else { None })
-            .sum::<u32>()
+            .filter_map(|c| {
+                if let Cmd::Wait(x) = c {
+                    Some(*x as u64)
+                } else {
+                    None
+                }
+            })
+            .sum::<u64>()
     }
 }
 
@@ -435,7 +442,7 @@ impl Psg {
         //println!("EOF wait cycles in queue: {}", self.wait_cycles()?);
         Ok(())
     }
-    fn wait_cycles(&self) -> Result<u32, String> {
+    fn wait_cycles(&self) -> Result<u64, String> {
         let state = self
             .state
             .lock()
