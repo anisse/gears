@@ -145,7 +145,8 @@ impl Tone {
             self.counter -= psg_cycles as u16;
             return;
         }
-        if self.reg == 0 {
+        if self.reg == 0 || self.reg == 1 {
+            self.polarity = TonePolarity::Pos;
             return;
         }
         let psg_cycles = psg_cycles - self.counter as u32;
