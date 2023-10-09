@@ -204,3 +204,52 @@ fn test_psg_single_freq() {
         top[0].1
     );
 }
+
+#[test]
+fn test_psg_duration() {
+    const SAMPLE_RATE: u32 = 44100;
+    const DURATION_SECS: u32 = 2;
+    const LEN: usize = (SAMPLE_RATE * DURATION_SECS) as usize;
+    const HALF_LEN: usize = LEN / 2;
+    const CPU_CLOCK_HZ: u32 = 3579545;
+
+    let psg = Arc::new(Psg::default());
+    const PSG_CMD: u16 = 0x7F;
+
+    // Set ~233 Hz frequency
+    psg.out(PSG_CMD, 0x80, 0).unwrap();
+    psg.out(PSG_CMD, 0x1E, 0).unwrap();
+    // Set Tone level max (0 attenuation)
+    psg.out(PSG_CMD, 0x90, 0).unwrap();
+    // wait 1 second and set the new ~1316 Hz frequency
+    for i in (20..(CPU_CLOCK_HZ * DURATION_SECS / 2)).step_by(20) {
+        psg.out(PSG_CMD, 0x90, i).unwrap();
+    }
+    psg.out(PSG_CMD, 0x85, CPU_CLOCK_HZ * DURATION_SECS / 2)
+        .unwrap();
+    psg.out(PSG_CMD, 0x05, CPU_CLOCK_HZ * DURATION_SECS / 2)
+        .unwrap();
+    // Generate new frequency for 1 second
+    psg.out(PSG_CMD, 0x90, CPU_CLOCK_HZ * DURATION_SECS)
+        .unwrap();
+
+    let mut samples = vec![0.0; LEN];
+    psg.synth_audio_f32(&mut samples, AudioConf::new(1, SAMPLE_RATE).unwrap())
+        .unwrap();
+    let mut real_planner = RealFftPlanner::<f32>::new();
+    // create a FFT
+    let r2c = real_planner.plan_fft_forward(HALF_LEN);
+    // make a vector for storing the spectrum
+    let mut spectrum = r2c.make_output_vec();
+    r2c.process(&mut samples[..HALF_LEN], &mut spectrum)
+        .unwrap();
+    let top = top_freqs_sorted(HALF_LEN, SAMPLE_RATE, &spectrum);
+    dbg!(&top);
+    assert!(top.len() > 1);
+    assert!(
+        (top[0].0 - 233.0).abs() < 0.005,
+        "233 Hz detected as {}, magnitude {}",
+        top[0].0,
+        top[0].1
+    );
+}
