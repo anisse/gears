@@ -52,13 +52,21 @@ enum TonePolarity {
     Neg = 0,
     Pos = 1,
 }
-impl TonePolarity {
-    fn flip(&mut self) {
+
+impl std::ops::Not for TonePolarity {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
         // XXX: maybe faster with math ?
-        *self = match self {
+        match self {
             TonePolarity::Neg => TonePolarity::Pos,
             TonePolarity::Pos => TonePolarity::Neg,
         }
+    }
+}
+impl TonePolarity {
+    fn flip(&mut self) {
+        *self = !*self;
     }
 }
 
