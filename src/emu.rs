@@ -94,6 +94,10 @@ impl Emulator {
         )
         .unwrap();
         self.over_cycles += cycles as isize - CPU_CYCLES_PER_LINE as isize;
+        if !matches!(&render, DisplayRefresh::NoDisplay) {
+            let psg = Arc::clone(&self.devs.pov.psg);
+            psg.debug_frame().unwrap();
+        }
         render
     }
     pub fn vdp_dump_tileset(&self, pixels: &mut [u8]) {
