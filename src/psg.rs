@@ -323,6 +323,9 @@ impl PsgState {
         let mut current_sample = 0;
         while let Some(cmd) = self.cmds.pop_front() {
             if !matches!(cmd, Cmd::Wait(_)) {
+                /* Empty cycles are here to consume waits that might be added *before* a command;
+                 * If we reach a non-wait command, then we need to reset empty_cycles.
+                 */
                 self.empty_cycles = 0;
             }
             match cmd {
