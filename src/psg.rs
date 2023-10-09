@@ -95,14 +95,17 @@ impl Default for Tone {
 impl Tone {
     fn update_level(&mut self, level: u8) {
         self.attenuation = level & REG_DATA_MASK;
+        //println!("Updated attenuation to {}", self.attenuation);
     }
     fn update_freq(&mut self, level: u8) {
         self.reg &= (DATA_MASK as u16) << DATA_SHIFT;
         self.reg |= (level as u16) & REG_DATA_MASK as u16;
+        //println!("Updated freq hi, now {}", self.reg);
     }
     fn update_freq_data(&mut self, level: u8) {
         self.reg &= REG_DATA_MASK as u16;
         self.reg |= (level as u16) << DATA_SHIFT;
+        //println!("Updated freq lo, now {}", self.reg);
     }
     #[allow(dead_code)] // used in test
     fn freq(&mut self) -> Option<usize> {
@@ -355,6 +358,7 @@ impl PsgState {
                 }
             }
             if current_sample == dest.len() {
+                //println!("Reached end of {} samples buffer", dest.len());
                 break;
             }
         }
@@ -369,6 +373,7 @@ impl PsgState {
                 .audio_f32(&mut dest[current_sample..], audio_conf.clone());
         }
 
+        /*
         println!(
             "{} empty cycles, {} cmds remaining: {} cycles or {}ms",
             self.empty_cycles,
@@ -376,7 +381,7 @@ impl PsgState {
             self.wait_cycles(),
             audio_conf.cycles_to_ms(self.wait_cycles()),
         );
-        //self.cmds.clear();
+        */
     }
     fn wait_cycles(&self) -> u32 {
         self.cmds
@@ -417,7 +422,7 @@ impl Psg {
         Ok(())
     }
     pub fn debug_frame(&self) -> Result<(), String> {
-        println!("EOF wait cycles in queue: {}", self.wait_cycles()?);
+        //println!("EOF wait cycles in queue: {}", self.wait_cycles()?);
         Ok(())
     }
     fn wait_cycles(&self) -> Result<u32, String> {
