@@ -140,20 +140,22 @@ impl Tone {
         ][(self.attenuation & 0xF) as usize]
     }
     // Set next internal state, advancing the clock by a number of cycles
-    fn update_state(&mut self, psg_cycles: u32) {
+    // Returns number of psg cycles after last polarity change
+    fn update_state(&mut self, psg_cycles: u32) -> Option<u16> {
         if (self.counter as u32) > psg_cycles {
             self.counter -= psg_cycles as u16;
-            return;
+            return None;
         }
         if self.reg == 0 || self.reg == 1 {
             self.polarity = TonePolarity::Pos;
-            return;
+            return None;
         }
         let psg_cycles = psg_cycles - self.counter as u32;
         if (psg_cycles / self.reg as u32) % 2 == 0 {
             self.polarity.flip();
         }
         self.counter = (self.reg as u32 - (psg_cycles % self.reg as u32)) as u16;
+        Some(self.reg - self.counter)
     }
     fn next_f32_frame(&mut self, dest: &mut [f32], conf: AudioConf) {
         // Work on millicycles to absorb precision issues
@@ -162,11 +164,19 @@ impl Tone {
         let psg_millicycles = conf.frames_to_psg_cycles(1000) + self.remaining_millicycles as u32;
         let psg_cycles = psg_millicycles / 1000;
         self.remaining_millicycles = (psg_millicycles % 1000) as u16;
-        self.update_state(psg_cycles);
-        let sample = self.polarity as i32 as f32 * 0.25 * self.attenuation_mul();
+        // Smooth
+        let smooth = if let Some(cycles_since_flip) = self.update_state(psg_cycles) {
+            let total = psg_cycles as f32;
+            (((total - cycles_since_flip as f32) * (!self.polarity) as i32 as f32)
+                + (cycles_since_flip as f32 * self.polarity as i32 as f32))
+                / total
+        } else {
+            1.0 // no smoothing
+        };
+        let sample = self.polarity as i32 as f32 * 0.25 * self.attenuation_mul() * smooth;
         /*
         println!(
-            "Sample: {sample}, attenuation: {}, polarity: {:?}, reg: {}, counter: {}",
+            "Sample: {sample}, attenuation: {}, polarity: {:?}, smooth: {smooth}, reg: {}, counter: {}",
             self.attenuation, self.polarity, self.reg, self.counter
         );
         */
