@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     collections::VecDeque,
     sync::{Arc, Mutex},
 };
@@ -336,10 +337,15 @@ impl Synth {
     }
 }
 
-impl PsgState {
-    fn synth_audio_f32(&mut self, dest: &mut [f32], audio_conf: AudioConf) {
+impl PsgRenderState {
+    fn synth_audio_f32(
+        &mut self,
+        cmds: &mut VecDeque<Cmd>,
+        dest: &mut [f32],
+        audio_conf: AudioConf,
+    ) {
         let mut current_sample = 0;
-        while let Some(cmd) = self.cmds.pop_front() {
+        while let Some(cmd) = cmds.pop_front() {
             if !matches!(cmd, Cmd::Wait(_)) {
                 /* Empty cycles are here to consume waits that might be added *before* a command;
                  * If we reach a non-wait command, then we need to reset empty_cycles.
@@ -365,8 +371,7 @@ impl PsgState {
                     let samples = audio_conf.frames_to_samples(frames);
                     let end = if current_sample + samples > dest.len() {
                         let remaining = samples - (dest.len() - current_sample);
-                        self.cmds
-                            .push_front(Cmd::Wait(audio_conf.samples_to_cycles(remaining)));
+                        cmds.push_front(Cmd::Wait(audio_conf.samples_to_cycles(remaining)));
                         dest.len()
                     } else {
                         current_sample + samples
@@ -405,9 +410,8 @@ impl PsgState {
         );
         */
     }
-    fn wait_cycles(&self) -> u64 {
-        self.cmds
-            .iter()
+    fn wait_cycles(&self, cmds: &mut VecDeque<Cmd>) -> u64 {
+        cmds.iter()
             .filter_map(|c| {
                 if let Cmd::Wait(x) = c {
                     Some(*x as u64)
@@ -428,25 +432,36 @@ pub(crate) enum Cmd {
 }
 
 #[derive(Default)]
-struct PsgState {
-    cmds: VecDeque<Cmd>,
+struct PsgRenderState {
     synth: Synth,
-    prev_cycle: u32,
     empty_cycles: u32,
     remaining_cycles: u32, // basically the opposite of empty_cycles, maybe we should merge the two in a
                            // single signed value
 }
-#[derive(Default)]
-pub struct Psg {
-    state: Mutex<PsgState>,
+pub struct PsgRender {
+    state: RefCell<PsgRenderState>,
+    cmds: AudioCmdList,
+    audio_conf: AudioConf,
 }
-impl Psg {
-    pub fn synth_audio_f32(&self, dest: &mut [f32], audio_conf: AudioConf) -> Result<(), String> {
+impl PsgRender {
+    pub fn new(cmds: AudioCmdList, audio_conf: AudioConf) -> PsgRender {
+        PsgRender {
+            state: RefCell::new(PsgRenderState::default()),
+            cmds,
+            audio_conf,
+        }
+    }
+    pub fn synth_audio_f32(&self, dest: &mut [f32]) -> Result<(), String> {
         let mut state = self
             .state
+            .try_borrow_mut()
+            .map_err(|e| format!("cannot lock state: {e}"))?;
+        let mut cmds = self
+            .cmds
+            .0
             .lock()
-            .map_err(|e| format!("cannot lock self: {e}"))?;
-        state.synth_audio_f32(dest, audio_conf);
+            .map_err(|e| format!("cannot lock cmds: {e}"))?;
+        state.synth_audio_f32(&mut cmds, dest, self.audio_conf.clone());
         Ok(())
     }
     pub fn debug_frame(&self) -> Result<(), String> {
@@ -456,30 +471,55 @@ impl Psg {
     fn wait_cycles(&self) -> Result<u64, String> {
         let state = self
             .state
+            .try_borrow_mut()
+            .map_err(|e| format!("cannot lock state: {e}"))?;
+        let mut cmds = self
+            .cmds
+            .0
             .lock()
-            .map_err(|e| format!("cannot lock self: {e}"))?;
+            .map_err(|e| format!("cannot lock cmds: {e}"))?;
 
-        Ok(state.wait_cycles())
+        Ok(state.wait_cycles(&mut cmds))
     }
 }
-impl io::Device for Arc<Psg> {
+
+#[derive(Clone)]
+pub struct AudioCmdList(Arc<Mutex<VecDeque<Cmd>>>);
+pub fn cmds() -> AudioCmdList {
+    AudioCmdList(Arc::new(Mutex::new(VecDeque::new())))
+}
+pub struct PsgDevice {
+    cmds: AudioCmdList,
+    prev_cycle: RefCell<u32>,
+}
+impl PsgDevice {
+    pub fn new(cmds: AudioCmdList) -> PsgDevice {
+        PsgDevice {
+            cmds,
+            prev_cycle: RefCell::new(0_u32),
+        }
+    }
+}
+impl io::Device for PsgDevice {
     fn out(&self, addr: u16, val: u8, cycle: u32) -> Result<(), String> {
         match addr & 0xFF {
             PSG_CMD | PSG_STEREO => {
                 //let mut prev_cycle = self.prev_cycle.borrow_mut();
-                let mut state = self
-                    .state
+                let mut cmds = self
+                    .cmds
+                    .0
                     .lock()
-                    .map_err(|e| format!("cannot lock self: {e}"))?;
-                let elapsed_cycles = if cycle >= state.prev_cycle {
-                    cycle - state.prev_cycle
+                    .map_err(|e| format!("cannot lock cmds: {e}"))?;
+                let mut prev_cycle = self.prev_cycle.borrow_mut();
+                let elapsed_cycles = if cycle >= *prev_cycle {
+                    cycle - *prev_cycle
                 } else {
                     // overflow, or a huge wait (unlikely and ignored)
-                    u32::MAX - (state.prev_cycle - cycle)
+                    u32::MAX - (*prev_cycle - cycle)
                 };
-                state.prev_cycle = cycle;
-                state.cmds.push_back(Cmd::Wait(elapsed_cycles));
-                state.cmds.push_back(match addr & 0xFF {
+                *prev_cycle = cycle;
+                cmds.push_back(Cmd::Wait(elapsed_cycles));
+                cmds.push_back(match addr & 0xFF {
                     PSG_CMD => Cmd::Write(val),
                     PSG_STEREO => Cmd::WriteStereo(val),
                     _ => unreachable!(),

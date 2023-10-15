@@ -55,15 +55,17 @@ pub struct Emulator {
     render_area: vdp::RenderArea,
     over_cycles: isize,
     audio_conf: AudioConf,
+    audio_cmds: psg::AudioCmdList,
     running: Arc<Mutex<bool>>, // TODO: atomic
 }
 
 impl Emulator {
     pub fn init(rom: Vec<u8>, visible_only: bool, audio_conf: AudioConf) -> Self {
+        let audio_cmds = psg::cmds();
         let mut emu = Self {
             cache: cpu::DisasCache::init(),
             cpu: cpu::init(),
-            devs: Rc::new(devices::Devices::new()),
+            devs: Rc::new(devices::Devices::new(audio_cmds.clone())),
             render_area: if visible_only {
                 vdp::RenderArea::VisibleOnly
             } else {
@@ -71,6 +73,7 @@ impl Emulator {
             },
             over_cycles: 0,
             audio_conf,
+            audio_cmds,
             running: Default::default(),
         };
         emu.cpu.mem = mem::Memory::init(mem::Mapper::SegaGG {
@@ -94,10 +97,13 @@ impl Emulator {
         )
         .unwrap();
         self.over_cycles += cycles as isize - CPU_CYCLES_PER_LINE as isize;
-        if !matches!(&render, DisplayRefresh::NoDisplay) {
-            let psg = Arc::clone(&self.devs.pov.psg);
-            psg.debug_frame().unwrap();
-        }
+        // if !matches!(&render, DisplayRefresh::NoDisplay) {
+        //     self.psg_render.debug_frame().unwrap();
+        //     /*
+        //     let psg = Arc::clone(&self.devs.pov.psg);
+        //     psg.debug_frame().unwrap();
+        //     */
+        // }
         render
     }
     pub fn vdp_dump_tileset(&self, pixels: &mut [u8]) {
@@ -116,12 +122,12 @@ impl Emulator {
         }
     }
     pub fn audio_callback(&self) -> AudioCallback {
-        let psg = Arc::clone(&self.devs.pov.psg);
-        let audio_conf = self.audio_conf.clone();
+        let psg_render = psg::PsgRender::new(self.audio_cmds.clone(), self.audio_conf.clone());
         let running = self.running.clone();
         Box::new(move |dest: &mut [f32]| {
             if *running.lock().unwrap() {
-                psg.synth_audio_f32(dest, audio_conf.clone())
+                psg_render
+                    .synth_audio_f32(dest)
                     .expect("synth audio failed");
             } else {
                 // go back to zero, for silence

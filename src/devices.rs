@@ -1,5 +1,4 @@
 use std::rc::Rc;
-use std::sync::Arc;
 
 use crate::io;
 use crate::joystick;
@@ -43,13 +42,13 @@ enum Device {
 }
 
 impl Devices {
-    pub fn new() -> Self {
+    pub fn new(audio_cmds: psg::AudioCmdList) -> Self {
         Self {
             dbg_io: DebugIO {},
             sys: system::System::default(),
             joy: joystick::Joystick::default(),
             pov: PsgOrVdp {
-                psg: Arc::new(psg::Psg::default()),
+                psg: psg::PsgDevice::new(audio_cmds),
                 vdp: vdp::Vdp::default(),
             },
             iomap: vec![
@@ -158,7 +157,7 @@ impl io::Device for DebugIO {
 }
 
 pub(crate) struct PsgOrVdp {
-    pub(crate) psg: Arc<psg::Psg>,
+    pub(crate) psg: psg::PsgDevice,
     pub(crate) vdp: vdp::Vdp,
 }
 impl io::Device for PsgOrVdp {

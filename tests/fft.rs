@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
-use gears::psg::AudioConf;
 use realfft::num_complex::Complex;
 use realfft::RealFftPlanner;
 use realfft::RealToComplex;
 
 use gears::io::Device;
-use gears::psg::Psg;
+use gears::psg::{cmds, AudioConf, PsgDevice, PsgRender};
 
 fn sine_wave(freq: f32, sample_rate: u32, duration_secs: u32) -> Vec<f32> {
     let mut buffer = Vec::new();
@@ -166,6 +165,11 @@ fn test_realfft() {
     }
 }
 
+fn psgs(conf: AudioConf) -> (PsgDevice, PsgRender) {
+    let cmds = cmds();
+    (PsgDevice::new(cmds.clone()), PsgRender::new(cmds, conf))
+}
+
 #[test]
 fn test_psg_single_freq() {
     const SAMPLE_RATE: u32 = 44100;
@@ -173,21 +177,21 @@ fn test_psg_single_freq() {
     const LEN: usize = (SAMPLE_RATE * DURATION_SECS) as usize;
     const CPU_CLOCK_HZ: u32 = 3579545;
 
-    let psg = Arc::new(Psg::default());
+    let (psg_dev, psg_render) = psgs(AudioConf::new(1, SAMPLE_RATE).unwrap());
     const PSG_CMD: u16 = 0x7F;
 
     // Set ~440 Hz frequency
-    psg.out(PSG_CMD, 0x8E, 0).unwrap();
-    psg.out(PSG_CMD, 0x0F, 0).unwrap();
+    psg_dev.out(PSG_CMD, 0x8E, 0).unwrap();
+    psg_dev.out(PSG_CMD, 0x0F, 0).unwrap();
     // Set Tone level max (0 attenuation)
-    psg.out(PSG_CMD, 0x90, 0).unwrap();
+    psg_dev.out(PSG_CMD, 0x90, 0).unwrap();
     // wait 10 seconds
-    psg.out(PSG_CMD, 0x80, CPU_CLOCK_HZ * DURATION_SECS)
+    psg_dev
+        .out(PSG_CMD, 0x80, CPU_CLOCK_HZ * DURATION_SECS)
         .unwrap();
 
     let mut samples = vec![0.0; LEN];
-    psg.synth_audio_f32(&mut samples, AudioConf::new(1, SAMPLE_RATE).unwrap())
-        .unwrap();
+    psg_render.synth_audio_f32(&mut samples).unwrap();
     let mut real_planner = RealFftPlanner::<f32>::new();
     // create a FFT
     let r2c = real_planner.plan_fft_forward(LEN);
@@ -213,29 +217,31 @@ fn test_psg_duration() {
     const HALF_LEN: usize = LEN / 2;
     const CPU_CLOCK_HZ: u32 = 3579545;
 
-    let psg = Arc::new(Psg::default());
+    let (psg_dev, psg_render) = psgs(AudioConf::new(1, SAMPLE_RATE).unwrap());
     const PSG_CMD: u16 = 0x7F;
 
     // Set ~233 Hz frequency
-    psg.out(PSG_CMD, 0x80, 0).unwrap();
-    psg.out(PSG_CMD, 0x1E, 0).unwrap();
+    psg_dev.out(PSG_CMD, 0x80, 0).unwrap();
+    psg_dev.out(PSG_CMD, 0x1E, 0).unwrap();
     // Set Tone level max (0 attenuation)
-    psg.out(PSG_CMD, 0x90, 0).unwrap();
+    psg_dev.out(PSG_CMD, 0x90, 0).unwrap();
     // wait 1 second and set the new ~1316 Hz frequency
     for i in (20..(CPU_CLOCK_HZ * DURATION_SECS / 2)).step_by(20) {
-        psg.out(PSG_CMD, 0x90, i).unwrap();
+        psg_dev.out(PSG_CMD, 0x90, i).unwrap();
     }
-    psg.out(PSG_CMD, 0x85, CPU_CLOCK_HZ * DURATION_SECS / 2)
+    psg_dev
+        .out(PSG_CMD, 0x85, CPU_CLOCK_HZ * DURATION_SECS / 2)
         .unwrap();
-    psg.out(PSG_CMD, 0x05, CPU_CLOCK_HZ * DURATION_SECS / 2)
+    psg_dev
+        .out(PSG_CMD, 0x05, CPU_CLOCK_HZ * DURATION_SECS / 2)
         .unwrap();
     // Generate new frequency for 1 second
-    psg.out(PSG_CMD, 0x90, CPU_CLOCK_HZ * DURATION_SECS)
+    psg_dev
+        .out(PSG_CMD, 0x90, CPU_CLOCK_HZ * DURATION_SECS)
         .unwrap();
 
     let mut samples = vec![0.0; LEN];
-    psg.synth_audio_f32(&mut samples, AudioConf::new(1, SAMPLE_RATE).unwrap())
-        .unwrap();
+    psg_render.synth_audio_f32(&mut samples).unwrap();
     let mut real_planner = RealFftPlanner::<f32>::new();
     // create a FFT
     let r2c = real_planner.plan_fft_forward(HALF_LEN);
