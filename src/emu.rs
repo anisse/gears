@@ -54,26 +54,22 @@ pub struct Emulator {
     devs: Rc<devices::Devices>,
     render_area: vdp::RenderArea,
     over_cycles: isize,
-    audio_conf: AudioConf,
-    audio_cmds: psg::AudioCmdList,
     running: Arc<Mutex<bool>>, // TODO: atomic
 }
 
 impl Emulator {
-    pub fn init(rom: Vec<u8>, visible_only: bool, audio_conf: AudioConf) -> Self {
-        let audio_cmds = psg::cmds();
+    pub fn init(rom: Vec<u8>, visible_only: bool, audio_conf: AudioConf) -> (Self, AudioCallback) {
+        let (audio_tx, audio_rx) = psg::cmds();
         let mut emu = Self {
             cache: cpu::DisasCache::init(),
             cpu: cpu::init(),
-            devs: Rc::new(devices::Devices::new(audio_cmds.clone())),
+            devs: Rc::new(devices::Devices::new(audio_tx)),
             render_area: if visible_only {
                 vdp::RenderArea::VisibleOnly
             } else {
                 vdp::RenderArea::EffectiveArea
             },
             over_cycles: 0,
-            audio_conf,
-            audio_cmds,
             running: Default::default(),
         };
         emu.cpu.mem = mem::Memory::init(mem::Mapper::SegaGG {
@@ -81,7 +77,8 @@ impl Emulator {
             backup_ram: None,
         });
         emu.cpu.io = io::RcDevice::new(emu.devs.clone());
-        emu
+        let running = emu.running.clone();
+        (emu, Self::audio_callback(audio_rx, audio_conf, running))
     }
     pub fn step(&mut self, pixels: &mut [u8]) -> DisplayRefresh {
         let (int, render) = self.devs.pov.vdp.step(pixels, self.render_area);
@@ -114,9 +111,12 @@ impl Emulator {
             _ => self.devs.joy.set_button(button.into(), false),
         }
     }
-    pub fn audio_callback(&self) -> AudioCallback {
-        let psg_render = psg::PsgRender::new(self.audio_cmds.clone(), self.audio_conf.clone());
-        let running = self.running.clone();
+    fn audio_callback(
+        cmds: psg::AudioCmdReceiver,
+        audio_conf: AudioConf,
+        running: Arc<Mutex<bool>>,
+    ) -> AudioCallback {
+        let psg_render = psg::PsgRender::new(cmds, audio_conf);
         Box::new(move |dest: &mut [f32]| {
             if *running.lock().unwrap() {
                 psg_render

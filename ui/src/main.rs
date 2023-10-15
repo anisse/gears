@@ -60,13 +60,13 @@ fn main() -> Result<(), String> {
     }
 
     let (audio_device, stream_config) = audio_init()?;
-    let mut emu = emu::Emulator::init(
+    let (mut emu, audio_callback) = emu::Emulator::init(
         data,
         true,
         emu::AudioConf::new(stream_config.channels, stream_config.sample_rate.0)?,
     );
     emu.run_commands(pixels.frame_mut(), &cmds);
-    let audio_stream = audio_init_stream(audio_device, stream_config, emu.audio_callback())?;
+    let audio_stream = audio_init_stream(audio_device, stream_config, audio_callback)?;
     audio_stream
         .play()
         .map_err(|e| format!("cannot play stream: {e}"))?;

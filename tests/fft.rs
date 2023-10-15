@@ -166,8 +166,8 @@ fn test_realfft() {
 }
 
 fn psgs(conf: AudioConf) -> (PsgDevice, PsgRender) {
-    let cmds = cmds();
-    (PsgDevice::new(cmds.clone()), PsgRender::new(cmds, conf))
+    let (tx, rx) = cmds();
+    (PsgDevice::new(tx), PsgRender::new(rx, conf))
 }
 
 #[test]

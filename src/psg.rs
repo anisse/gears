@@ -1,8 +1,4 @@
-use std::{
-    cell::RefCell,
-    collections::VecDeque,
-    sync::{Arc, Mutex},
-};
+use std::{cell::RefCell, collections::VecDeque, sync::mpsc};
 
 use crate::io;
 
@@ -340,12 +336,12 @@ impl Synth {
 impl PsgRenderState {
     fn synth_audio_f32(
         &mut self,
-        cmds: &mut VecDeque<Cmd>,
+        cmds: &mpsc::Receiver<Cmd>,
         dest: &mut [f32],
         audio_conf: AudioConf,
     ) {
         let mut current_sample = 0;
-        while let Some(cmd) = cmds.pop_front() {
+        for cmd in cmds.try_iter() {
             if !matches!(cmd, Cmd::Wait(_)) {
                 /* Empty cycles are here to consume waits that might be added *before* a command;
                  * If we reach a non-wait command, then we need to reset empty_cycles.
@@ -440,11 +436,11 @@ struct PsgRenderState {
 }
 pub struct PsgRender {
     state: RefCell<PsgRenderState>,
-    cmds: AudioCmdList,
+    cmds: AudioCmdReceiver,
     audio_conf: AudioConf,
 }
 impl PsgRender {
-    pub fn new(cmds: AudioCmdList, audio_conf: AudioConf) -> PsgRender {
+    pub fn new(cmds: AudioCmdReceiver, audio_conf: AudioConf) -> PsgRender {
         PsgRender {
             state: RefCell::new(PsgRenderState::default()),
             cmds,
@@ -456,27 +452,25 @@ impl PsgRender {
             .state
             .try_borrow_mut()
             .map_err(|e| format!("cannot lock state: {e}"))?;
-        let mut cmds = self
-            .cmds
-            .0
-            .lock()
-            .map_err(|e| format!("cannot lock cmds: {e}"))?;
-        state.synth_audio_f32(&mut cmds, dest, self.audio_conf.clone());
+        state.synth_audio_f32(&self.cmds.0, dest, self.audio_conf.clone());
         Ok(())
     }
 }
 
-#[derive(Clone)]
-pub struct AudioCmdList(Arc<Mutex<VecDeque<Cmd>>>);
-pub fn cmds() -> AudioCmdList {
-    AudioCmdList(Arc::new(Mutex::new(VecDeque::new())))
+pub struct AudioCmdReceiver(mpsc::Receiver<Cmd>);
+pub struct AudioCmdSender(mpsc::Sender<Cmd>);
+
+//pub struct AudioCmdListReceiver(Arc<Mutex<VecDeque<Cmd>>>);
+pub fn cmds() -> (AudioCmdSender, AudioCmdReceiver) {
+    let (tx, rx) = mpsc::channel::<Cmd>();
+    (AudioCmdSender(tx), AudioCmdReceiver(rx))
 }
 pub struct PsgDevice {
-    cmds: AudioCmdList,
+    cmds: AudioCmdSender,
     prev_cycle: RefCell<u32>,
 }
 impl PsgDevice {
-    pub fn new(cmds: AudioCmdList) -> PsgDevice {
+    pub fn new(cmds: AudioCmdSender) -> PsgDevice {
         PsgDevice {
             cmds,
             prev_cycle: RefCell::new(0_u32),
@@ -488,11 +482,6 @@ impl io::Device for PsgDevice {
         match addr & 0xFF {
             PSG_CMD | PSG_STEREO => {
                 //let mut prev_cycle = self.prev_cycle.borrow_mut();
-                let mut cmds = self
-                    .cmds
-                    .0
-                    .lock()
-                    .map_err(|e| format!("cannot lock cmds: {e}"))?;
                 let mut prev_cycle = self.prev_cycle.borrow_mut();
                 let elapsed_cycles = if cycle >= *prev_cycle {
                     cycle - *prev_cycle
@@ -501,12 +490,18 @@ impl io::Device for PsgDevice {
                     u32::MAX - (*prev_cycle - cycle)
                 };
                 *prev_cycle = cycle;
-                cmds.push_back(Cmd::Wait(elapsed_cycles));
-                cmds.push_back(match addr & 0xFF {
-                    PSG_CMD => Cmd::Write(val),
-                    PSG_STEREO => Cmd::WriteStereo(val),
-                    _ => unreachable!(),
-                });
+                self.cmds
+                    .0
+                    .send(Cmd::Wait(elapsed_cycles))
+                    .map_err(|e| format!("cannot send wait cmd: {e}"))?;
+                self.cmds
+                    .0
+                    .send(match addr & 0xFF {
+                        PSG_CMD => Cmd::Write(val),
+                        PSG_STEREO => Cmd::WriteStereo(val),
+                        _ => unreachable!(),
+                    })
+                    .map_err(|e| format!("cannot send cmd: {e}"))?;
                 /*
                 println!(
                     "PSG Write @{addr:04X}: <{elapsed_cycles}> --> [{val}] (len: {})",

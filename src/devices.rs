@@ -42,7 +42,7 @@ enum Device {
 }
 
 impl Devices {
-    pub fn new(audio_cmds: psg::AudioCmdList) -> Self {
+    pub fn new(audio_cmds: psg::AudioCmdSender) -> Self {
         Self {
             dbg_io: DebugIO {},
             sys: system::System::default(),
