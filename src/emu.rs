@@ -1,8 +1,9 @@
 pub mod testcmd;
 
 use std::rc::Rc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use crate::cpu;
 use crate::devices;
@@ -54,7 +55,7 @@ pub struct Emulator {
     devs: Rc<devices::Devices>,
     render_area: vdp::RenderArea,
     over_cycles: isize,
-    running: Arc<Mutex<bool>>, // TODO: atomic
+    running: Arc<AtomicBool>,
 }
 
 impl Emulator {
@@ -114,11 +115,11 @@ impl Emulator {
     fn audio_callback(
         cmds: psg::AudioCmdReceiver,
         audio_conf: AudioConf,
-        running: Arc<Mutex<bool>>,
+        running: Arc<AtomicBool>,
     ) -> AudioCallback {
         let psg_render = psg::PsgRender::new(cmds, audio_conf);
         Box::new(move |dest: &mut [f32]| {
-            if *running.lock().unwrap() {
+            if running.load(Ordering::Acquire) {
                 psg_render
                     .synth_audio_f32(dest)
                     .expect("synth audio failed");
@@ -136,7 +137,7 @@ impl Emulator {
         })
     }
     pub fn run(&self, running: bool) {
-        *self.running.lock().unwrap() = running;
+        self.running.swap(running, Ordering::AcqRel);
     }
     pub fn run_commands(&mut self, pixels: &mut [u8], cmds: &[testcmd::TestCommand]) -> u32 {
         let mut frame = 0;
