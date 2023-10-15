@@ -369,14 +369,14 @@ impl PsgRenderState {
                     // synth
                     let frames = audio_conf.cycles_to_frames(cycles);
                     let samples = audio_conf.frames_to_samples(frames);
-                    let end = if current_sample + samples > dest.len() {
+                    let (end, remaining) = if current_sample + samples > dest.len() {
                         let remaining = samples - (dest.len() - current_sample);
-                        cmds.push_front(Cmd::Wait(audio_conf.samples_to_cycles(remaining)));
-                        dest.len()
+                        (dest.len(), audio_conf.samples_to_cycles(remaining))
                     } else {
-                        current_sample + samples
+                        (current_sample + samples, 0)
                     };
-                    self.remaining_cycles = cycles - audio_conf.samples_to_cycles(samples);
+                    self.remaining_cycles =
+                        cycles - audio_conf.samples_to_cycles(samples) + remaining;
                     self.empty_cycles = 0;
                     self.synth
                         .audio_f32(&mut dest[current_sample..end], audio_conf.clone());
