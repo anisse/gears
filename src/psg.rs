@@ -464,23 +464,6 @@ impl PsgRender {
         state.synth_audio_f32(&mut cmds, dest, self.audio_conf.clone());
         Ok(())
     }
-    pub fn debug_frame(&self) -> Result<(), String> {
-        //println!("EOF wait cycles in queue: {}", self.wait_cycles()?);
-        Ok(())
-    }
-    fn wait_cycles(&self) -> Result<u64, String> {
-        let state = self
-            .state
-            .try_borrow_mut()
-            .map_err(|e| format!("cannot lock state: {e}"))?;
-        let mut cmds = self
-            .cmds
-            .0
-            .lock()
-            .map_err(|e| format!("cannot lock cmds: {e}"))?;
-
-        Ok(state.wait_cycles(&mut cmds))
-    }
 }
 
 #[derive(Clone)]
