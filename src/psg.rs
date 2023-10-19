@@ -357,10 +357,12 @@ impl PsgRenderState {
                 Cmd::Wait(cycles) => {
                     // First check that we didn't have any empty_cycles to consume
                     if self.empty_cycles > 0 && cycles <= self.empty_cycles {
+                        /*
                         println!(
                             "consuming {cycles} empty cycles out of {}",
                             self.empty_cycles
                         );
+                        */
                         self.empty_cycles -= cycles;
                         continue;
                     }
