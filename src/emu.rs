@@ -154,12 +154,10 @@ impl Emulator {
                 TestCommand::WaitFrames(f) => {
                     for _ in 0..*f {
                         loop {
-                            // TODO: also take ScreenDoneNoRefresh into account
-                            /* if matches!(
+                            if matches!(
                                 self.step(pixels),
-                                DisplayRefresh::ScreenDone /*| DisplayRefresh::ScreenDoneNoRefresh */
-                            ) { */
-                            if let DisplayRefresh::ScreenDone = self.step(pixels) {
+                                DisplayRefresh::ScreenDone | DisplayRefresh::ScreenDoneNoRefresh,
+                            ) {
                                 break;
                             }
                         }
