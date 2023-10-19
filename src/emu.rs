@@ -139,18 +139,31 @@ impl Emulator {
     pub fn run(&self, running: bool) {
         self.running.swap(running, Ordering::AcqRel);
     }
-    pub fn run_commands(&mut self, pixels: &mut [u8], cmds: &[testcmd::TestCommand]) -> u32 {
+    pub fn run_commands(
+        &mut self,
+        pixels: &mut [u8],
+        cmds: &[testcmd::TestCommand],
+        audio_callback: &mut AudioCallback,
+        audio_conf: AudioConf,
+    ) -> u32 {
         let mut frame = 0;
+        let mut audio_buf = vec![0.0_f32; audio_conf.display_frame_to_samples()];
+        self.run(true);
         for cmd in cmds.iter() {
             match cmd {
                 TestCommand::WaitFrames(f) => {
                     for _ in 0..*f {
                         loop {
                             // TODO: also take ScreenDoneNoRefresh into account
+                            /* if matches!(
+                                self.step(pixels),
+                                DisplayRefresh::ScreenDone /*| DisplayRefresh::ScreenDoneNoRefresh */
+                            ) { */
                             if let DisplayRefresh::ScreenDone = self.step(pixels) {
                                 break;
                             }
                         }
+                        audio_callback(&mut audio_buf);
                     }
                     frame += *f
                 }
@@ -158,6 +171,7 @@ impl Emulator {
                 TestCommand::ReleaseButton(b) => self.release(*b),
             }
         }
+        self.run(false);
         frame
     }
 }

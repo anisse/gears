@@ -60,12 +60,9 @@ fn main() -> Result<(), String> {
     }
 
     let (audio_device, stream_config) = audio_init()?;
-    let (mut emu, audio_callback) = emu::Emulator::init(
-        data,
-        true,
-        emu::AudioConf::new(stream_config.channels, stream_config.sample_rate.0)?,
-    );
-    emu.run_commands(pixels.frame_mut(), &cmds);
+    let audio_conf = emu::AudioConf::new(stream_config.channels, stream_config.sample_rate.0)?;
+    let (mut emu, mut audio_callback) = emu::Emulator::init(data, true, audio_conf.clone());
+    emu.run_commands(pixels.frame_mut(), &cmds, &mut audio_callback, audio_conf);
     let audio_stream = audio_init_stream(audio_device, stream_config, audio_callback)?;
     audio_stream
         .play()

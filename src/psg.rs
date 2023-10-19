@@ -272,6 +272,9 @@ impl AudioConf {
     const fn frames_to_psg_cycles(&self, frames: usize) -> u32 {
         ((frames * CPU_CLOCK_HZ) / (self.sample_rate as usize * 16)) as u32
     }
+    pub const fn display_frame_to_samples(&self) -> usize {
+        self.sample_rate as usize * self.channels as usize / 60
+    }
 }
 
 impl Synth {

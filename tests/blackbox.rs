@@ -50,10 +50,11 @@ fn common_test(filename: &Path, cmds: &[TestCommand], result: &[u8]) -> Result<(
     let mut data: Vec<u8> = vec![];
     file.read_to_end(&mut data)
         .map_err(|why| format!("Could not read {}: {}", path.display(), why))?;
-    let (mut emu, _audio) = emu::Emulator::init(data, true, emu::AudioConf::new(2, 44100)?);
+    let audio_conf = emu::AudioConf::new(2, 44100)?;
+    let (mut emu, mut audio) = emu::Emulator::init(data, true, audio_conf.clone());
     let mut pixels = vec![0; emu::LCD_WIDTH * emu::LCD_HEIGHT * 4];
     assert_eq!(pixels.len(), result.len());
-    let frame = emu.run_commands(&mut pixels, cmds);
+    let frame = emu.run_commands(&mut pixels, cmds, &mut audio, audio_conf);
     /*
     pixels
         .iter()
