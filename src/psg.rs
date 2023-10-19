@@ -396,15 +396,7 @@ impl PsgRenderState {
                 .audio_f32(&mut dest[current_sample..], audio_conf.clone());
         }
 
-        /*
-        println!(
-            "{} empty cycles, {} cmds remaining: {} cycles or {}ms",
-            self.empty_cycles,
-            self.cmds.len(),
-            self.wait_cycles(),
-            audio_conf.cycles_to_ms(self.wait_cycles()),
-        );
-        */
+        //println!("{} empty cycles", self.empty_cycles);
     }
     fn wait_cycles(&self, cmds: &mut VecDeque<Cmd>) -> u64 {
         cmds.iter()
@@ -460,7 +452,6 @@ impl PsgRender {
 pub struct AudioCmdReceiver(mpsc::Receiver<Cmd>);
 pub struct AudioCmdSender(mpsc::Sender<Cmd>);
 
-//pub struct AudioCmdListReceiver(Arc<Mutex<VecDeque<Cmd>>>);
 pub fn cmds() -> (AudioCmdSender, AudioCmdReceiver) {
     let (tx, rx) = mpsc::channel::<Cmd>();
     (AudioCmdSender(tx), AudioCmdReceiver(rx))
@@ -502,12 +493,7 @@ impl io::Device for PsgDevice {
                         _ => unreachable!(),
                     })
                     .map_err(|e| format!("cannot send cmd: {e}"))?;
-                /*
-                println!(
-                    "PSG Write @{addr:04X}: <{elapsed_cycles}> --> [{val}] (len: {})",
-                    state.cmds.len()
-                );
-                */
+                //println!("PSG Write @{addr:04X}: <{elapsed_cycles}> --> [{val}]");
                 Ok(())
             }
             _ => Err(format!(
