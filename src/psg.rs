@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::VecDeque, sync::mpsc};
+use std::{cell::RefCell, sync::mpsc};
 
 use crate::io;
 
@@ -400,17 +400,6 @@ impl PsgRenderState {
         }
 
         //println!("{} empty cycles", self.empty_cycles);
-    }
-    fn wait_cycles(&self, cmds: &mut VecDeque<Cmd>) -> u64 {
-        cmds.iter()
-            .filter_map(|c| {
-                if let Cmd::Wait(x) = c {
-                    Some(*x as u64)
-                } else {
-                    None
-                }
-            })
-            .sum::<u64>()
     }
 }
 
