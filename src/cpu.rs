@@ -1384,7 +1384,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
         s.r.PC += op.length as u16;
     }
 
-    s.cycle_counter += op_len as u32;
+    s.cycle_counter = s.cycle_counter.wrapping_add(op_len as u32);
     Ok(op_len)
 }
 
