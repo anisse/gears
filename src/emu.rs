@@ -28,6 +28,7 @@ pub enum Button {
 
 pub const LCD_HEIGHT: usize = vdp::VISIBLE_PIXEL_HEIGHT;
 pub const LCD_WIDTH: usize = vdp::VISIBLE_PIXEL_WIDTH;
+const FRAMES_PER_SECOND_GAMEGEAR: usize = 60;
 
 const CPU_CYCLES_PER_LINE: usize = 228;
 
@@ -147,7 +148,8 @@ impl Emulator {
         audio_conf: AudioConf,
     ) -> u32 {
         let mut frame = 0;
-        let mut audio_buf = vec![0.0_f32; audio_conf.display_frame_to_samples()];
+        let mut audio_buf =
+            vec![0.0_f32; audio_conf.display_frame_to_samples(FRAMES_PER_SECOND_GAMEGEAR)];
         self.run(true);
         for cmd in cmds.iter() {
             match cmd {

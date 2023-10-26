@@ -5,6 +5,7 @@ use crate::io;
 const PSG_CMD: u16 = 0x7F;
 const PSG_STEREO: u16 = 0x06;
 const CPU_CLOCK_HZ: usize = 3579545;
+const CPU_TO_PSG_CLOCK_DIVIDER: usize = 16;
 
 const REG_MASK: u8 = 0b1000_0000;
 const REG_DATA_MASK: u8 = 0b0000_1111;
@@ -270,10 +271,10 @@ impl AudioConf {
         ((samples * CPU_CLOCK_HZ) / ((self.sample_rate * self.channels as u32) as usize)) as u32
     }
     const fn frames_to_psg_cycles(&self, frames: usize) -> u32 {
-        ((frames * CPU_CLOCK_HZ) / (self.sample_rate as usize * 16)) as u32
+        ((frames * CPU_CLOCK_HZ) / (self.sample_rate as usize * CPU_TO_PSG_CLOCK_DIVIDER)) as u32
     }
-    pub const fn display_frame_to_samples(&self) -> usize {
-        self.sample_rate as usize * self.channels as usize / 60
+    pub const fn display_frame_to_samples(&self, fps: usize) -> usize {
+        self.sample_rate as usize * self.channels as usize / fps
     }
 }
 
