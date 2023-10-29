@@ -255,6 +255,7 @@ impl AudioConf {
             )),
         }
     }
+    #[allow(dead_code)] // used in debug code
     const fn cycles_to_samples(&self, cycles: u64) -> usize {
         (cycles as usize * self.sample_rate as usize * self.channels as usize) / CPU_CLOCK_HZ
     }
