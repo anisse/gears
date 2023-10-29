@@ -22,6 +22,8 @@ const NOISE_OUTPUT: u16 = 1;
 
 const REG_LATCH_MASK: u8 = 0b0111_0000;
 
+const AUDIO_F32_CHANNEL_MAX: f32 = 0.25; // 1.0 / 4
+
 #[derive(Default)]
 enum Latch {
     #[default]
@@ -182,7 +184,8 @@ impl Tone {
         } else {
             1.0 // no smoothing
         };
-        let sample = self.polarity as i32 as f32 * 0.25 * self.attenuation_mul() * smooth;
+        let sample =
+            self.polarity as i32 as f32 * AUDIO_F32_CHANNEL_MAX * self.attenuation_mul() * smooth;
         /*
         println!(
             "Sample: {sample}, attenuation: {}, polarity: {:?}, smooth: {smooth}, reg: {}, counter: {}",
@@ -286,7 +289,8 @@ impl Noise {
                 };
             }
         }
-        let sample = self.polarity as i32 as f32 * 0.25 * self.tone.attenuation_mul();
+        let sample =
+            self.polarity as i32 as f32 * AUDIO_F32_CHANNEL_MAX * self.tone.attenuation_mul();
         /*
         println!(
             "Sample: {sample}, attenuation: {}, polarity: {:?}, LFSR: {:016b}",
@@ -407,6 +411,8 @@ impl Synth {
                 audio_conf.channels
             )
         }
+        // handrolled mixer; all channels have a hardcoded 0.25 maximum, so we use the full f32
+        // range
         for frame in dest.chunks_mut(audio_conf.channels.into()) {
             // for now only tone 0
             frame.fill_with(Default::default);
