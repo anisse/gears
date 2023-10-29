@@ -12,6 +12,13 @@ const REG_DATA_MASK: u8 = 0b0000_1111;
 const DATA_MASK: u8 = 0b0011_1111;
 const DATA_SHIFT: usize = 4;
 const ATTENUATION_MAX: u8 = REG_DATA_MASK;
+const NOISE_TYPE_MASK: u8 = 0b0000_0100;
+const NOISE_CLOCK_MASK: u8 = 0b0000_0011;
+const NOISE_REG_BASE_VALUE: u16 = 16;
+const NOISE_STATE_INITIAL: u16 = 0x8000;
+const NOISE_WHITE_TAPPED_BIT_0: u32 = 0;
+const NOISE_WHITE_TAPPED_BIT_1: u32 = 3;
+const NOISE_OUTPUT: u16 = 1;
 
 const REG_LATCH_MASK: u8 = 0b0111_0000;
 
@@ -155,13 +162,17 @@ impl Tone {
         self.counter = (self.reg as u32 - (psg_cycles % self.reg as u32)) as u16;
         Some(self.reg - self.counter)
     }
-    fn next_f32_frame(&mut self, dest: &mut [f32], conf: AudioConf) {
+    fn consume_frame(&mut self, conf: AudioConf) -> u32 {
         // Work on millicycles to absorb precision issues
         // For some reason using powers of 2 (512, 1024, 2048…) instead 1000 to raise precesion
         // does not yield very good results when testing the FFT of 440.4Hz
         let psg_millicycles = conf.frames_to_psg_cycles(1000) + self.remaining_millicycles as u32;
         let psg_cycles = psg_millicycles / 1000;
         self.remaining_millicycles = (psg_millicycles % 1000) as u16;
+        psg_cycles
+    }
+    fn next_f32_frame(&mut self, dest: &mut [f32], conf: AudioConf) {
+        let psg_cycles = self.consume_frame(conf.clone());
         // Smooth
         let smooth = if let Some(cycles_since_flip) = self.update_state(psg_cycles) {
             let total = psg_cycles as f32;
@@ -205,24 +216,92 @@ fn freq_440() {
 #[derive(Default)]
 enum NoiseType {
     #[default]
-    White,
-    Periodic,
+    Periodic = 0,
+    White = 1,
+}
+
+#[derive(Default)]
+enum NoiseToneSource {
+    #[default]
+    Inner,
+    Tone2,
 }
 
 #[derive(Default)]
 struct Noise {
+    tone: Tone,
     state: u16,
-    attenuation: u8,
-    right: bool,
-    left: bool,
+    polarity: TonePolarity,
     typ: NoiseType,
+    src: NoiseToneSource,
 }
 
 impl Noise {
     fn update_level(&mut self, level: u8) {
-        self.attenuation = level & REG_DATA_MASK;
+        self.tone.attenuation = level & REG_DATA_MASK;
     }
-    fn ctrl(&mut self, ctrl: u8) {}
+    fn ctrl(&mut self, ctrl: u8) {
+        self.typ = if ctrl & NOISE_TYPE_MASK == 0 {
+            NoiseType::Periodic
+        } else {
+            NoiseType::White
+        };
+        self.state = NOISE_STATE_INITIAL;
+        match ctrl & NOISE_CLOCK_MASK {
+            0..=2 => {
+                self.src = NoiseToneSource::Inner;
+                self.tone.reg = NOISE_REG_BASE_VALUE << (ctrl & NOISE_CLOCK_MASK);
+            }
+            3 => {
+                self.src = NoiseToneSource::Tone2;
+                self.tone.reg = 0;
+            }
+            _ => unreachable!(),
+        };
+    }
+    fn update_lfsr(&mut self) -> u16 {
+        let out = self.state & NOISE_OUTPUT;
+        self.state = (self.state >> 1)
+            | ((((self.state >> NOISE_WHITE_TAPPED_BIT_1) & 1)
+                ^ ((self.state >> NOISE_WHITE_TAPPED_BIT_0) & 1))
+                << 15);
+        out
+    }
+    fn next_f32_frame(&mut self, dest: &mut [f32], conf: AudioConf) {
+        if let NoiseToneSource::Tone2 = self.src {
+            println!("Unimplemented noise source tone 2");
+            return;
+        }
+        if let NoiseType::Periodic = self.typ {
+            println!("Unimplemented periodic noise type");
+            return;
+        }
+        let psg_cycles = self.tone.consume_frame(conf.clone());
+        if self.tone.update_state(psg_cycles).is_some() {
+            if let TonePolarity::Pos = self.tone.polarity {
+                self.polarity = match self.update_lfsr() & 1 {
+                    0 => TonePolarity::Neg,
+                    1 => TonePolarity::Pos,
+                    _ => unreachable!(),
+                };
+            }
+        }
+        let sample = self.polarity as i32 as f32 * 0.25 * self.tone.attenuation_mul();
+        /*
+        println!(
+            "Sample: {sample}, attenuation: {}, polarity: {:?}, LFSR: {:016b}",
+            self.tone.attenuation, self.polarity, self.state
+        );
+        */
+        if conf.channels == 2 && dest.len() == 2 {
+            dest[0] += if self.tone.left { sample } else { 0.0 };
+            dest[1] += if self.tone.right { sample } else { 0.0 };
+            return;
+        }
+        for s in dest.iter_mut() {
+            *s += sample;
+        }
+    }
 }
 
 #[derive(Default)]
@@ -285,8 +364,8 @@ impl Synth {
             t.right = (channels & (1 << i)) != 0;
             t.left = (channels & (1 << (i + 4))) != 0;
         }
-        self.noise.right = (channels & (1 << 3)) != 0;
-        self.noise.left = (channels & (1 << (3 + 4))) != 0;
+        self.noise.tone.right = (channels & (1 << 3)) != 0;
+        self.noise.tone.left = (channels & (1 << (3 + 4))) != 0;
     }
     fn cmd(&mut self, cmd: u8) {
         if cmd & REG_MASK != 0 {
@@ -334,6 +413,7 @@ impl Synth {
             self.tone
                 .iter_mut()
                 .for_each(|t| t.next_f32_frame(frame, audio_conf.clone()));
+            self.noise.next_f32_frame(frame, audio_conf.clone());
         }
     }
 }
