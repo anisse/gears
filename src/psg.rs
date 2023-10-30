@@ -53,7 +53,7 @@ impl From<u8> for Latch {
     }
 }
 
-#[derive(Default, Clone, Copy, Debug)]
+#[derive(Default, Clone, Copy, Debug, PartialEq)]
 enum TonePolarity {
     #[default]
     Neg = 0,
@@ -74,6 +74,16 @@ impl std::ops::Not for TonePolarity {
 impl TonePolarity {
     fn flip(&mut self) {
         *self = !*self;
+    }
+}
+
+impl From<u16> for TonePolarity {
+    fn from(value: u16) -> Self {
+        match value & 1 {
+            0 => TonePolarity::Neg,
+            1 => TonePolarity::Pos,
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -216,14 +226,14 @@ fn freq_440() {
     assert_eq!(t.freq(), Some(440));
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 enum NoiseType {
     #[default]
     Periodic = 0,
     White = 1,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 enum NoiseToneSource {
     #[default]
     Inner,
@@ -237,6 +247,7 @@ struct Noise {
     polarity: TonePolarity,
     typ: NoiseType,
     src: NoiseToneSource,
+    tone2_polarity: TonePolarity,
 }
 
 impl Noise {
@@ -244,6 +255,7 @@ impl Noise {
         self.tone.attenuation = level & REG_DATA_MASK;
     }
     fn ctrl(&mut self, ctrl: u8) {
+        //println!("Noise ctrl: {ctrl:08b}");
         self.typ = if ctrl & NOISE_TYPE_MASK == 0 {
             NoiseType::Periodic
         } else {
@@ -270,31 +282,43 @@ impl Noise {
                 << 15);
         out
     }
-    fn next_f32_frame(&mut self, dest: &mut [f32], conf: AudioConf) {
-        if let NoiseToneSource::Tone2 = self.src {
-            println!("Unimplemented noise source tone 2");
-            return;
+    fn update_shift(&mut self) -> u16 {
+        let out = self.state & NOISE_OUTPUT;
+        self.state = self.state.rotate_right(1);
+        out
+    }
+    fn update(&mut self) {
+        self.polarity = match self.typ {
+            NoiseType::Periodic => self.update_shift(),
+            NoiseType::White => self.update_lfsr(),
         }
-        if let NoiseType::Periodic = self.typ {
-            println!("Unimplemented periodic noise type");
-            return;
-        }
+        .into();
+    }
+    fn next_f32_frame(&mut self, tone2: &Tone, dest: &mut [f32], conf: AudioConf) {
         let psg_cycles = self.tone.consume_frame(conf.clone());
-        if self.tone.update_state(psg_cycles).is_some() {
-            if let TonePolarity::Pos = self.tone.polarity {
-                self.polarity = match self.update_lfsr() & 1 {
-                    0 => TonePolarity::Neg,
-                    1 => TonePolarity::Pos,
-                    _ => unreachable!(),
-                };
+        match self.src {
+            NoiseToneSource::Inner => {
+                if self.tone.update_state(psg_cycles).is_some() {
+                    if let TonePolarity::Pos = self.tone.polarity {
+                        self.update()
+                    }
+                }
+            }
+            NoiseToneSource::Tone2 => {
+                if self.tone2_polarity != tone2.polarity {
+                    self.tone2_polarity = tone2.polarity;
+                    if let TonePolarity::Pos = tone2.polarity {
+                        self.update();
+                    }
+                }
             }
         }
         let sample =
             self.polarity as i32 as f32 * AUDIO_F32_CHANNEL_MAX * self.tone.attenuation_mul();
         /*
         println!(
-            "Sample: {sample}, attenuation: {}, polarity: {:?}, LFSR: {:016b}",
-            self.tone.attenuation, self.polarity, self.state
+            "Sample: {sample:1.9}, attenuation: {}, polarity: {:?}, src: {:?}, type: {:?}, tone2 pol: {}/{}, SR: {:016b}",
+            self.tone.attenuation, self.polarity, self.src, self.typ, self.tone2_polarity as i32, tone2.polarity as i32, self.state,
         );
         */
         if conf.channels == 2 && dest.len() == 2 {
@@ -419,7 +443,8 @@ impl Synth {
             self.tone
                 .iter_mut()
                 .for_each(|t| t.next_f32_frame(frame, audio_conf.clone()));
-            self.noise.next_f32_frame(frame, audio_conf.clone());
+            self.noise
+                .next_f32_frame(&self.tone[2], frame, audio_conf.clone());
         }
     }
 }
