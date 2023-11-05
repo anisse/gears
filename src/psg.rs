@@ -185,20 +185,11 @@ impl Tone {
     }
     fn next_f32_frame(&mut self, dest: &mut [f32], conf: AudioConf) {
         let psg_cycles = self.consume_frame(conf.clone());
-        // Smooth
-        let smooth = if let Some(cycles_since_flip) = self.update_state(psg_cycles) {
-            let total = psg_cycles as f32;
-            (((total - cycles_since_flip as f32) * (!self.polarity) as i32 as f32)
-                + (cycles_since_flip as f32 * self.polarity as i32 as f32))
-                / total
-        } else {
-            1.0 // no smoothing
-        };
-        let sample =
-            self.polarity as i32 as f32 * AUDIO_F32_CHANNEL_MAX * self.attenuation_mul() * smooth;
+        self.update_state(psg_cycles);
+        let sample = self.polarity as i32 as f32 * AUDIO_F32_CHANNEL_MAX * self.attenuation_mul();
         /*
         println!(
-            "Sample: {sample}, attenuation: {}, polarity: {:?}, smooth: {smooth}, reg: {}, counter: {}",
+            "Sample: {sample}, attenuation: {}, polarity: {:?}, reg: {}, counter: {}",
             self.attenuation, self.polarity, self.reg, self.counter
         );
         */
