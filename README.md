@@ -19,8 +19,7 @@ It has a mostly complete Z80 emulator, that passes [z80test](https://github.com/
  - Finish that VDP
    * still missing horizontal interrupt testing (H counter, line completion)
  - Finish that PSG (sound)
-   * synchronization is completely broken
-   * noise is missing
+   * there is no filtering or downsampling strategy. A low-pass filter should do.
  - WASM target. Dependencies should allow that
  - Support a complete game gear game
  - It's fast enough but there is a lot of margin for improvement; for example it does allocations in the CPU emulation path which are not needed.
