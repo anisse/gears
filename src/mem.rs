@@ -133,13 +133,28 @@ impl Memory {
         self.set_u8(addr.wrapping_add(1), ((val >> 8) & 0xFF) as u8);
     }
 
+    fn rom_bitmask(&self) -> u32 {
+        if let Mapper::SegaGG { rom, .. } = &self.mapper {
+            return match rom.len() {
+                32768 => 0x00007FFF,
+                65536 => 0x0000FFFF,
+                131072 => 0x0001FFFF,
+                262144 => 0x0003FFFF,
+                524288 => 0x0007FFFF,
+                1048576 => 0x000FFFFF,
+                // Technically this should be unsupported, but keep it as-is for now
+                _ => 0xFFFFFFFF,
+            };
+        }
+        0xFFFFFFFF
+    }
+
     fn set_bank(&mut self, num: usize, val: u8) {
         let _shift = self.ram[0x1FFC] & 0x3;
-        let d1 = Dest::Rom {
-            start: (val as u32) << 14,
-        };
+        let start = ((val as u32) << 14) & self.rom_bitmask();
+        let d1 = Dest::Rom { start };
         let d2 = Dest::Rom {
-            start: ((val as u32) << 14) + 0x2000,
+            start: start + 0x2000,
         };
         //println!("setting bank {} to dest {:X?}", num, &d1);
         self.map[num * 2] = d1;
