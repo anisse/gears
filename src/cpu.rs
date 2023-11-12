@@ -1381,7 +1381,7 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
     memptr_index(op, &mut s.r);
     s.q.changed = start_f != s.r.F || op.ins == Instruction::SCF;
     if update_pc {
-        s.r.PC += op.length as u16;
+        s.r.PC = s.r.PC.wrapping_add(op.length as u16);
     }
 
     s.cycle_counter = s.cycle_counter.wrapping_add(op_len as u32);
