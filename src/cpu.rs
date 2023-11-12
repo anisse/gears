@@ -1416,10 +1416,11 @@ pub fn interrupt_mode_1(s: &mut State) -> Result<usize, String> {
 
 pub fn run(s: &mut State, tstates_len: usize, debug: bool) -> Result<usize, String> {
     let mut tstates_ran = 0;
+    let mut disas_target = [0_u8; 4];
     while tstates_ran < tstates_len {
         // TODO: split into m states, fetch etc
-        let disas_target = s.mem.fetch_range_safe(s.r.PC, 4);
-        if let Some(op) = disas::disas(disas_target) {
+        s.mem.fetch_range_safe(s.r.PC, &mut disas_target);
+        if let Some(op) = disas::disas(&disas_target) {
             if debug {
                 println!("{:04X}: {:?}", s.r.PC, op);
                 //println!("{}", s.r);
@@ -1439,10 +1440,11 @@ pub fn run_cached(
     debug: bool,
 ) -> Result<usize, String> {
     let mut tstates_ran = 0;
+    let mut disas_target = [0_u8; 4];
     while tstates_ran < tstates_len {
         // TODO: split into m states, fetch etc
-        let disas_target = s.mem.fetch_range_safe(s.r.PC, 4);
-        if let Some(op) = c.disas(disas_target) {
+        s.mem.fetch_range_safe(s.r.PC, &mut disas_target);
+        if let Some(op) = c.disas(&disas_target) {
             if debug {
                 if s.halted {
                     print!(".");

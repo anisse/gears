@@ -90,33 +90,9 @@ impl Memory {
         self.fetch_u8(addr) as u16 | ((self.fetch_u8(addr.wrapping_add(1)) as u16) << 8)
     }
 
-    pub fn fetch_range_safe(&self, addr: u16, len: u16) -> &[u8] {
-        match self.map[addr as usize >> 13] {
-            Dest::Rom { start } => {
-                if let Mapper::SegaGG { rom, .. } = &self.mapper {
-                    &rom[((addr & !0xE000) as usize + start as usize)
-                        ..((addr & !0xE000) as usize + start as usize + len as usize)]
-                } else {
-                    unreachable!()
-                }
-            }
-            Dest::Ram { start } => {
-                &self.ram
-                    [((addr & !0xE000) + start) as usize..((addr & !0xE000) + start + len) as usize]
-            }
-            Dest::Bram { start } => {
-                if let Mapper::SegaGG {
-                    backup_ram: Some(bram),
-                    ..
-                } = &self.mapper
-                {
-                    &bram[((addr & !0xE000) + start) as usize
-                        ..((addr & !0xE000) + start + len) as usize]
-                } else {
-                    unreachable!()
-                }
-            }
-            Dest::Panic => panic!("couldn't get a memory slice for @{:04X}+{:04X}", addr, len),
+    pub fn fetch_range_safe(&self, addr: u16, dest: &mut [u8]) {
+        for (i, d) in dest.iter_mut().enumerate() {
+            *d = self.fetch_u8(addr.wrapping_add(i as u16))
         }
     }
 
