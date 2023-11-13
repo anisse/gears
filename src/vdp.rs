@@ -99,6 +99,8 @@ const VISIBLE_AREA_START_X: usize =
 const VISIBLE_AREA_START_Y: usize = 3 * CHAR_SIZE as usize;
 const VISIBLE_AREA_END_X: usize = VISIBLE_PIXEL_WIDTH + VISIBLE_AREA_START_X;
 const VISIBLE_AREA_END_Y: usize = VISIBLE_PIXEL_HEIGHT + VISIBLE_AREA_START_Y;
+// size added at the end is the same as the one at the start (3 characters)
+const EFFECTIVE_AREA_END_Y: usize = VISIBLE_AREA_END_Y + VISIBLE_AREA_START_Y;
 
 #[derive(Debug, Clone, Copy)]
 enum WriteDest {
@@ -849,6 +851,35 @@ impl VdpState {
         self.status = 0; // clear all three flags
         Ok(st)
     }
+    fn line_interrupt_load_start(&mut self) {
+        if self.reg[10] > 0 {
+            // -1 is because we don't emulate lines out of effective area, and counter is updated once
+            // at line 0xFF (line 511) (which is just before the effective area start)
+            self.line_interrupt_counter = self.reg[10] - 1;
+        } else {
+            self.line_interrupt_counter = 0;
+        }
+    }
+    fn line_interrupt_update(&mut self) {
+        if self.v_counter > EFFECTIVE_AREA_END_Y as u8 {
+            self.line_interrupt_counter = self.reg[10];
+            return;
+        }
+        if self.line_interrupt_counter != 0 {
+            self.line_interrupt_counter -= 1;
+        } else {
+            self.line_interrupt_counter = self.reg[10];
+            /*
+            println!(
+                "Interrupt counter reset to {} (at line {})",
+                self.reg[10], self.v_counter,
+            );
+            */
+        }
+    }
+    fn line_interrupt_is_up(&self) -> bool {
+        self.reg[0] & REG0_IE1 != 0 && self.line_interrupt_counter == 0
+    }
 }
 impl Vdp {
     pub fn new() -> Self {
@@ -876,9 +907,7 @@ impl Vdp {
         if state.v_counter == 0 {
             state.vertical_scroll = state.reg[9];
             state.v_counter_jumped = false;
-            if state.reg[10] != 0 {
-                state.line_interrupt_counter = state.reg[10] - 1;
-            }
+            state.line_interrupt_load_start();
         }
         if state.v_counter == 0xDA && !state.v_counter_jumped {
             state.v_counter_jumped = true;
@@ -904,19 +933,22 @@ impl Vdp {
                 rendered = DisplayRefresh::ScreenDoneNoRefresh;
             }
         }
-        if state.line_interrupt_counter != 0 {
-            state.line_interrupt_counter -= 1;
+        let line_interrupt = state.line_interrupt_is_up();
+        if line_interrupt {
+            /*
+            println!(
+                "Line interrupt at {} (reg 10 = {}) ",
+                state.v_counter, state.reg[10]
+            );
+            */
         }
-        let line_interrupt = state.reg[0] & REG0_IE1 != 0 && state.line_interrupt_counter == 0;
         let interrupt =
             if (state.status & ST_I != 0 && state.reg[1] & REG1_IE != 0) || line_interrupt {
                 VdpInt::InterruptGenerated
             } else {
                 VdpInt::NoInterrupt
             };
-        if state.line_interrupt_counter == 0 {
-            state.line_interrupt_counter = state.reg[10];
-        }
+        state.line_interrupt_update();
         (interrupt, rendered)
     }
 
