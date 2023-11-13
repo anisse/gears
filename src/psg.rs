@@ -428,9 +428,8 @@ impl Synth {
         }
         // handrolled mixer; all channels have a hardcoded 0.25 maximum, so we use the full f32
         // range
+        dest.fill(0.0);
         for frame in dest.chunks_mut(audio_conf.channels.into()) {
-            // for now only tone 0
-            frame.fill_with(Default::default);
             self.tone
                 .iter_mut()
                 .for_each(|t| t.next_f32_frame(frame, audio_conf.clone()));
