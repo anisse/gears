@@ -1,11 +1,15 @@
 #![deny(clippy::all)]
 #![forbid(unsafe_code)]
 
+use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use std::{env, time};
 
+#[cfg(target_arch = "wasm32")]
+use instant::{Duration, Instant};
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::{Duration, Instant};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use gilrs::Gilrs;
 use pixels::{Pixels, SurfaceTexture};
@@ -245,8 +249,8 @@ struct EmuLoop {
     state: RunState,
     skip_next: bool,
 
-    current_time: time::Instant, //TODO: maybe use https://github.com/sebcrozet/instant for WASM
-    accumulator: time::Duration,
+    current_time: Instant,
+    accumulator: Duration,
 }
 
 impl Default for EmuLoop {
@@ -257,8 +261,8 @@ impl Default for EmuLoop {
             skip_next: false,
             state: RunState::Run,
 
-            current_time: time::Instant::now(),
-            accumulator: time::Duration::from_secs(0),
+            current_time: Instant::now(),
+            accumulator: Duration::from_secs(0),
         }
     }
 }
@@ -271,8 +275,7 @@ enum RunState {
 }
 
 impl EmuLoop {
-    const FRAME_DURATION: time::Duration =
-        time::Duration::from_nanos((1.0 / 60.0 * 1_000_000_000.0) as u64);
+    const FRAME_DURATION: Duration = Duration::from_nanos((1.0 / 60.0 * 1_000_000_000.0) as u64);
     fn main_events_cleared(&mut self, emu: &mut emu::Emulator, pixels: &mut Pixels) -> bool {
         /*
         print!(
@@ -316,8 +319,8 @@ impl EmuLoop {
                 return true;
             }
             RunState::Sleep => {
-                const SLEEP_TIME: time::Duration = time::Duration::from_millis(1);
-                const EPOLL_TIMEOUT: time::Duration = SLEEP_TIME;
+                const SLEEP_TIME: Duration = Duration::from_millis(1);
+                const EPOLL_TIMEOUT: Duration = SLEEP_TIME;
                 // Workaround winit/mio polling using epoll with a timeout of 1ms, so take that
                 // into account for sleeping in case there is no event (most often)
                 if self.accumulator + SLEEP_TIME + EPOLL_TIMEOUT < Self::FRAME_DURATION {
@@ -341,7 +344,7 @@ impl EmuLoop {
             }
             RunState::Render => RunState::Sleep,
             RunState::Sleep => {
-                let new_time = time::Instant::now();
+                let new_time = Instant::now();
                 let elapsed_time = new_time.duration_since(self.current_time);
                 self.current_time = new_time;
                 self.accumulator += elapsed_time;
