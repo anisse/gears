@@ -18,8 +18,13 @@ features = ["wayland-dlopen", "wayland"]
 path = "../"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1"
 cpal = { version = "0.15.2", features = ["wasm-bindgen"] }
 instant = "0.1"
+wasm-bindgen = "0.2.89"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = ["GpuTextureFormat"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 cpal = "0.15.2"
+pollster = "0.3"
