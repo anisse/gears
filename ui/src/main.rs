@@ -246,9 +246,18 @@ fn handle_key(emu: &mut emu::Emulator, input: &winit::event::KeyboardInput) {
 
 fn audio_init() -> Result<(cpal::Device, cpal::StreamConfig), String> {
     let audio_host = cpal::default_host();
-    let audio_device = audio_host
-        .default_output_device()
-        .ok_or_else(|| "cannot get default audio output device".to_string())?;
+    let audio_device = audio_host.default_output_device().ok_or_else(|| {
+        format!(
+            "cannot get default audio output device; available: {}",
+            match audio_host.output_devices() {
+                Ok(devs) => devs
+                    .map(|d| d.name().unwrap_or("nameless device".to_string() + ", "))
+                    .collect::<String>(),
+
+                Err(e) => e.to_string(),
+            }
+        )
+    })?;
     /*
     let audio_configs = audio_device.supported_output_configs().map_err(|e| {
         format!(
