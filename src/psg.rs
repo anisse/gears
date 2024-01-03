@@ -4,8 +4,8 @@ use crate::io;
 
 const PSG_CMD: u16 = 0x7F;
 const PSG_STEREO: u16 = 0x06;
-const CPU_CLOCK_HZ: usize = 3579545;
-const CPU_TO_PSG_CLOCK_DIVIDER: usize = 16;
+const CPU_CLOCK_HZ: u64 = 3579545;
+const CPU_TO_PSG_CLOCK_DIVIDER: u64 = 16;
 
 const REG_MASK: u8 = 0b1000_0000;
 const REG_DATA_MASK: u8 = 0b0000_1111;
@@ -125,11 +125,11 @@ impl Tone {
         //println!("Updated freq lo, now {}", self.reg);
     }
     #[allow(dead_code)] // used in test
-    fn freq(&mut self) -> Option<usize> {
+    fn freq(&mut self) -> Option<u64> {
         if self.reg == 0 {
             None
         } else {
-            Some(CPU_CLOCK_HZ / (32 * self.reg as usize))
+            Some(CPU_CLOCK_HZ / (32 * self.reg as u64))
         }
     }
     fn attenuation_mul(&self) -> f32 {
@@ -355,22 +355,25 @@ impl AudioConf {
     }
     #[allow(dead_code)] // used in debug code
     const fn cycles_to_samples(&self, cycles: u64) -> usize {
-        (cycles as usize * self.sample_rate as usize * self.channels as usize) / CPU_CLOCK_HZ
+        (cycles as usize * self.sample_rate as usize * self.channels as usize)
+            / CPU_CLOCK_HZ as usize
     }
     const fn cycles_to_frames(&self, cycles: u32) -> usize {
-        (cycles as usize * self.sample_rate as usize) / CPU_CLOCK_HZ
+        (cycles as usize * self.sample_rate as usize) / (CPU_CLOCK_HZ as usize)
     }
     const fn frames_to_samples(&self, frames: usize) -> usize {
         frames * self.channels as usize
     }
-    fn cycles_to_ms(&self, cycles: u64) -> f32 {
+    fn _cycles_to_ms(&self, cycles: u64) -> f32 {
         (self.cycles_to_samples(cycles) as f32 * 1000.0) / self.sample_rate as f32
     }
     const fn samples_to_cycles(&self, samples: usize) -> u32 {
-        ((samples * CPU_CLOCK_HZ) / ((self.sample_rate * self.channels as u32) as usize)) as u32
+        ((samples as u64 * CPU_CLOCK_HZ) / ((self.sample_rate * self.channels as u32) as u64))
+            as u32
     }
     const fn frames_to_psg_cycles(&self, frames: usize) -> u32 {
-        ((frames * CPU_CLOCK_HZ) / (self.sample_rate as usize * CPU_TO_PSG_CLOCK_DIVIDER)) as u32
+        ((frames as u64 * CPU_CLOCK_HZ) / (self.sample_rate as u64 * CPU_TO_PSG_CLOCK_DIVIDER))
+            as u32
     }
     pub const fn display_frame_to_samples(&self, fps: usize) -> usize {
         self.sample_rate as usize * self.channels as usize / fps
@@ -497,7 +500,7 @@ impl PsgRenderState {
                 "filling {} samples or {}ms",
                 dest.len() - current_sample,
                 audio_conf
-                    .cycles_to_ms(audio_conf.samples_to_cycles(dest.len() - current_sample) as u64),
+                    ._cycles_to_ms(audio_conf.samples_to_cycles(dest.len() - current_sample) as u64),
             );*/
             self.empty_cycles += audio_conf.samples_to_cycles(dest.len() - current_sample);
             self.synth
