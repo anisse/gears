@@ -7,7 +7,6 @@ authors = ["Anisse Astier <anisse@astier.eu>"]
 [dependencies]
 pixels = "0.13.0"
 gilrs = "0.10.2"
-wgpu = "0.18"
 
 [dependencies.winit]
 version = "0.28.7"
@@ -24,7 +23,9 @@ instant = "0.1"
 wasm-bindgen = "0.2.89"
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = ["GpuTextureFormat"] }
+wgpu = { version = "0.18", features = ["webgl"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 cpal = "0.15.2"
 pollster = "0.3"
+wgpu = "0.18"
