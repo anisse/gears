@@ -399,7 +399,7 @@ impl EmuLoop {
                 // Workaround winit/mio polling using epoll with a timeout of 1ms, so take that
                 // into account for sleeping in case there is no event (most often)
                 if self.accumulator + SLEEP_TIME + EPOLL_TIMEOUT < Self::FRAME_DURATION {
-                    std::thread::sleep(SLEEP_TIME);
+                    //std::thread::sleep(SLEEP_TIME);
                 }
             }
         }
