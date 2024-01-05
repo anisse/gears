@@ -1,3 +1,4 @@
+mod channel;
 pub mod cpu;
 mod devices;
 mod disas;

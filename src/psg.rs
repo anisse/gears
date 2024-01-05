@@ -1,5 +1,6 @@
-use std::{cell::RefCell, sync::mpsc};
+use std::cell::RefCell;
 
+use crate::channel::*;
 use crate::io;
 
 const PSG_CMD: u16 = 0x7F;
@@ -445,7 +446,7 @@ impl Synth {
 impl PsgRenderState {
     fn synth_audio_f32(
         &mut self,
-        cmds: &mpsc::Receiver<Cmd>,
+        cmds: &ChannelReceiver<Cmd>,
         dest: &mut [f32],
         audio_conf: AudioConf,
     ) {
@@ -549,11 +550,12 @@ impl PsgRender {
     }
 }
 
-pub struct AudioCmdReceiver(mpsc::Receiver<Cmd>);
-pub struct AudioCmdSender(mpsc::Sender<Cmd>);
+pub struct AudioCmdReceiver(ChannelReceiver<Cmd>);
+pub struct AudioCmdSender(ChannelSender<Cmd>);
 
 pub fn cmds() -> (AudioCmdSender, AudioCmdReceiver) {
-    let (tx, rx) = mpsc::channel::<Cmd>();
+    let (tx, rx) = channel();
+
     (AudioCmdSender(tx), AudioCmdReceiver(rx))
 }
 pub struct PsgDevice {
