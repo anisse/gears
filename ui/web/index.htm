@@ -7,7 +7,12 @@
   <body>
     <script type="module">
       import init from "./gears-ui.js";
-      init();
+      import run_web from "./gears-ui.js";
+      var start = async function() {
+        init();
+      }
+      document.getElementById("start").addEventListener("click", async (e) => { await start () });
     </script>
+    <button id="start"> Start </button>
   </body>
 </html>
