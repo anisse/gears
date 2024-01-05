@@ -321,9 +321,7 @@ fn audio_init_stream(
 struct EmuLoop {
     running: bool,
     stepping: bool,
-    state: RunState,
     skip_next: bool,
-
     current_time: Instant,
     accumulator: Duration,
 }
@@ -334,100 +332,61 @@ impl Default for EmuLoop {
             running: true,
             stepping: false,
             skip_next: false,
-            state: RunState::Run,
-
             current_time: Instant::now(),
             accumulator: Duration::from_secs(0),
         }
     }
 }
 
-#[derive(Debug)]
-enum RunState {
-    Run,
-    Render,
-    Sleep,
-}
-
 impl EmuLoop {
     const FRAME_DURATION: Duration = Duration::from_nanos((1.0 / 60.0 * 1_000_000_000.0) as u64);
     fn main_events_cleared(&mut self, emu: &mut emu::Emulator, pixels: &mut Pixels) -> bool {
         /*
-        print!(
-            "{:#?} {:#?} state {:?} => ",
+        let start_msg = format!(
+            "elapsed since last call: {:#?}, acc: {:#?}, => ",
             self.current_time.elapsed(),
             self.accumulator,
-            self.state
         );
         */
-        self.state = self.should_run_or_sleep();
+        let single_step = self.stepping;
+        self.accumulator += self.current_time.elapsed();
+        let mut frames = 0;
+        while self.accumulator >= Self::FRAME_DURATION {
+            self.current_time = Instant::now();
+            frames += 1;
+            self.run(emu, pixels);
+            self.accumulator -= Self::FRAME_DURATION;
+            self.accumulator += self.current_time.elapsed();
+        }
+        self.current_time = Instant::now();
         /*
         println!(
-            "{:?} {:#?} {:#?}",
-            self.state,
+            "{start_msg} elapsed: {:#?}, acc: {:#?}, skip_next: {}, ran {frames} frames",
             self.current_time.elapsed(),
-            self.accumulator
+            self.accumulator,
+            self.skip_next
         );
         */
-        match self.state {
-            RunState::Run => {
-                if !self.running && !self.stepping {
-                    return false;
-                }
-                loop {
-                    match emu.step(pixels.frame_mut()) {
-                        emu::DisplayRefresh::NoDisplay => {}
-                        emu::DisplayRefresh::ScreenDone => break,
-                        emu::DisplayRefresh::ScreenDoneNoRefresh => {
-                            self.skip_next = true;
-                            break;
-                        }
-                    }
-                }
-                self.stepping = false;
-            }
-            RunState::Render => {
-                if self.skip_next {
-                    self.skip_next = false;
-                    return false;
-                }
-                return true;
-            }
-            RunState::Sleep => {
-                const SLEEP_TIME: Duration = Duration::from_millis(1);
-                const EPOLL_TIMEOUT: Duration = SLEEP_TIME;
-                // Workaround winit/mio polling using epoll with a timeout of 1ms, so take that
-                // into account for sleeping in case there is no event (most often)
-                if self.accumulator + SLEEP_TIME + EPOLL_TIMEOUT < Self::FRAME_DURATION {
-                    //std::thread::sleep(SLEEP_TIME);
-                }
-            }
-        }
-        false
+        frames > 0 && !self.skip_next && (self.running || single_step)
     }
-
-    fn should_run_or_sleep(&mut self) -> RunState {
-        match self.state {
-            RunState::Run => {
-                if self.accumulator >= Self::FRAME_DURATION {
-                    self.accumulator -= Self::FRAME_DURATION;
+    fn run(&mut self, emu: &mut emu::Emulator, pixels: &mut Pixels) {
+        if !self.running && !self.stepping {
+            return;
+        }
+        let buffer = pixels.frame_mut();
+        loop {
+            match emu.step(buffer) {
+                emu::DisplayRefresh::NoDisplay => {}
+                emu::DisplayRefresh::ScreenDone => {
+                    self.skip_next = false;
+                    break;
                 }
-                if self.accumulator >= Self::FRAME_DURATION {
-                    return RunState::Run; // frame skip
+                emu::DisplayRefresh::ScreenDoneNoRefresh => {
+                    self.skip_next = true;
+                    break;
                 }
-                RunState::Render
-            }
-            RunState::Render => RunState::Sleep,
-            RunState::Sleep => {
-                let new_time = Instant::now();
-                let elapsed_time = new_time.duration_since(self.current_time);
-                self.current_time = new_time;
-                self.accumulator += elapsed_time;
-                if self.accumulator >= Self::FRAME_DURATION {
-                    return RunState::Run;
-                }
-                RunState::Sleep
             }
         }
+        self.stepping = false;
     }
 }
