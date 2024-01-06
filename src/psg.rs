@@ -360,7 +360,7 @@ impl AudioConf {
             / CPU_CLOCK_HZ as usize
     }
     const fn cycles_to_frames(&self, cycles: u32) -> usize {
-        (cycles as usize * self.sample_rate as usize) / (CPU_CLOCK_HZ as usize)
+        ((cycles as u64 * self.sample_rate as u64) / CPU_CLOCK_HZ) as usize
     }
     const fn frames_to_samples(&self, frames: usize) -> usize {
         frames * self.channels as usize
