@@ -3,3 +3,6 @@ target = [
 	"wasm32-unknown-unknown",
 	"x86_64-unknown-linux-gnu",
 ]
+
+[target.wasm32-unknown-unknown]
+rustflags = [ "--cfg=web_sys_unstable_apis" ]
