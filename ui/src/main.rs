@@ -139,6 +139,12 @@ async fn run() -> Result<(), Box<dyn Error>> {
                         handle_key(&mut emu, input);
                     }
                 },
+                WindowEvent::Focused(focus) => {
+                    if state.running_focus != *focus {
+                        state.running_focus = *focus;
+                        emu.run(state.should_run())
+                    }
+                }
                 WindowEvent::Resized(size) => {
                     pixels
                         .resize_surface(size.width, size.height)
@@ -149,7 +155,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
             Event::MainEventsCleared => {
                 // Update internal state and request a redraw
                 joystick_events(&mut emu, &mut gilrs);
-                emu.run(state.running || state.stepping);
+                emu.run(state.should_run());
                 if state.main_events_cleared(&mut emu, &mut pixels) {
                     window.request_redraw();
                 }
@@ -191,15 +197,19 @@ fn web_init(window: Rc<Window>) -> Result<(), Box<dyn Error>> {
 
     let client_window = web_sys::window().ok_or_else(|| "cannot get JS DOM window".to_string())?;
 
+    let canvas = window.canvas();
     // Attach winit canvas to body element
     client_window
         .document()
         .ok_or_else(|| "no document in window".to_string())?
         .body()
         .ok_or_else(|| "no body in document".to_string())?
-        .append_child(&web_sys::Element::from(window.canvas()))
+        .append_child(&canvas)
         .map_err(|e| format!("couldn't insert winit canvas in document body: {e:?}"))?;
 
+    canvas
+        .focus()
+        .map_err(|e| format!("Could not focus canvas: {e:?}"))?;
     // Listen for resize event on browser client. Adjust winit window dimensions
     // on event trigger
     let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |_e: web_sys::Event| {
@@ -336,6 +346,7 @@ fn audio_init_stream(
 #[derive(Debug)]
 struct EmuLoop {
     running: bool,
+    running_focus: bool,
     stepping: bool,
     skip_next: bool,
     current_time: Instant,
@@ -346,6 +357,7 @@ impl Default for EmuLoop {
     fn default() -> Self {
         Self {
             running: true,
+            running_focus: true,
             stepping: false,
             skip_next: false,
             current_time: Instant::now(),
@@ -383,10 +395,13 @@ impl EmuLoop {
             self.skip_next
         );
         */
-        frames > 0 && !self.skip_next && (self.running || single_step)
+        frames > 0 && !self.skip_next && (self.should_run() || single_step)
+    }
+    fn should_run(&self) -> bool {
+        (self.running && self.running_focus) || self.stepping
     }
     fn run(&mut self, emu: &mut emu::Emulator, pixels: &mut Pixels) {
-        if !self.running && !self.stepping {
+        if !self.should_run() {
             return;
         }
         let buffer = pixels.frame_mut();
