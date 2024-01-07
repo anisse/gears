@@ -6,7 +6,7 @@ authors = ["Anisse Astier <anisse@astier.eu>"]
 
 [dependencies]
 pixels = "0.13.0"
-gilrs = "0.10.2"
+gilrs = "0.10.4"
 
 [dependencies.winit]
 version = "0.28.7"
