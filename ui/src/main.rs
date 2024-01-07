@@ -90,7 +90,8 @@ mod web {
                     .inner_height()
                     .expect("Cannot get JS Window height")
                     .as_f64()
-                    .expect("height not f64"),
+                    .expect("height not f64")
+                    - 45.0,
             )
         };
 
