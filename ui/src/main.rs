@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 use std::env;
+use std::error::Error;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -23,7 +24,7 @@ use winit::window::WindowBuilder;
 use gears::emu;
 use gears::emu::testcmd;
 
-fn main() -> Result<(), String> {
+fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(target_arch = "wasm32")]
     {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -40,7 +41,7 @@ fn main() -> Result<(), String> {
 async fn run_web() {
     run().await.unwrap();
 }
-async fn run() -> Result<(), String> {
+async fn run() -> Result<(), Box<dyn Error>> {
     let event_loop = EventLoop::new();
     let window = {
         let size = LogicalSize::new(emu::LCD_WIDTH as f64, emu::LCD_HEIGHT as f64);
@@ -49,7 +50,7 @@ async fn run() -> Result<(), String> {
             .with_inner_size(size)
             .with_min_inner_size(size)
             .build(&event_loop)
-            .unwrap()
+            .map_err(|e| format!("cannot create gears window: {e}"))?
     };
 
     let window = Rc::new(window);
@@ -61,10 +62,18 @@ async fn run() -> Result<(), String> {
 
         // Retrieve current width and height dimensions of browser client window
         let get_window_size = || {
-            let client_window = web_sys::window().unwrap();
+            let client_window = web_sys::window().expect("cannot get JS DOM window");
             LogicalSize::new(
-                client_window.inner_width().unwrap().as_f64().unwrap(),
-                client_window.inner_height().unwrap().as_f64().unwrap(),
+                client_window
+                    .inner_width()
+                    .expect("Cannot get JS Window width")
+                    .as_f64()
+                    .expect("width not f64"),
+                client_window
+                    .inner_height()
+                    .expect("Cannot get JS Window height")
+                    .as_f64()
+                    .expect("height not f64"),
             )
         };
 
@@ -73,17 +82,17 @@ async fn run() -> Result<(), String> {
         // Initialize winit window with current dimensions of browser client
         window.set_inner_size(get_window_size());
 
-        let client_window = web_sys::window().unwrap();
+        let client_window =
+            web_sys::window().ok_or_else(|| "cannot get JS DOM window".to_string())?;
 
         // Attach winit canvas to body element
-        web_sys::window()
-            .and_then(|win| win.document())
-            .and_then(|doc| doc.body())
-            .and_then(|body| {
-                body.append_child(&web_sys::Element::from(window.canvas()))
-                    .ok()
-            })
-            .expect("couldn't append canvas to document body");
+        client_window
+            .document()
+            .ok_or_else(|| "no document in window".to_string())?
+            .body()
+            .ok_or_else(|| "no body in document".to_string())?
+            .append_child(&web_sys::Element::from(window.canvas()))
+            .map_err(|e| format!("couldn't insert winit canvas in document body: {e:?}"))?;
 
         // Listen for resize event on browser client. Adjust winit window dimensions
         // on event trigger
@@ -93,7 +102,7 @@ async fn run() -> Result<(), String> {
         }) as Box<dyn FnMut(_)>);
         client_window
             .add_event_listener_with_callback("resize", closure.as_ref().unchecked_ref())
-            .unwrap();
+            .map_err(|e| format!("cannot add resize event listener to window: {e:?}"))?;
         closure.forget();
     }
 
