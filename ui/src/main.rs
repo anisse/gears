@@ -19,7 +19,7 @@ use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, Event, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::WindowBuilder;
+use winit::window::{Window, WindowBuilder};
 
 use gears::emu;
 use gears::emu::testcmd;
@@ -28,22 +28,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(target_arch = "wasm32")]
     {
         std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+        console_log::init_with_level(log::Level::Info).expect("error initializing logger");
+
         wasm_bindgen_futures::spawn_local(run_web());
         Ok(())
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     {
+        env_logger::init();
         pollster::block_on(run())
     }
 }
 #[cfg(target_arch = "wasm32")]
 async fn run_web() {
-    run().await.unwrap();
+    loop {
+        run().await.unwrap();
+    }
 }
 async fn run() -> Result<(), Box<dyn Error>> {
     let event_loop = EventLoop::new();
-    let window = {
+    let window = Rc::new({
         let size = LogicalSize::new(emu::LCD_WIDTH as f64, emu::LCD_HEIGHT as f64);
         WindowBuilder::new()
             .with_title("Gears")
@@ -51,60 +56,9 @@ async fn run() -> Result<(), Box<dyn Error>> {
             .with_min_inner_size(size)
             .build(&event_loop)
             .map_err(|e| format!("cannot create gears window: {e}"))?
-    };
+    });
 
-    let window = Rc::new(window);
-
-    #[cfg(target_arch = "wasm32")]
-    {
-        use wasm_bindgen::JsCast;
-        use winit::platform::web::WindowExtWebSys;
-
-        // Retrieve current width and height dimensions of browser client window
-        let get_window_size = || {
-            let client_window = web_sys::window().expect("cannot get JS DOM window");
-            LogicalSize::new(
-                client_window
-                    .inner_width()
-                    .expect("Cannot get JS Window width")
-                    .as_f64()
-                    .expect("width not f64"),
-                client_window
-                    .inner_height()
-                    .expect("Cannot get JS Window height")
-                    .as_f64()
-                    .expect("height not f64"),
-            )
-        };
-
-        let window = Rc::clone(&window);
-
-        // Initialize winit window with current dimensions of browser client
-        window.set_inner_size(get_window_size());
-
-        let client_window =
-            web_sys::window().ok_or_else(|| "cannot get JS DOM window".to_string())?;
-
-        // Attach winit canvas to body element
-        client_window
-            .document()
-            .ok_or_else(|| "no document in window".to_string())?
-            .body()
-            .ok_or_else(|| "no body in document".to_string())?
-            .append_child(&web_sys::Element::from(window.canvas()))
-            .map_err(|e| format!("couldn't insert winit canvas in document body: {e:?}"))?;
-
-        // Listen for resize event on browser client. Adjust winit window dimensions
-        // on event trigger
-        let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |_e: web_sys::Event| {
-            let size = get_window_size();
-            window.set_inner_size(size)
-        }) as Box<dyn FnMut(_)>);
-        client_window
-            .add_event_listener_with_callback("resize", closure.as_ref().unchecked_ref())
-            .map_err(|e| format!("cannot add resize event listener to window: {e:?}"))?;
-        closure.forget();
-    }
+    web_init(Rc::clone(&window))?;
 
     let mut pixels = {
         let window_size = window.inner_size();
@@ -204,6 +158,59 @@ async fn run() -> Result<(), Box<dyn Error>> {
         }
         print!("");
     });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn web_init(_window: Rc<Window>) -> Result<(), Box<dyn Error>> {
+    Ok(())
+}
+#[cfg(target_arch = "wasm32")]
+fn web_init(window: Rc<Window>) -> Result<(), Box<dyn Error>> {
+    use wasm_bindgen::JsCast;
+    use winit::platform::web::WindowExtWebSys;
+
+    // Retrieve current width and height dimensions of browser client window
+    let get_window_size = || {
+        let client_window = web_sys::window().expect("cannot get JS DOM window");
+        LogicalSize::new(
+            client_window
+                .inner_width()
+                .expect("Cannot get JS Window width")
+                .as_f64()
+                .expect("width not f64"),
+            client_window
+                .inner_height()
+                .expect("Cannot get JS Window height")
+                .as_f64()
+                .expect("height not f64"),
+        )
+    };
+
+    // Initialize winit window with current dimensions of browser client
+    window.set_inner_size(get_window_size());
+
+    let client_window = web_sys::window().ok_or_else(|| "cannot get JS DOM window".to_string())?;
+
+    // Attach winit canvas to body element
+    client_window
+        .document()
+        .ok_or_else(|| "no document in window".to_string())?
+        .body()
+        .ok_or_else(|| "no body in document".to_string())?
+        .append_child(&web_sys::Element::from(window.canvas()))
+        .map_err(|e| format!("couldn't insert winit canvas in document body: {e:?}"))?;
+
+    // Listen for resize event on browser client. Adjust winit window dimensions
+    // on event trigger
+    let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |_e: web_sys::Event| {
+        let size = get_window_size();
+        window.set_inner_size(size)
+    }) as Box<dyn FnMut(_)>);
+    client_window
+        .add_event_listener_with_callback("resize", closure.as_ref().unchecked_ref())
+        .map_err(|e| format!("cannot add resize event listener to window: {e:?}"))?;
+    closure.forget();
+    Ok(())
 }
 
 fn joystick_events(emu: &mut emu::Emulator, gilrs: &mut Gilrs) {
