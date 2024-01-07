@@ -3,17 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title> Gears </title>
+    <style type="text/css">
+      body {
+          background-color: #000;
+          margin: 0;
+          overflow: hidden;
+          color: #fff;
+      }
+    </style>
   </head>
   <body>
     <script type="module">
       import init from "./gears-ui.js";
-      import run_web from "./gears-ui.js";
-      var start = async function() {
+      window.addEventListener("load", () => {
         init();
-      }
-      document.getElementById("start").addEventListener("click", async (e) => { await start () });
+      });
     </script>
-    <button id="start"> Start </button>
-    Start, then Keys: ⬆️⬇️⬅️➡️  and for Start: [SHIFT], 1: 🔙 2: ↩️, Pause emulation: [SPACE]
   </body>
 </html>

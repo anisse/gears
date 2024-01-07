@@ -24,26 +24,105 @@ use winit::window::{Window, WindowBuilder};
 use gears::emu;
 use gears::emu::testcmd;
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() -> Result<(), Box<dyn Error>> {
-    #[cfg(target_arch = "wasm32")]
-    {
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-        console_log::init_with_level(log::Level::Info).expect("error initializing logger");
-
-        wasm_bindgen_futures::spawn_local(run_web());
-        Ok(())
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        env_logger::init();
-        pollster::block_on(run())
-    }
+    pollster::block_on(run())
 }
 #[cfg(target_arch = "wasm32")]
-async fn run_web() {
-    loop {
-        run().await.unwrap();
+fn main() {
+    web::web_main().unwrap();
+}
+#[cfg(target_arch = "wasm32")]
+mod web {
+    use std::error::Error;
+    use std::rc::Rc;
+
+    use wasm_bindgen::closure::Closure;
+    use wasm_bindgen::{JsCast, JsValue};
+    use winit::window::Window;
+
+    pub fn web_main() -> Result<(), JsValue> {
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+        console_log::init_with_level(log::Level::Info).expect("error initializing logger");
+        setup_dom()
+    }
+    fn setup_dom() -> Result<(), JsValue> {
+        let client_window = web_sys::window().ok_or_else(|| "cannot get JS DOM window")?;
+        let document = client_window
+            .document()
+            .ok_or_else(|| "no document in window")?;
+        let body = document.body().ok_or_else(|| "no body in document")?;
+        let button = document
+            .create_element("button")
+            .map_err(|e| format!("cannot create button: {e:?}"))?;
+        body.set_inner_text(
+            "D-Pad: ⬆️⬇️⬅️➡️ , Start: [SHIFT], 1: [BACKSPACE], 2: [ENTER], Pause emulation: [SPACE]\n",
+        );
+        button.set_text_content(Some("Start"));
+        body.append_child(&button)
+            .map_err(|e| format!("couldn't insert start button in document body: {e:?}"))?;
+        let closure = Closure::wrap(Box::new(move |_e: web_sys::Event| {
+            wasm_bindgen_futures::spawn_local(run_noerr());
+        }) as Box<dyn FnMut(_)>);
+        button
+            .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
+            .map_err(|e| format!("cannot attach callback to button: {e:?}"))?;
+        closure.forget();
+        Ok(())
+    }
+    async fn run_noerr() {
+        super::run().await.unwrap();
+    }
+    pub fn web_init(window: Rc<Window>) -> Result<(), Box<dyn Error>> {
+        use winit::dpi::LogicalSize;
+        use winit::platform::web::WindowExtWebSys;
+
+        // Retrieve current width and height dimensions of browser client window
+        let get_window_size = || {
+            let client_window = web_sys::window().expect("cannot get JS DOM window");
+            LogicalSize::new(
+                client_window
+                    .inner_width()
+                    .expect("Cannot get JS Window width")
+                    .as_f64()
+                    .expect("width not f64"),
+                client_window
+                    .inner_height()
+                    .expect("Cannot get JS Window height")
+                    .as_f64()
+                    .expect("height not f64"),
+            )
+        };
+
+        // Initialize winit window with current dimensions of browser client
+        window.set_inner_size(get_window_size());
+
+        let client_window = web_sys::window().ok_or("cannot get JS DOM window")?;
+
+        let canvas = window.canvas();
+        // Attach winit canvas to body element
+        client_window
+            .document()
+            .ok_or_else(|| "no document in window".to_string())?
+            .body()
+            .ok_or_else(|| "no body in document".to_string())?
+            .append_child(&canvas)
+            .map_err(|e| format!("couldn't insert winit canvas in document body: {e:?}"))?;
+
+        canvas
+            .focus()
+            .map_err(|e| format!("Could not focus canvas: {e:?}"))?;
+        // Listen for resize event on browser client. Adjust winit window dimensions
+        // on event trigger
+        let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |_e: web_sys::Event| {
+            let size = get_window_size();
+            window.set_inner_size(size)
+        }) as Box<dyn FnMut(_)>);
+        client_window
+            .add_event_listener_with_callback("resize", closure.as_ref().unchecked_ref())
+            .map_err(|e| format!("cannot add resize event listener to window: {e:?}"))?;
+        closure.forget();
+        Ok(())
     }
 }
 async fn run() -> Result<(), Box<dyn Error>> {
@@ -166,60 +245,10 @@ async fn run() -> Result<(), Box<dyn Error>> {
     });
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-fn web_init(_window: Rc<Window>) -> Result<(), Box<dyn Error>> {
-    Ok(())
-}
-#[cfg(target_arch = "wasm32")]
-fn web_init(window: Rc<Window>) -> Result<(), Box<dyn Error>> {
-    use wasm_bindgen::JsCast;
-    use winit::platform::web::WindowExtWebSys;
-
-    // Retrieve current width and height dimensions of browser client window
-    let get_window_size = || {
-        let client_window = web_sys::window().expect("cannot get JS DOM window");
-        LogicalSize::new(
-            client_window
-                .inner_width()
-                .expect("Cannot get JS Window width")
-                .as_f64()
-                .expect("width not f64"),
-            client_window
-                .inner_height()
-                .expect("Cannot get JS Window height")
-                .as_f64()
-                .expect("height not f64"),
-        )
-    };
-
-    // Initialize winit window with current dimensions of browser client
-    window.set_inner_size(get_window_size());
-
-    let client_window = web_sys::window().ok_or_else(|| "cannot get JS DOM window".to_string())?;
-
-    let canvas = window.canvas();
-    // Attach winit canvas to body element
-    client_window
-        .document()
-        .ok_or_else(|| "no document in window".to_string())?
-        .body()
-        .ok_or_else(|| "no body in document".to_string())?
-        .append_child(&canvas)
-        .map_err(|e| format!("couldn't insert winit canvas in document body: {e:?}"))?;
-
-    canvas
-        .focus()
-        .map_err(|e| format!("Could not focus canvas: {e:?}"))?;
-    // Listen for resize event on browser client. Adjust winit window dimensions
-    // on event trigger
-    let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |_e: web_sys::Event| {
-        let size = get_window_size();
-        window.set_inner_size(size)
-    }) as Box<dyn FnMut(_)>);
-    client_window
-        .add_event_listener_with_callback("resize", closure.as_ref().unchecked_ref())
-        .map_err(|e| format!("cannot add resize event listener to window: {e:?}"))?;
-    closure.forget();
+fn web_init(win: Rc<Window>) -> Result<(), Box<dyn Error>> {
+    #[cfg(target_arch = "wasm32")]
+    return web::web_init(win);
+    #[cfg(not(target_arch = "wasm32"))]
     Ok(())
 }
 
