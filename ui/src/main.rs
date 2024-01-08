@@ -50,8 +50,10 @@ mod web {
     use std::error::Error;
     use std::rc::Rc;
 
+    use js_sys::Uint8Array;
     use wasm_bindgen::closure::Closure;
     use wasm_bindgen::{JsCast, JsValue};
+    use web_sys::{Document, Element, HtmlInputElement};
     use winit::window::Window;
 
     pub fn web_main() -> Result<(), JsValue> {
@@ -73,17 +75,63 @@ mod web {
         body.append_child(&button)
             .map_err(|e| format!("couldn't insert start button in document body: {e:?}"))?;
         let closure = Closure::wrap(Box::new(move |_e: web_sys::Event| {
-            wasm_bindgen_futures::spawn_local(run_noerr());
+            wasm_bindgen_futures::spawn_local(run_noerr(
+                include_bytes!("../../../roms/Sonic The Hedgehog (World) (Rev 1).gg").into(),
+            ));
         }) as Box<dyn FnMut(_)>);
         button
             .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
             .map_err(|e| format!("cannot attach callback to button: {e:?}"))?;
         closure.forget();
+        body.append_child(&select_rom_btn(document)?.into())
+            .map_err(|e| format!("couldn't insert select button in document body: {e:?}"))?;
+
         Ok(())
     }
-    async fn run_noerr() {
-        let data: Vec<u8> =
-            include_bytes!("../../../roms/Sonic The Hedgehog (World) (Rev 1).gg").into();
+    fn select_rom_btn(doc: Document) -> Result<Element, JsValue> {
+        let button = doc
+            .create_element("button")
+            .map_err(|e| format!("cannot create button: {e:?}"))?;
+        button.set_text_content(Some("Open File..."));
+        let input = doc.create_element("input").unwrap();
+        let input_html: &HtmlInputElement = input.unchecked_ref();
+        let input_html = input_html.clone();
+        input_html.set_attribute("type", "file")?;
+        input_html.set_attribute("accept", ".png,.jpeg,.gg")?;
+        let file_reader = web_sys::FileReader::new().expect("cannot create file reader");
+        let open_file_dialog = Closure::wrap(Box::new(move |_e: web_sys::Event| {
+            let input_html = input_html.clone();
+            let ip1 = input_html.clone();
+            let file_reader = file_reader.clone();
+            let load_file = Closure::wrap(Box::new(move |_e: web_sys::Event| {
+                let file_reader = file_reader.clone();
+                let fr1 = file_reader.clone();
+                let file_loaded = Closure::wrap(Box::new(move |_e: web_sys::Event| {
+                    let array = fr1.result().unwrap();
+                    let u8array = Uint8Array::new(&array);
+                    wasm_bindgen_futures::spawn_local(run_noerr(u8array.to_vec()));
+                }) as Box<dyn FnMut(_)>);
+                let files = ip1.files().expect("a file list");
+                let file = files.get(0).expect("first file");
+                file_reader.set_onloadend(Some(file_loaded.as_ref().unchecked_ref()));
+                file_reader
+                    .read_as_array_buffer(&file.into())
+                    .expect("cannot read file");
+                file_loaded.forget();
+            }) as Box<dyn FnMut(_)>);
+            input_html
+                .add_event_listener_with_callback("change", load_file.as_ref().unchecked_ref())
+                .expect("cannot attach callback onchange input");
+            load_file.forget();
+            input_html.click();
+        }) as Box<dyn FnMut(_)>);
+        button
+            .add_event_listener_with_callback("click", open_file_dialog.as_ref().unchecked_ref())
+            .map_err(|e| format!("cannot attach callback to button: {e:?}"))?;
+        open_file_dialog.forget();
+        Ok(button)
+    }
+    async fn run_noerr(data: Vec<u8>) {
         super::run(&data, &[]).await.unwrap();
     }
     pub fn web_init(window: Rc<Window>) -> Result<(), Box<dyn Error>> {
