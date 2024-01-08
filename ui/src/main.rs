@@ -47,11 +47,9 @@ mod web {
         setup_dom()
     }
     fn setup_dom() -> Result<(), JsValue> {
-        let client_window = web_sys::window().ok_or_else(|| "cannot get JS DOM window")?;
-        let document = client_window
-            .document()
-            .ok_or_else(|| "no document in window")?;
-        let body = document.body().ok_or_else(|| "no body in document")?;
+        let client_window = web_sys::window().ok_or("cannot get JS DOM window")?;
+        let document = client_window.document().ok_or("no document in window")?;
+        let body = document.body().ok_or("no body in document")?;
         let button = document
             .create_element("button")
             .map_err(|e| format!("cannot create button: {e:?}"))?;
@@ -104,9 +102,9 @@ mod web {
         // Attach winit canvas to body element
         client_window
             .document()
-            .ok_or_else(|| "no document in window".to_string())?
+            .ok_or("no document in window")?
             .body()
-            .ok_or_else(|| "no body in document".to_string())?
+            .ok_or("no body in document")?
             .append_child(&canvas)
             .map_err(|e| format!("couldn't insert winit canvas in document body: {e:?}"))?;
 
