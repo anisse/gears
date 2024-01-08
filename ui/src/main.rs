@@ -97,7 +97,7 @@ mod web {
         let input_html: &HtmlInputElement = input.unchecked_ref();
         let input_html = input_html.clone();
         input_html.set_attribute("type", "file")?;
-        input_html.set_attribute("accept", ".png,.jpeg,.gg")?;
+        input_html.set_attribute("accept", ".gg")?;
         let file_reader = web_sys::FileReader::new().expect("cannot create file reader");
         let open_file_dialog = Closure::wrap(Box::new(move |_e: web_sys::Event| {
             let input_html = input_html.clone();
