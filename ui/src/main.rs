@@ -26,7 +26,20 @@ use gears::emu::testcmd;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> Result<(), Box<dyn Error>> {
-    pollster::block_on(run())
+    let args: Vec<String> = env::args().collect();
+    let cmds = testcmd::TestCommand::new_vec(args.get(2).unwrap_or(&String::new()))?;
+    let file = args.get(1).expect("needs an argument");
+    let path = Path::new(file);
+
+    let mut file = match File::open(path) {
+        Err(why) => panic!("Cannot open {}: {}", path.display(), why),
+        Ok(f) => f,
+    };
+
+    let mut data: Vec<u8> = vec![];
+    file.read_to_end(&mut data)
+        .map_err(|e| format!("Could not read {}: {e}", path.display()))?;
+    pollster::block_on(run(&data, &cmds))
 }
 #[cfg(target_arch = "wasm32")]
 fn main() {
@@ -69,7 +82,9 @@ mod web {
         Ok(())
     }
     async fn run_noerr() {
-        super::run().await.unwrap();
+        let data: Vec<u8> =
+            include_bytes!("../../../roms/Sonic The Hedgehog (World) (Rev 1).gg").into();
+        super::run(&data, &[]).await.unwrap();
     }
     pub fn web_init(window: Rc<Window>) -> Result<(), Box<dyn Error>> {
         use winit::dpi::LogicalSize;
@@ -124,7 +139,7 @@ mod web {
         Ok(())
     }
 }
-async fn run() -> Result<(), Box<dyn Error>> {
+async fn run(data: &[u8], cmds: &[testcmd::TestCommand]) -> Result<(), Box<dyn Error>> {
     let event_loop = EventLoop::new();
     let window = Rc::new({
         let size = LogicalSize::new(emu::LCD_WIDTH as f64, emu::LCD_HEIGHT as f64);
@@ -155,25 +170,14 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     let mut gilrs = Gilrs::new().map_err(|e| format!("cannot init gilrs gamepad library: {e}"))?;
 
-    let args: Vec<String> = env::args().collect();
-    let file = args.get(1).expect("needs an argument");
-    let cmds = testcmd::TestCommand::new_vec(args.get(2).unwrap_or(&String::new()))?;
-    let path = Path::new(file);
-
-    let mut file = match File::open(path) {
-        Err(why) => panic!("Cannot open {}: {}", path.display(), why),
-        Ok(f) => f,
-    };
-
-    let mut data: Vec<u8> = vec![];
-    if let Err(why) = file.read_to_end(&mut data) {
-        panic!("Could not read {}: {}", path.display(), why);
-    }
-
     let (audio_device, stream_config) = audio_init()?;
     let audio_conf = emu::AudioConf::new(stream_config.channels, stream_config.sample_rate.0)?;
-    let (mut emu, mut audio_callback) = emu::Emulator::init(data, true, audio_conf.clone());
-    emu.run_commands(pixels.frame_mut(), &cmds, &mut audio_callback, audio_conf);
+    let (mut emu, mut audio_callback) = emu::Emulator::init(
+        data.to_vec(), /* TODO: remove copy */
+        true,
+        audio_conf.clone(),
+    );
+    emu.run_commands(pixels.frame_mut(), cmds, &mut audio_callback, audio_conf);
     let audio_stream = audio_init_stream(audio_device, stream_config, audio_callback)?;
     audio_stream
         .play()
