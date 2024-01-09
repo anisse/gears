@@ -53,7 +53,7 @@ mod web {
     use js_sys::Uint8Array;
     use wasm_bindgen::closure::Closure;
     use wasm_bindgen::{JsCast, JsValue};
-    use web_sys::{Document, Element, HtmlInputElement};
+    use web_sys::{Document, Element, Event, FileReader, HtmlInputElement};
     use winit::window::Window;
 
     pub fn web_main() -> Result<(), JsValue> {
@@ -74,7 +74,7 @@ mod web {
         button.set_text_content(Some("Start"));
         body.append_child(&button)
             .map_err(|e| format!("couldn't insert start button in document body: {e:?}"))?;
-        let closure = Closure::wrap(Box::new(move |_e: web_sys::Event| {
+        let closure = Closure::wrap(Box::new(move |_e: Event| {
             wasm_bindgen_futures::spawn_local(run_noerr(
                 include_bytes!("../../../roms/Sonic The Hedgehog (World) (Rev 1).gg").into(),
             ));
@@ -93,25 +93,29 @@ mod web {
             .create_element("button")
             .map_err(|e| format!("cannot create button: {e:?}"))?;
         button.set_text_content(Some("Open File..."));
-        let input = doc.create_element("input").unwrap();
+        let input = doc
+            .create_element("input")
+            .map_err(|e| format!("cannot create input: {e:?}"))?;
         let input_html: &HtmlInputElement = input.unchecked_ref();
         let input_html = input_html.clone();
         input_html.set_attribute("type", "file")?;
         input_html.set_attribute("accept", ".gg")?;
-        let file_reader = web_sys::FileReader::new().expect("cannot create file reader");
-        let open_file_dialog = Closure::wrap(Box::new(move |_e: web_sys::Event| {
+        let file_reader =
+            FileReader::new().map_err(|e| format!("cannot create file reader: {e:?}"))?;
+        let open_file_dialog = Closure::wrap(Box::new(move |_e: Event| {
             let input_html = input_html.clone();
-            let ip1 = input_html.clone();
+            let input_html_clone = input_html.clone();
             let file_reader = file_reader.clone();
-            let load_file = Closure::wrap(Box::new(move |_e: web_sys::Event| {
-                let file_reader = file_reader.clone();
-                let fr1 = file_reader.clone();
-                let file_loaded = Closure::wrap(Box::new(move |_e: web_sys::Event| {
-                    let array = fr1.result().unwrap();
+            let load_file = Closure::wrap(Box::new(move |_e: Event| {
+                let file_reader_clone = file_reader.clone();
+                let file_loaded = Closure::wrap(Box::new(move |_e: Event| {
+                    let array = file_reader_clone
+                        .result()
+                        .expect("cannot get file reader result");
                     let u8array = Uint8Array::new(&array);
                     wasm_bindgen_futures::spawn_local(run_noerr(u8array.to_vec()));
                 }) as Box<dyn FnMut(_)>);
-                let files = ip1.files().expect("a file list");
+                let files = input_html_clone.files().expect("a file list");
                 let file = files.get(0).expect("first file");
                 file_reader.set_onloadend(Some(file_loaded.as_ref().unchecked_ref()));
                 file_reader
@@ -176,7 +180,7 @@ mod web {
             .map_err(|e| format!("Could not focus canvas: {e:?}"))?;
         // Listen for resize event on browser client. Adjust winit window dimensions
         // on event trigger
-        let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |_e: web_sys::Event| {
+        let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |_e: Event| {
             let size = get_window_size();
             window.set_inner_size(size)
         }) as Box<dyn FnMut(_)>);
