@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Anisse Astier <anisse@astier.eu>"]
 
+[lib]
+crate-type = ["cdylib"]
+
 [dependencies]
 pixels = "0.13.0"
 gilrs = "0.10.4"
