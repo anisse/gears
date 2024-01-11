@@ -25,7 +25,7 @@ const REG_LATCH_MASK: u8 = 0b0111_0000;
 
 const AUDIO_F32_CHANNEL_MAX: f32 = 0.25; // 1.0 / 4
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 enum Latch {
     #[default]
     Tone0Freq = 0 << 4,
@@ -118,15 +118,27 @@ impl Tone {
     fn update_freq(&mut self, level: u8) {
         self.reg &= (DATA_MASK as u16) << DATA_SHIFT;
         self.reg |= (level as u16) & REG_DATA_MASK as u16;
-        //println!("Updated freq hi, now {}", self.reg);
+        /*
+        println!(
+            "Updated freq hi, now {:02X}({:?} Hz)",
+            self.reg,
+            self.freq()
+        );
+        */
     }
     fn update_freq_data(&mut self, level: u8) {
         self.reg &= REG_DATA_MASK as u16;
         self.reg |= ((level & DATA_MASK) as u16) << DATA_SHIFT;
-        //println!("Updated freq lo, now {}", self.reg);
+        /*
+        println!(
+            "Updated freq lo, now {:02X} ({:?} Hz)",
+            self.reg,
+            self.freq()
+        );
+        */
     }
     #[allow(dead_code)] // used in test
-    fn freq(&mut self) -> Option<u64> {
+    fn freq(&self) -> Option<u64> {
         if self.reg == 0 {
             None
         } else {
@@ -245,6 +257,7 @@ struct Noise {
 impl Noise {
     fn update_level(&mut self, level: u8) {
         self.tone.attenuation = level & REG_DATA_MASK;
+        //println!("Noise attenuation to {}", self.tone.attenuation);
     }
     fn ctrl(&mut self, ctrl: u8) {
         //println!("Noise ctrl: {ctrl:08b}");
@@ -392,13 +405,16 @@ impl Synth {
     }
     fn cmd(&mut self, cmd: u8) {
         if cmd & REG_MASK != 0 {
+            //print!("REG {cmd:02X} ");
             self.update_reg(cmd);
         } else {
+            //print!("DAT {cmd:02X} ");
             self.update_data(cmd);
         }
     }
     fn update_reg(&mut self, cmd: u8) {
         self.latch = Latch::from(cmd);
+        //print!("{:?} ", self.latch);
         match self.latch {
             Tone0Freq => self.tone[0].update_freq(cmd),
             Tone0Attn => self.tone[0].update_level(cmd),
@@ -411,6 +427,7 @@ impl Synth {
         }
     }
     fn update_data(&mut self, cmd: u8) {
+        //print!("{:?} ", self.latch);
         match self.latch {
             Tone0Freq => self.tone[0].update_freq_data(cmd),
             Tone0Attn => self.tone[0].update_level(cmd),
@@ -595,7 +612,7 @@ impl io::Device for PsgDevice {
                         _ => unreachable!(),
                     })
                     .map_err(|e| format!("cannot send cmd: {e}"))?;
-                //println!("PSG Write @{addr:04X}: <{elapsed_cycles}> --> [{val}]");
+                //println!("PSG Write @{addr:04X}: <t={elapsed_cycles}> --> [{val:02X}]");
                 Ok(())
             }
             _ => Err(format!(
