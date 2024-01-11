@@ -210,6 +210,45 @@ fn test_psg_single_freq() {
 }
 
 #[test]
+fn test_psg_ignored_bit() {
+    const SAMPLE_RATE: u32 = 44100;
+    const DURATION_SECS: u32 = 10;
+    const LEN: usize = (SAMPLE_RATE * DURATION_SECS) as usize;
+    const CPU_CLOCK_HZ: u32 = 3579545;
+
+    let (psg_dev, psg_render) = psgs(AudioConf::new(1, SAMPLE_RATE).unwrap());
+    const PSG_CMD: u16 = 0x7F;
+
+    // Set ~440 Hz frequency
+    psg_dev.out(PSG_CMD, 0x8E, 0).unwrap();
+    psg_dev.out(PSG_CMD, 0x4F, 0).unwrap();
+    // Set Tone level max (0 attenuation)
+    psg_dev.out(PSG_CMD, 0x90, 0).unwrap();
+    // wait 10 seconds
+    psg_dev
+        .out(PSG_CMD, 0x80, CPU_CLOCK_HZ * DURATION_SECS)
+        .unwrap();
+
+    let mut samples = vec![0.0; LEN];
+    psg_render.synth_audio_f32(&mut samples).unwrap();
+    let mut real_planner = RealFftPlanner::<f32>::new();
+    // create a FFT
+    let r2c = real_planner.plan_fft_forward(LEN);
+    // make a vector for storing the spectrum
+    let mut spectrum = r2c.make_output_vec();
+    r2c.process(&mut samples, &mut spectrum).unwrap();
+    let top = top_freqs_sorted(LEN, SAMPLE_RATE, &spectrum);
+    dbg!(&top[..5]);
+    assert!(top.len() > 1);
+    assert!(
+        (top[0].0 - 440.4).abs() < 0.005,
+        "440 Hz detected as {}, magnitude {}",
+        top[0].0,
+        top[0].1
+    );
+}
+
+#[test]
 fn test_psg_duration() {
     const SAMPLE_RATE: u32 = 44100;
     const DURATION_SECS: u32 = 2;
