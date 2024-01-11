@@ -122,7 +122,7 @@ impl Tone {
     }
     fn update_freq_data(&mut self, level: u8) {
         self.reg &= REG_DATA_MASK as u16;
-        self.reg |= (level as u16) << DATA_SHIFT;
+        self.reg |= ((level & DATA_MASK) as u16) << DATA_SHIFT;
         //println!("Updated freq lo, now {}", self.reg);
     }
     #[allow(dead_code)] // used in test
