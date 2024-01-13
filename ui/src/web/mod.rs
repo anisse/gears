@@ -33,7 +33,16 @@ fn setup_dom() -> Result<(), JsValue> {
         )?
         .into(),
     )
-    .map_err(|e| format!("couldn't insert play span in document body: {e:?}"))?;
+    .map_err(|e| format!("couldn't insert Monaco play span in document body: {e:?}"))?;
+    body.append_child(
+        &append_embedded_rom(
+            document.clone(),
+            "<a href=\"https://github.com/sverx/GGTestSuite\">GG Test Suite</a>:",
+            include_bytes!("../../web/GGTestSuite.gg").into(),
+        )?
+        .into(),
+    )
+    .map_err(|e| format!("couldn't insert GGT play span in document body: {e:?}"))?;
     body.append_child(&select_rom_btn(document)?.into())
         .map_err(|e| format!("couldn't insert select file in document body: {e:?}"))?;
 
