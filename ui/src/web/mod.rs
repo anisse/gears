@@ -29,7 +29,7 @@ fn setup_dom() -> Result<(), JsValue> {
         &append_embedded_rom(
             document.clone(),
             "<a href=\"https://louistheseganerd.itch.io/monaco-master\">Monaco Master</a>:",
-            include_bytes!("../../web/Monaco Master GG V1.1.gg").into(),
+            include_bytes!("../../resources/Monaco Master GG V1.1.gg").into(),
         )?
         .into(),
     )
@@ -38,7 +38,7 @@ fn setup_dom() -> Result<(), JsValue> {
         &append_embedded_rom(
             document.clone(),
             "<a href=\"https://github.com/sverx/GGTestSuite\">GG Test Suite</a>:",
-            include_bytes!("../../web/GGTestSuite.gg").into(),
+            include_bytes!("../../resources/GGTestSuite.gg").into(),
         )?
         .into(),
     )
