@@ -19,7 +19,7 @@ pub fn web_main() -> Result<(), JsValue> {
 fn setup_dom() -> Result<(), JsValue> {
     let client_window = web_sys::window().ok_or("cannot get JS DOM window")?;
     let document = client_window.document().ok_or("no document in window")?;
-    let body = body_init(document.clone())?;
+    let body = body_init(&document)?;
     body.append_child(
         &append_embedded_rom(
             document.clone(),
@@ -43,7 +43,7 @@ fn setup_dom() -> Result<(), JsValue> {
 
     Ok(())
 }
-fn body_init(doc: Document) -> Result<HtmlElement, JsValue> {
+fn body_init(doc: &Document) -> Result<HtmlElement, JsValue> {
     let body = doc.body().ok_or("no body in document")?;
     body.set_inner_text(
         "D-Pad: ⬆️⬇️⬅️➡️ , Start: [SHIFT], 1: [BACKSPACE], 2: [ENTER], Pause emulation: [SPACE]\n",
@@ -57,8 +57,12 @@ fn append_embedded_rom(doc: Document, html: &str, rom_data: Vec<u8>) -> Result<E
         .create_element("button")
         .map_err(|e| format!("cannot create button: {e:?}"))?;
     button.set_text_content(Some("Play"));
+    let html = html.to_string();
     let closure = Closure::wrap(Box::new(move |_e: Event| {
-        body_init(doc.clone()).unwrap();
+        let body = body_init(&doc).expect("body");
+        let span = doc.create_element("span").expect("span");
+        span.set_inner_html(&html);
+        body.append_child(&span).unwrap();
         wasm_bindgen_futures::spawn_local(run_noerr(
             rom_data.clone(), /* TODO: remove useless clone */
         ));
@@ -97,7 +101,7 @@ fn select_rom_btn(doc: Document) -> Result<Element, JsValue> {
                     .result()
                     .expect("cannot get file reader result");
                 let u8array = Uint8Array::new(&array);
-                body_init(doc.clone()).unwrap();
+                body_init(&doc).unwrap();
                 wasm_bindgen_futures::spawn_local(run_noerr(u8array.to_vec()));
             }) as Box<dyn FnMut(_)>);
             let files = input_html_clone.files().expect("a file list");
