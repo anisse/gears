@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 [dependencies]
 pixels = "0.13.0"
 gilrs = "0.10.4"
-log = "0.4"
+log = { version = "0.4", features = ["std"] }
 
 [dependencies.winit]
 version = "0.28.7"

@@ -7,11 +7,13 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use gears::emu::testcmd;
+use log::{Level, Metadata, Record};
 
 use core::run;
+use gears::emu::testcmd;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    init_log()?;
     let args: Vec<String> = env::args().collect();
     let cmds = testcmd::TestCommand::new_vec(args.get(2).unwrap_or(&String::new()))?;
     let file = args.get(1).expect("needs an argument");
@@ -27,3 +29,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map_err(|e| format!("Could not read {}: {e}", path.display()))?;
     pollster::block_on(run(&data, &cmds))
 }
+
+struct SimpleLogger;
+fn init_log() -> Result<(), Box<dyn Error>> {
+    log::set_logger(&LOGGER)?;
+    log::set_max_level(LOG_LEVEL.to_level_filter());
+    Ok(())
+}
+
+impl log::Log for SimpleLogger {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        metadata.level() <= LOG_LEVEL
+    }
+
+    fn log(&self, record: &Record) {
+        if self.enabled(record.metadata()) {
+            println!("{} - {}", record.level(), record.args());
+        }
+    }
+
+    fn flush(&self) {}
+}
+
+static LOGGER: SimpleLogger = SimpleLogger;
+static LOG_LEVEL: Level = Level::Info;
