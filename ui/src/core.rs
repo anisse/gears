@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use gilrs::Gilrs;
+use log::{debug, info, trace};
 use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, Event, VirtualKeyCode, WindowEvent};
@@ -69,7 +70,7 @@ pub async fn run(data: &[u8], cmds: &[testcmd::TestCommand]) -> Result<(), Box<d
         // Draw the current frame
         match event {
             Event::RedrawRequested(_) => {
-                log::info!("Sending render");
+                debug!("Sending render");
                 if pixels
                     .render()
                     .map_err(|e| println!("pixels.render() failed: {e}"))
@@ -104,7 +105,7 @@ pub async fn run(data: &[u8], cmds: &[testcmd::TestCommand]) -> Result<(), Box<d
                     }
                 },
                 WindowEvent::Focused(focus) => {
-                    log::warn!("got focus event {focus}");
+                    info!("got focus event {focus}");
                     if state.running_focus != *focus {
                         state.running_focus = *focus;
                         emu.run(state.should_run())
@@ -121,9 +122,9 @@ pub async fn run(data: &[u8], cmds: &[testcmd::TestCommand]) -> Result<(), Box<d
                 // Update internal state and request a redraw
                 joystick_events(&mut emu, &mut gilrs);
                 emu.run(state.should_run());
-                log::info!("running emu after events cleared");
+                trace!("running emu after events cleared");
                 if state.main_events_cleared(&mut emu, &mut pixels) {
-                    log::info!("requesting window redraw");
+                    debug!("requesting window redraw");
                     window.request_redraw();
                 }
             }
@@ -150,14 +151,14 @@ fn joystick_events(emu: &mut emu::Emulator, gilrs: &mut Gilrs) {
 }
 
 fn handle_joystick_event(emu: &mut emu::Emulator, ev: gilrs::EventType) {
-    log::warn!("joy ev: {:?}", ev);
+    trace!("joy ev: {:?}", ev);
     let (emu_action, btn): (fn(&mut emu::Emulator, emu::Button), _) = match ev {
         gilrs::EventType::ButtonPressed(button, _) => (emu::Emulator::press, button),
         gilrs::EventType::ButtonReleased(button, _) => (emu::Emulator::release, button),
         //gilrs::EventType::AxisValueChanged(button, val, _) => todo!(),
         _ => return,
     };
-    log::warn!("joy btn: {:?}", btn);
+    debug!("joy btn: {:?}", btn);
     let button = match btn {
         gilrs::Button::DPadUp => emu::Button::Up,
         gilrs::Button::DPadDown => emu::Button::Down,
@@ -205,18 +206,10 @@ fn audio_init() -> Result<(cpal::Device, cpal::StreamConfig), String> {
             }
         )
     })?;
-    /*
-    let audio_configs = audio_device.supported_output_configs().map_err(|e| {
-        format!(
-            "no supported config for device {:?}: {e}",
-            audio_device.name()
-        )
-    })?;
-    println!(
-        "default out conf: {:?}",
+    trace!(
+        "Audio device default output config: {:?}",
         audio_device.default_output_config()
     );
-    */
     let audio_config = audio_device
         .default_output_config()
         .map_err(|e| format!("output config error: {e}"))?;
@@ -229,7 +222,7 @@ fn audio_init() -> Result<(cpal::Device, cpal::StreamConfig), String> {
         return Err(format!("Only two channels are supported, not: {channels}"));
     }
     let supported_buffer_size = audio_config.buffer_size().clone();
-    //println!("Possible sizes: {supported_buffer_size:?}");
+    trace!("Audio config possible buffer sizes: {supported_buffer_size:?}");
     let mut stream_config: cpal::StreamConfig = audio_config.into();
     let default_buffer_size = 1472; // ~ 16ms buffer, about a frame. This is a manually rounded-up
                                     // buffer
@@ -290,15 +283,9 @@ impl Default for EmuLoop {
 impl EmuLoop {
     const FRAME_DURATION: Duration = Duration::from_nanos((1.0 / 60.0 * 1_000_000_000.0) as u64);
     fn main_events_cleared(&mut self, emu: &mut emu::Emulator, pixels: &mut Pixels) -> bool {
-        /*
-        let start_msg = format!(
-            "elapsed since last call: {:#?}, acc: {:#?}, => ",
-            self.current_time.elapsed(),
-            self.accumulator,
-        );
-        */
+        let (start_elapsed, start_acc) = (self.current_time.elapsed(), self.accumulator);
         let single_step = self.stepping;
-        self.accumulator += self.current_time.elapsed();
+        self.accumulator += start_elapsed;
         let mut frames = 0;
         while self.accumulator >= Self::FRAME_DURATION {
             self.current_time = Instant::now();
@@ -308,14 +295,12 @@ impl EmuLoop {
             self.accumulator += self.current_time.elapsed();
         }
         self.current_time = Instant::now();
-        /*
-        println!(
-            "{start_msg} elapsed: {:#?}, acc: {:#?}, skip_next: {}, ran {frames} frames",
+        trace!(
+            "events cleared elapsed since last call: {start_elapsed:#?}, acc: {start_acc:#?}, => elapsed: {:#?}, acc: {:#?}, skip_next: {}, ran {frames} frames",
             self.current_time.elapsed(),
             self.accumulator,
             self.skip_next
         );
-        */
         frames > 0 && !self.skip_next && (self.should_run() || single_step)
     }
     fn should_run(&self) -> bool {
