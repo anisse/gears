@@ -8,7 +8,7 @@ use std::rc::Rc;
 use js_sys::Uint8Array;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
-use web_sys::{Document, Element, Event, FileReader, HtmlInputElement};
+use web_sys::{Document, Element, Event, FileReader, HtmlElement, HtmlInputElement};
 use winit::window::Window;
 
 pub fn web_main() -> Result<(), JsValue> {
@@ -19,10 +19,7 @@ pub fn web_main() -> Result<(), JsValue> {
 fn setup_dom() -> Result<(), JsValue> {
     let client_window = web_sys::window().ok_or("cannot get JS DOM window")?;
     let document = client_window.document().ok_or("no document in window")?;
-    let body = document.body().ok_or("no body in document")?;
-    body.set_inner_text(
-        "D-Pad: ⬆️⬇️⬅️➡️ , Start: [SHIFT], 1: [BACKSPACE], 2: [ENTER], Pause emulation: [SPACE]\n",
-    );
+    let body = body_init(document.clone())?;
     body.append_child(
         &append_embedded_rom(
             document.clone(),
@@ -46,6 +43,13 @@ fn setup_dom() -> Result<(), JsValue> {
 
     Ok(())
 }
+fn body_init(doc: Document) -> Result<HtmlElement, JsValue> {
+    let body = doc.body().ok_or("no body in document")?;
+    body.set_inner_text(
+        "D-Pad: ⬆️⬇️⬅️➡️ , Start: [SHIFT], 1: [BACKSPACE], 2: [ENTER], Pause emulation: [SPACE]\n",
+    );
+    Ok(body)
+}
 fn append_embedded_rom(doc: Document, html: &str, rom_data: Vec<u8>) -> Result<Element, JsValue> {
     let span = doc.create_element("span")?;
     span.set_inner_html(html);
@@ -54,6 +58,7 @@ fn append_embedded_rom(doc: Document, html: &str, rom_data: Vec<u8>) -> Result<E
         .map_err(|e| format!("cannot create button: {e:?}"))?;
     button.set_text_content(Some("Play"));
     let closure = Closure::wrap(Box::new(move |_e: Event| {
+        body_init(doc.clone()).unwrap();
         wasm_bindgen_futures::spawn_local(run_noerr(
             rom_data.clone(), /* TODO: remove useless clone */
         ));
@@ -80,16 +85,19 @@ fn select_rom_btn(doc: Document) -> Result<Element, JsValue> {
     input_html.set_attribute("accept", ".gg")?;
     let file_reader = FileReader::new().map_err(|e| format!("cannot create file reader: {e:?}"))?;
     let open_file_dialog = Closure::wrap(Box::new(move |_e: Event| {
+        let doc = doc.clone();
         let input_html = input_html.clone();
         let input_html_clone = input_html.clone();
         let file_reader = file_reader.clone();
         let load_file = Closure::wrap(Box::new(move |_e: Event| {
+            let doc = doc.clone();
             let file_reader_clone = file_reader.clone();
             let file_loaded = Closure::wrap(Box::new(move |_e: Event| {
                 let array = file_reader_clone
                     .result()
                     .expect("cannot get file reader result");
                 let u8array = Uint8Array::new(&array);
+                body_init(doc.clone()).unwrap();
                 wasm_bindgen_futures::spawn_local(run_noerr(u8array.to_vec()));
             }) as Box<dyn FnMut(_)>);
             let files = input_html_clone.files().expect("a file list");
