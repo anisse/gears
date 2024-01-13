@@ -134,11 +134,11 @@ pub async fn run(data: &[u8], cmds: &[testcmd::TestCommand]) -> Result<(), Box<d
     });
 }
 
-fn web_init(win: Rc<Window>) -> Result<(), Box<dyn Error>> {
+fn web_init(_win: Rc<Window>) -> Result<(), Box<dyn Error>> {
     #[cfg(target_arch = "wasm32")]
     {
         use crate::web;
-        return web::web_init(win);
+        return web::web_init(_win);
     }
     #[cfg(not(target_arch = "wasm32"))]
     Ok(())

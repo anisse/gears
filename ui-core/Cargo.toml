@@ -1,0 +1,33 @@
+[package]
+name = "gears-ui-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Anisse Astier <anisse@astier.eu>"]
+
+[dependencies]
+pixels = "0.13.0"
+gilrs = "0.10.4"
+log = { version = "0.4", features = ["std"] }
+wasm-bindgen = "0.2.89"
+
+[dependencies.winit]
+version = "0.28.7"
+default-features = false
+features = ["wayland-dlopen", "wayland"]
+
+[dependencies.gears]
+path = "../"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1"
+console_log = "1"
+cpal = { version = "0.15.2", features = ["wasm-bindgen"] }
+instant = "0.1"
+js-sys = "0.3"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = ["GpuTextureFormat", "File", "FileReader", "FileList", "HtmlInputElement", "Blob"] }
+wgpu = { version = "0.18", features = ["webgl"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+cpal = "0.15.2"
+wgpu = "0.18"

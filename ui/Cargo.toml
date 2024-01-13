@@ -8,30 +8,12 @@ authors = ["Anisse Astier <anisse@astier.eu>"]
 crate-type = ["cdylib"]
 
 [dependencies]
-pixels = "0.13.0"
-gilrs = "0.10.4"
 log = { version = "0.4", features = ["std"] }
-
-[dependencies.winit]
-version = "0.28.7"
-default-features = false
-features = ["wayland-dlopen", "wayland"]
+wasm-bindgen = "0.2.89"
+pollster = "0.3"
 
 [dependencies.gears]
 path = "../"
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-console_error_panic_hook = "0.1"
-console_log = "1"
-cpal = { version = "0.15.2", features = ["wasm-bindgen"] }
-instant = "0.1"
-js-sys = "0.3"
-wasm-bindgen = "0.2.89"
-wasm-bindgen-futures = "0.4"
-web-sys = { version = "0.3", features = ["GpuTextureFormat", "File", "FileReader", "FileList", "HtmlInputElement", "Blob"] }
-wgpu = { version = "0.18", features = ["webgl"] }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-cpal = "0.15.2"
-pollster = "0.3"
-wgpu = "0.18"
+[dependencies.gears-ui-core]
+path = "../ui-core"

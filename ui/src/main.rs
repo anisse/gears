@@ -1,6 +1,4 @@
 #![deny(clippy::all)]
-mod core;
-
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -9,8 +7,8 @@ use std::path::Path;
 
 use log::{Level, Metadata, Record};
 
-use core::run;
 use gears::emu::testcmd;
+use gears_ui_core::core::run;
 
 fn main() -> Result<(), Box<dyn Error>> {
     init_log()?;

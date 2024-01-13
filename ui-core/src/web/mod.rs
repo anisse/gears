@@ -7,13 +7,11 @@ use std::rc::Rc;
 
 use js_sys::Uint8Array;
 use wasm_bindgen::closure::Closure;
-use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{Document, Element, Event, FileReader, HtmlInputElement};
 use winit::window::Window;
 
-#[wasm_bindgen(start)]
-pub(crate) fn web_main() -> Result<(), JsValue> {
+pub fn web_main() -> Result<(), JsValue> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     console_log::init_with_level(log::Level::Info).expect("error initializing logger");
     setup_dom()
