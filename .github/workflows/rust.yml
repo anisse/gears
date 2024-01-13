@@ -16,6 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: Prepare
+      run: sudo apt install -y libudev-dev libasound2-dev
     - name: Build
       run: cargo build --verbose --workspace
     - name: Run tests
