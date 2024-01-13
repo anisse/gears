@@ -22,28 +22,42 @@ fn setup_dom() -> Result<(), JsValue> {
     let client_window = web_sys::window().ok_or("cannot get JS DOM window")?;
     let document = client_window.document().ok_or("no document in window")?;
     let body = document.body().ok_or("no body in document")?;
-    let button = document
-        .create_element("button")
-        .map_err(|e| format!("cannot create button: {e:?}"))?;
     body.set_inner_text(
         "D-Pad: ⬆️⬇️⬅️➡️ , Start: [SHIFT], 1: [BACKSPACE], 2: [ENTER], Pause emulation: [SPACE]\n",
     );
-    button.set_text_content(Some("Start"));
-    body.append_child(&button)
-        .map_err(|e| format!("couldn't insert start button in document body: {e:?}"))?;
+    body.append_child(
+        &append_embedded_rom(
+            document.clone(),
+            "<a href=\"https://louistheseganerd.itch.io/monaco-master\">Monaco Master</a>:",
+            include_bytes!("../../web/Monaco Master GG V1.1.gg").into(),
+        )?
+        .into(),
+    )
+    .map_err(|e| format!("couldn't insert play span in document body: {e:?}"))?;
+    body.append_child(&select_rom_btn(document)?.into())
+        .map_err(|e| format!("couldn't insert select file in document body: {e:?}"))?;
+
+    Ok(())
+}
+fn append_embedded_rom(doc: Document, html: &str, rom_data: Vec<u8>) -> Result<Element, JsValue> {
+    let span = doc.create_element("span")?;
+    span.set_inner_html(html);
+    let button = doc
+        .create_element("button")
+        .map_err(|e| format!("cannot create button: {e:?}"))?;
+    button.set_text_content(Some("Play"));
     let closure = Closure::wrap(Box::new(move |_e: Event| {
         wasm_bindgen_futures::spawn_local(run_noerr(
-            include_bytes!("../../../../roms/Sonic The Hedgehog (World) (Rev 1).gg").into(),
+            rom_data.clone(), /* TODO: remove useless clone */
         ));
     }) as Box<dyn FnMut(_)>);
     button
         .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
         .map_err(|e| format!("cannot attach callback to button: {e:?}"))?;
     closure.forget();
-    body.append_child(&select_rom_btn(document)?.into())
-        .map_err(|e| format!("couldn't insert select button in document body: {e:?}"))?;
-
-    Ok(())
+    span.append_child(&button)
+        .map_err(|e| format!("couldn't insert play button in span: {e:?}"))?;
+    Ok(span)
 }
 fn select_rom_btn(doc: Document) -> Result<Element, JsValue> {
     let button = doc
