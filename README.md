@@ -3,25 +3,26 @@
 
 In-progress Game Gear emulator written in Rust.
 
-It has a mostly complete Z80 emulator, that passes [z80test](https://github.com/raxoft/z80test), [zexall](https://mdfs.net/Software/Z80/Exerciser/), and [FUSE](http://fuse-emulator.sourceforge.net/) tests.
+It has a mostly complete Z80 emulator, that passes [z80test](https://github.com/raxoft/z80test) (1.0 only), [zexall](https://mdfs.net/Software/Z80/Exerciser/), and [FUSE](http://fuse-emulator.sourceforge.net/) tests.
 
 
 ## Current status
 
- - supports the game gear/master system rom banking
- - minimal interrupt support
- - Beginning of a VDP implementation, able to display some games
- - Small UI relying on winit+pixels+cpal crates that supports input with keyboard and gamepad (both hardcoded bindings)
+ - supports the game gear/master system SEGA rom banking
+ - minimal CPU interrupt support
+ - a VDP implementation, able to display some games
+ - Small "UI" relying on winit+pixels+cpal+gilrs crates that supports input with keyboard and gamepad (both hardcoded bindings)
  - A test suite for the VDP with some ROM frames to prevent regressions
+ - WASM target for in-browser emulation (WIP)
 
 ## TODO
 
- - Finish that VDP
+ - Finish VDP details
    * still missing horizontal interrupt testing (H counter, line completion)
- - Finish that PSG (sound)
+ - Polish the PSG (sound)
    * there is no filtering or downsampling strategy. A low-pass filter should do.
- - WASM target. Dependencies should allow that
- - Support a complete game gear game
+ - WASM is far from complete; lacks a complete UI, just like native.
+ - Support more game gear games. Many work, but there might be bugs.
  - It's fast enough but there is a lot of margin for improvement; for example it does allocations in the CPU emulation path which are not needed.
  - Master system support at some point because some game gear cartridges actually shipped the SMS version. It will also be useful to enjoy the wider screen in some infamously hard games on Game Gear (Sonic 2 for example).
 
