@@ -11,13 +11,28 @@ env:
 
 jobs:
   build:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, ubuntu-22.04]
+        toolchain: [ "stable", "beta" ]
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@v4
+
     - name: Prepare
       run: sudo apt install -y libudev-dev libasound2-dev
+
+    - name: Install rust
+      id: toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: ${{ matrix.toolchain }}
+        rustflags: ""
+        cache: false
+
     - name: Build
       run: cargo build --verbose --workspace
     - name: Run tests
