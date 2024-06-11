@@ -34,6 +34,7 @@ overflow-checks = true
 [workspace]
 members = [
 	"cli",
-	"ui",
+	"desktop",
+	"web",
 	"ui-core",
 ]

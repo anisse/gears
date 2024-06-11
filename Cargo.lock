@@ -647,14 +647,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "gears-ui"
+name = "gears-desktop"
 version = "0.1.0"
 dependencies = [
  "gears",
  "gears-ui-core",
  "log",
  "pollster",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -675,6 +674,17 @@ dependencies = [
  "web-sys",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "gears-web"
+version = "0.1.0"
+dependencies = [
+ "gears",
+ "gears-ui-core",
+ "log",
+ "pollster",
+ "wasm-bindgen",
 ]
 
 [[package]]
