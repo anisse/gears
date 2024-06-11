@@ -1,0 +1,19 @@
+[package]
+name = "gears-web"
+version = "0.1.0"
+edition = "2021"
+authors = ["Anisse Astier <anisse@astier.eu>"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+log = { version = "0.4", features = ["std"] }
+wasm-bindgen = "0.2.89"
+pollster = "0.3"
+
+[dependencies.gears]
+path = "../"
+
+[dependencies.gears-ui-core]
+path = "../ui-core"

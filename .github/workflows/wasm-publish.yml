@@ -32,11 +32,11 @@ jobs:
       - name: install wasm-pack dep
         run: cargo install wasm-pack
       - name: build
-        run: cd ui && wasm-pack build --target web --out-dir web --release --no-typescript
+        run: cd web && wasm-pack build --target web --out-dir web --release --no-typescript
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'ui/web/'
+          path: 'web/web/'
 
   # Deployment job
   deploy:
