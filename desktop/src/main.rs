@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut data: Vec<u8> = vec![];
     file.read_to_end(&mut data)
         .map_err(|e| format!("Could not read {}: {e}", path.display()))?;
-    pollster::block_on(run(&data, &cmds))
+    pollster::block_on(run(&data, &cmds, |_| Ok(())))
 }
 
 struct SimpleLogger;

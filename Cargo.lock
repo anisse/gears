@@ -660,18 +660,13 @@ dependencies = [
 name = "gears-ui-core"
 version = "0.1.0"
 dependencies = [
- "console_error_panic_hook",
- "console_log",
  "cpal",
  "gears",
  "gilrs",
  "instant",
- "js-sys",
  "log",
  "pixels",
  "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
  "wgpu",
  "winit",
 ]
@@ -680,11 +675,17 @@ dependencies = [
 name = "gears-web"
 version = "0.1.0"
 dependencies = [
+ "console_error_panic_hook",
+ "console_log",
  "gears",
  "gears-ui-core",
+ "js-sys",
  "log",
  "pollster",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "winit",
 ]
 
 [[package]]

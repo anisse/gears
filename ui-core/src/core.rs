@@ -21,7 +21,13 @@ use winit::window::{Window, WindowBuilder};
 use gears::emu;
 use gears::emu::testcmd;
 
-pub async fn run(data: &[u8], cmds: &[testcmd::TestCommand]) -> Result<(), Box<dyn Error>> {
+type PlatformWindowInitFn = fn(Rc<Window>) -> Result<(), Box<dyn Error>>;
+
+pub async fn run(
+    data: &[u8],
+    cmds: &[testcmd::TestCommand],
+    win_init: PlatformWindowInitFn,
+) -> Result<(), Box<dyn Error>> {
     let event_loop = EventLoop::new();
     let window = Rc::new({
         let size = LogicalSize::new(emu::LCD_WIDTH as f64, emu::LCD_HEIGHT as f64);
@@ -33,7 +39,7 @@ pub async fn run(data: &[u8], cmds: &[testcmd::TestCommand]) -> Result<(), Box<d
             .map_err(|e| format!("cannot create gears window: {e}"))?
     });
 
-    web_init(Rc::clone(&window))?;
+    win_init(Rc::clone(&window))?;
 
     let mut pixels = {
         let window_size = window.inner_size();
@@ -132,16 +138,6 @@ pub async fn run(data: &[u8], cmds: &[testcmd::TestCommand]) -> Result<(), Box<d
         }
         print!("");
     });
-}
-
-fn web_init(_win: Rc<Window>) -> Result<(), Box<dyn Error>> {
-    #[cfg(target_arch = "wasm32")]
-    {
-        use crate::web;
-        return web::web_init(_win);
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    Ok(())
 }
 
 fn joystick_events(emu: &mut emu::Emulator, gilrs: &mut Gilrs) {
