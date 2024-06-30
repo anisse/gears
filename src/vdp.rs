@@ -1026,6 +1026,8 @@ impl Vdp {
                             rvh: false,
                             rvv: false,
                             palette1: false,
+                            #[cfg(feature = "pattern_debug")]
+                            bg_num: 0,
                         }
                     } else {
                         MoreSettings::SpritePriority { bg: 0, sprites: 0 }
