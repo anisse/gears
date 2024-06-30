@@ -129,6 +129,10 @@ struct VdpState {
     cmd_byte1: Option<u8>,
     cram_byte1: Option<u8>,
     vertical_scroll: u8, // We need to save it at the beginning of the frame
+    // do we need to recompute the whole palette?
+    cram_dirty: bool,
+    // Cache directly encoded pixels
+    color_cache: [u32; 32],
 }
 
 #[derive(Debug)]
@@ -241,6 +245,48 @@ impl VdpState {
             ((rg >> 4) & 0xF) | (rg & 0xF0),
             (b & 0xF) | ((b << 4) & 0xF0),
         )
+    }
+    fn palette_recompute(&mut self) {
+        if !self.cram_dirty {
+            return;
+        }
+        for color in 0..32 {
+            let (r, g, b) = self.rgb((color & 16) << 1, color as u8 & 0xF);
+            // This depends both on pixel format and endianness
+            self.color_cache[color] = (r as u32) | (g as u32) << 8 | (b as u32) << 16 | 0xFF << 24;
+        }
+        self.cram_dirty = false;
+    }
+    fn pixel_set_full(
+        &self,
+        dest: &mut [u8],
+        x: usize,
+        line_offset: usize,
+        palette_base: usize,
+        code: u8,
+    ) {
+        const PIX_SIZE: usize = 4;
+        let src = &self.color_cache[(palette_base >> 1) + code as usize] as *const u32;
+        let dst = &mut dest[line_offset * PIX_SIZE + x * PIX_SIZE] as *mut u8;
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(src, dst.cast(), 1);
+        }
+
+        // Unfortunately this cannot be optimized to a single store
+        /*
+        (
+            dest[line_offset * PIX_SIZE + x * PIX_SIZE],
+            dest[line_offset * PIX_SIZE + x * PIX_SIZE + 1],
+            dest[line_offset * PIX_SIZE + x * PIX_SIZE + 2],
+            dest[line_offset * PIX_SIZE + x * PIX_SIZE + 3],
+        ) = (
+            ((pixel >> 24) & 0xFF) as u8,
+            ((pixel >> 16) & 0xFF) as u8,
+            ((pixel >> 8) & 0xFF) as u8,
+            (pixel & 0xFF) as u8,
+        );
+        */
     }
     #[inline]
     fn pixel_set(
@@ -378,20 +424,11 @@ impl VdpState {
                     continue;
                 }
             }
-            let (color_r, color_g, color_b) = self.rgb(palette_base, code);
-
             let line_length = c.line_length as usize * CHAR_SIZE as usize;
             let pix_size = 4; // 4 bytes per pixels, one for each component
 
-            Self::pixel_set(
-                dest,
-                x + col,
-                y * line_length,
-                pix_size,
-                color_r,
-                color_g,
-                color_b,
-            );
+            self.pixel_set_full(dest, x + col, y * line_length, palette_base, code);
+
             if overflow_pause && (col == 0 || col == 7 || src_line == 0 || src_line == 7) {
                 Self::pixel_set(dest, x + col, y * line_length, pix_size, 0xF3, 0, 0);
             }
@@ -702,6 +739,7 @@ impl VdpState {
         );
     }
     fn render_line(&mut self, pixels: &mut [u8], line: u8, render_area: RenderArea) {
+        self.palette_recompute();
         match render_area {
             RenderArea::VisibleOnly => self.render_line_visible(pixels, line),
             RenderArea::EffectiveArea => self.render_line_effective(pixels, line),
@@ -801,6 +839,9 @@ impl VdpState {
                     debugio!("Upper CRAM byte set: {:02X}", val);
                     self.cram_byte1 = Some(val);
                 } else {
+                    if ram[addr - 1] != cram_byte1.unwrap() || ram[addr] != val & 0x0F {
+                        self.cram_dirty = true;
+                    }
                     ram[addr - 1] = cram_byte1.unwrap();
                     ram[addr] = val & 0x0F;
                     debugio!(
@@ -1063,6 +1104,8 @@ impl Default for VdpState {
             cmd_byte1: None,
             cram_byte1: None,
             vertical_scroll: 0,
+            cram_dirty: true,
+            color_cache: [0; 32],
         }
     }
 }
