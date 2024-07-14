@@ -9,11 +9,11 @@ It has a mostly complete Z80 emulator, that passes [z80test](https://github.com/
 ## Current status
 
  - supports the game gear/master system SEGA rom banking
- - minimal CPU interrupt support
+ - minimal CPU interrupt support (mode 1)
  - a VDP implementation, able to display some games
  - Small "UI" relying on winit+pixels+cpal+gilrs crates that supports input with keyboard and gamepad (both hardcoded bindings)
  - A test suite for the VDP with some ROM frames to prevent regressions
- - WASM target for in-browser emulation (WIP)
+ - WASM target for in-browser emulation.
 
 ## TODO
 
@@ -21,7 +21,7 @@ It has a mostly complete Z80 emulator, that passes [z80test](https://github.com/
    * still missing horizontal interrupt testing (H counter, line completion)
  - Polish the PSG (sound)
    * there is no filtering or downsampling strategy. A low-pass filter should do.
- - WASM is far from complete; lacks a complete UI, just like native.
+ - WASM is incomplete: lacks a complete UI (e.g configurable keybindings), just like the desktop version.
  - Support more game gear games. Many work, but there might be bugs.
  - It's fast enough but there is a lot of margin for improvement; for example it does allocations in the CPU emulation path which are not needed.
  - Master system support at some point because some game gear cartridges actually shipped the SMS version. It will also be useful to enjoy the wider screen in some infamously hard games on Game Gear (Sonic 2 for example).
