@@ -26,9 +26,15 @@ It has a mostly complete Z80 emulator, that passes [z80test](https://github.com/
  - It's fast enough but there is a lot of margin for improvement; for example it does allocations in the CPU emulation path which are not needed.
  - Master system support at some point because some game gear cartridges actually shipped the SMS version. It will also be useful to enjoy the wider screen in some infamously hard games on Game Gear (Sonic 2 for example).
 
+## Demo
+
+The [web version of the gears emulator is available online here](https://anisse.github.io/gears/). It should always be the latest version.
+
 ## Learned lessons
 
 Over the course of writing this emulator, I took a pause to reflect on some intricacies of the Z80, and gave a [talk on Z80's "last secrets" at FOSDEM 2022](https://archive.fosdem.org/2022/schedule/event/z80/). It's not exhaustive, and there are many more such secrets that have been discovered in the past 10 years by the Z80 emulation community.
+
+I also gave two talks at FOSEDM 2024, one about [WASM on the web with Rust, using gears as an example](https://fosdem.org/2024/schedule/event/fosdem-2024-1691-wasm-101-porting-a-sega-game-gear-emulator-to-the-browser/). And another about [my advice on how to start to write an emulator](https://fosdem.org/2024/schedule/event/fosdem-2024-2146-how-do-you-write-an-emulator-anyway-/).
 
 I also wrote the following updates:
  * [Talks and emulation: with some emulator progress](https://anisse.astier.eu/talks-emulation.html)
