@@ -1390,13 +1390,14 @@ pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
 
 fn interrupt_op(vector: u8) -> disas::OpCode {
     disas::OpCode {
-        data: Vec::new(),
+        data: [0; 4],
         length: 0,
         ins: Instruction::RST,
         op1: Some(Operand::Imm8(vector)),
         op2: None,
         op3: None,
-        tstates: vec![4, 5, 3, 3],
+        tstates: [4, 5, 3, 3, 0, 0],
+        mcycles: 4,
     }
 }
 pub fn interrupt_mode_1(s: &mut State) -> Result<usize, String> {
