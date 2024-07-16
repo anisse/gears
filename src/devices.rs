@@ -128,7 +128,7 @@ impl Devices {
                 addr & !map.ignore_mask >= map.start && addr & !map.ignore_mask <= map.end
             })
             .map(|(dev, _)| dev)
-            .ok_or(format!("Address {:04X} to unknown device", addr))
+            .ok_or_else(|| format!("Address {:04X} to unknown device", addr))
     }
 }
 
