@@ -25,8 +25,6 @@ fn z80doc() {
     z80common(include_bytes!("z80test/z80doc.tap"))
 }
 fn z80common(prog: &[u8]) {
-    let cache = gears::cpu::DisasCache::init();
-
     let mut state = cpu::init();
     state.mem = mem::Memory::init(mem::Mapper::ZX64K); // This test suite is for machines with more RAM
     state.io = io::RcDevice::new(ZxSpectrumIODevice {});
@@ -58,7 +56,7 @@ fn z80common(prog: &[u8]) {
     state.r.PC = load_addr;
     let mut msg = String::new();
     loop {
-        cpu::run_cached(&cache, &mut state, 1, false).unwrap();
+        cpu::run(&mut state, 1, false).unwrap();
         /*
         println!(
             "{:04X}: {:04X} | {:04X} {:04X} {:04X} {:04X} {:04X} {:04X} {:04X}",

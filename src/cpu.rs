@@ -1433,33 +1433,6 @@ pub fn run(s: &mut State, tstates_len: usize, debug: bool) -> Result<usize, Stri
     }
     Ok(tstates_ran)
 }
-pub use disas::DisasCache;
-pub fn run_cached(
-    c: &disas::DisasCache,
-    s: &mut State,
-    tstates_len: usize,
-    debug: bool,
-) -> Result<usize, String> {
-    let mut tstates_ran = 0;
-    let mut disas_target = [0_u8; 4];
-    while tstates_ran < tstates_len {
-        // TODO: split into m states, fetch etc
-        s.mem.fetch_range_safe(s.r.PC, &mut disas_target);
-        if let Some(op) = c.disas(&disas_target) {
-            if debug {
-                if s.halted {
-                    print!(".");
-                } else {
-                    print!("\n{:04X}: {:?} ", s.r.PC, op);
-                }
-            }
-            tstates_ran += run_op(s, &op)?;
-        } else {
-            return Err(format!("Unknown instruction(s)) {:02X?}", disas_target));
-        }
-    }
-    Ok(tstates_ran)
-}
 #[cfg(test)]
 mod tests {
     use crate::cpu::*;

@@ -17,8 +17,6 @@ fn zexdoc() {
     zex(prog);
 }
 fn zex(prog: &[u8]) {
-    let cache = gears::cpu::DisasCache::init();
-
     let mut state = cpu::init();
     state.mem = mem::Memory::init(mem::Mapper::ZX64K); // This test suite is for machines with more RAM
     state.io = io::RcDevice::new(ZxSpectrumIODevice {});
@@ -26,7 +24,7 @@ fn zex(prog: &[u8]) {
     let load_addr = 0x100;
 
     for (addr, val) in prog.iter().enumerate() {
-        state.mem.set_u8(addr as u16 + load_addr as u16, *val);
+        state.mem.set_u8(addr as u16 + load_addr, *val);
     }
 
     // replace syscall 5
@@ -37,7 +35,7 @@ fn zex(prog: &[u8]) {
     state.r.PC = load_addr;
     let mut msg = String::new();
     loop {
-        cpu::run_cached(&cache, &mut state, 1, false).unwrap();
+        cpu::run(&mut state, 1, false).unwrap();
         /*
         println!(
             "{:04X}: {:04X} | {:04X} {:04X} {:04X} {:04X} {:04X} {:04X} {:04X}",

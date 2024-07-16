@@ -329,42 +329,6 @@ fn decode_operand_cond_cc(arg: u8) -> FlagCondition {
     }
 }
 
-const CACHE_SIZE: usize = 256;
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct DisasCache {
-    cache: [Option<Rc<OpCode>>; CACHE_SIZE],
-}
-
-impl DisasCache {
-    pub fn init() -> DisasCache {
-        const INIT: Option<Rc<OpCode>> = None;
-        let mut dc = DisasCache {
-            cache: [INIT; CACHE_SIZE],
-        };
-
-        for (i, c) in dc.cache.iter_mut().enumerate() {
-            let opcode = disas(&[i as u8]);
-            if opcode.is_none() {
-                continue;
-            }
-            if let Some(op) = opcode {
-                if op.length == 1 {
-                    *c = Some(Rc::new(op));
-                }
-            }
-        }
-        //dbg!(&dc.cache);
-        dc
-    }
-    pub fn disas(&self, ins: &[u8]) -> Option<Rc<OpCode>> {
-        let i = ins[0] as usize; // | (ins[1] as usize) << 8;
-        if let Some(ref o) = self.cache[i] {
-            return Some(Rc::clone(o));
-        }
-        disas(ins).map(Rc::new)
-    }
-}
-
 #[inline]
 fn ins_to_data(ins: &[u8]) -> [u8; 4] {
     let mut data = [0; 4];

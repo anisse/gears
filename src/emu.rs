@@ -51,7 +51,6 @@ pub use psg::AudioConf;
 pub use vdp::DisplayRefresh;
 
 pub struct Emulator {
-    cache: cpu::DisasCache,
     cpu: cpu::State,
     devs: Rc<devices::Devices>,
     render_area: vdp::RenderArea,
@@ -63,7 +62,6 @@ impl Emulator {
     pub fn init(rom: Vec<u8>, visible_only: bool, audio_conf: AudioConf) -> (Self, AudioCallback) {
         let (audio_tx, audio_rx) = psg::cmds();
         let mut emu = Self {
-            cache: cpu::DisasCache::init(),
             cpu: cpu::init(),
             devs: Rc::new(devices::Devices::new(audio_tx)),
             render_area: if visible_only {
@@ -88,8 +86,7 @@ impl Emulator {
             //println!("VDP sent an interrupt !");
             cpu::interrupt_mode_1(&mut self.cpu).unwrap();
         }
-        let cycles = cpu::run_cached(
-            &self.cache,
+        let cycles = cpu::run(
             &mut self.cpu,
             (CPU_CYCLES_PER_LINE as isize - self.over_cycles) as usize,
             false,
