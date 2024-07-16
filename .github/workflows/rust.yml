@@ -36,7 +36,7 @@ jobs:
 
     - name: Prepare
       if: runner.os == 'Linux'
-      run: sudo apt install -y libudev-dev libasound2-dev
+      run: sudo apt update && sudo apt install -y libudev-dev libasound2-dev
 
     - name: Install rust
       id: toolchain
