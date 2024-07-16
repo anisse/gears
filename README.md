@@ -23,7 +23,7 @@ It has a mostly complete Z80 emulator, that passes [z80test](https://github.com/
    * there is no filtering or downsampling strategy. A low-pass filter should do.
  - WASM is incomplete: lacks a complete UI (e.g configurable keybindings), just like the desktop version.
  - Support more game gear games. Many work, but there might be bugs.
- - It's fast enough but there is a lot of margin for improvement; for example it does allocations in the CPU emulation path which are not needed.
+ - It's fast enough but there is a margin for improvement.
  - Master system support at some point because some game gear cartridges actually shipped the SMS version. It will also be useful to enjoy the wider screen in some infamously hard games on Game Gear (Sonic 2 for example).
 
 ## Demo
