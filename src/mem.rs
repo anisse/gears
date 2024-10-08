@@ -31,10 +31,7 @@ impl Memory {
         match mapper {
             Mapper::ZX64K => Memory {
                 ram: vec![0; 0x10000],
-                mapper: match mapper {
-                    Mapper::ZX64K => Mapper::ZX64K,
-                    Mapper::SegaGG { rom, backup_ram } => Mapper::SegaGG { rom, backup_ram },
-                },
+                mapper,
                 map: [
                     Dest::Ram { start: 0x0000 },
                     Dest::Ram { start: 0x2000 },
