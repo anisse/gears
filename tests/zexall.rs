@@ -1,3 +1,5 @@
+use gears::cpu::Cpu;
+use gears::mem::MemoryMapper;
 use gears::{cpu, io, mem};
 
 // Heavily inspired by iz80's test
@@ -17,8 +19,7 @@ fn zexdoc() {
     zex(prog);
 }
 fn zex(prog: &[u8]) {
-    let mut state = cpu::init();
-    state.mem = mem::Memory::init(mem::Mapper::ZX64K); // This test suite is for machines with more RAM
+    let mut state = cpu::init(mem::ZX64kMapper::default());
     state.io = io::RcDevice::new(ZxSpectrumIODevice {});
 
     let load_addr = 0x100;
@@ -35,7 +36,7 @@ fn zex(prog: &[u8]) {
     state.r.PC = load_addr;
     let mut msg = String::new();
     loop {
-        cpu::run(&mut state, 1, false).unwrap();
+        state.run(1, false).unwrap();
         /*
         println!(
             "{:04X}: {:04X} | {:04X} {:04X} {:04X} {:04X} {:04X} {:04X} {:04X}",

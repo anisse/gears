@@ -9,7 +9,7 @@ use crate::cpu;
 use crate::devices;
 use crate::io;
 use crate::joystick;
-use crate::mem;
+use crate::mem::SegaGGMapper;
 use crate::psg;
 use crate::vdp;
 
@@ -51,7 +51,7 @@ pub use psg::AudioConf;
 pub use vdp::DisplayRefresh;
 
 pub struct Emulator {
-    cpu: cpu::State,
+    cpu: Box<dyn cpu::Cpu>,
     devs: Rc<devices::Devices>,
     render_area: vdp::RenderArea,
     over_cycles: isize,
@@ -61,9 +61,15 @@ pub struct Emulator {
 impl Emulator {
     pub fn init(rom: Vec<u8>, visible_only: bool, audio_conf: AudioConf) -> (Self, AudioCallback) {
         let (audio_tx, audio_rx) = psg::cmds();
-        let mut emu = Self {
-            cpu: cpu::init(),
-            devs: Rc::new(devices::Devices::new(audio_tx)),
+        let devs = Rc::new(devices::Devices::new(audio_tx));
+        let emu = Self {
+            cpu: {
+                Box::new(cpu::init_cpu(
+                    SegaGGMapper::new(rom, None),
+                    io::RcDevice::new(devs.clone()),
+                ))
+            },
+            devs,
             render_area: if visible_only {
                 vdp::RenderArea::VisibleOnly
             } else {
@@ -72,11 +78,6 @@ impl Emulator {
             over_cycles: 0,
             running: Default::default(),
         };
-        emu.cpu.mem = mem::Memory::init(mem::Mapper::SegaGG {
-            rom,
-            backup_ram: None,
-        });
-        emu.cpu.io = io::RcDevice::new(emu.devs.clone());
         let running = emu.running.clone();
         (emu, Self::audio_callback(audio_rx, audio_conf, running))
     }
@@ -84,14 +85,15 @@ impl Emulator {
         let (int, render) = self.devs.pov.vdp.step(pixels, self.render_area);
         if let vdp::VdpInt::InterruptGenerated = int {
             //println!("VDP sent an interrupt !");
-            cpu::interrupt_mode_1(&mut self.cpu).unwrap();
+            self.cpu.interrupt_mode_1().unwrap();
         }
-        let cycles = cpu::run(
-            &mut self.cpu,
-            (CPU_CYCLES_PER_LINE as isize - self.over_cycles) as usize,
-            false,
-        )
-        .unwrap();
+        let cycles = self
+            .cpu
+            .run(
+                (CPU_CYCLES_PER_LINE as isize - self.over_cycles) as usize,
+                false,
+            )
+            .unwrap();
         self.over_cycles += cycles as isize - CPU_CYCLES_PER_LINE as isize;
         render
     }
