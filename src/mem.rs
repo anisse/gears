@@ -187,6 +187,7 @@ impl MemoryMapper for SegaGGMapper {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
+#[allow(dead_code)]
 enum Dest {
     Rom { start: u32 },
     Ram { start: u16 },
