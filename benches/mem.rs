@@ -18,5 +18,21 @@ pub fn criterion_benchmark_long(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, criterion_benchmark, criterion_benchmark_long);
+pub fn criterion_benchmark_gg(c: &mut Criterion) {
+    let mut mem = mem::SegaGGMapper::new(vec![0; 32762], None); // This test suite is for machines with more RAM
+    c.bench_function("mem set gg", |b| {
+        b.iter(|| {
+            for i in 0xC000..0xFFFC {
+                mem.set_u8(black_box(i), 42);
+            }
+        })
+    });
+}
+
+criterion_group!(
+    benches,
+    criterion_benchmark,
+    criterion_benchmark_long,
+    criterion_benchmark_gg
+);
 criterion_main!(benches);
