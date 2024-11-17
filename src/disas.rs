@@ -1,5 +1,4 @@
 use std::fmt;
-use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Reg8 {
