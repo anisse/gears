@@ -47,6 +47,6 @@ jobs:
         cache: false
 
     - name: Build
-      run: cargo build --verbose --workspace
+      run: cargo build --verbose --workspace --all-targets
     - name: Run tests
       run: cargo test --workspace --verbose -- --skip test_roms
