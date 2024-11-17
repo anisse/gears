@@ -50,6 +50,8 @@ impl io::Device for System {
                 Ok(())
             }
             _ => Ok(()),
+            #[allow(unreachable_patterns)]
+            /* This is only for debugging missing devices */
             _ => Err(format!(
                 "unknown system port output write address @{:04X} {:02X}",
                 addr, val
@@ -61,6 +63,8 @@ impl io::Device for System {
         match addr & 0xFF {
             0x0 => Ok((!(*self.start_button.borrow() as u8) << 7) | u8::from(&self.region)),
             _ => Ok(0),
+            #[allow(unreachable_patterns)]
+            /* This is only for debugging missing devices */
             _ => Err(format!("unknown system port input address @{:04X}", addr)),
         }
     }
