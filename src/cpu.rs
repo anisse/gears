@@ -2,7 +2,7 @@ use crate::disas;
 use crate::disas::{Instruction, OpSize, Operand};
 use crate::io;
 use crate::io::Device;
-use crate::mem;
+use crate::mem::MemoryMapper;
 use std::fmt;
 
 enum Flag {
@@ -107,16 +107,30 @@ pub struct Regs {
     pub IFF2: bool,
 }
 
-#[derive(Default, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 #[allow(non_snake_case)]
-pub struct State {
+pub struct State<M: MemoryMapper> {
     pub r: Regs,
     q: FChanged,
     pub halted: bool,
-    pub mem: mem::Memory,
+    pub mem: M,
     pub io: io::RcDevice,
     pending_interrupt: bool,
     pub cycle_counter: u32,
+}
+
+pub trait Cpu {
+    fn run(&mut self, tstates_len: usize, debug: bool) -> Result<usize, String>;
+    fn interrupt_mode_1(&mut self) -> Result<usize, String>;
+}
+
+impl<M> Default for State<M>
+where
+    M: Default + MemoryMapper,
+{
+    fn default() -> Self {
+        init(M::default())
+    }
 }
 
 impl Regs {
@@ -317,7 +331,7 @@ impl fmt::Debug for Regs {
         write!(f, "{}", self)
     }
 }
-fn get_op8(s: &State, op: Operand) -> u8 {
+fn get_op8<M: MemoryMapper>(s: &State<M>, op: Operand) -> u8 {
     // TODO: size
     match op {
         Operand::Reg8(reg) => match reg {
@@ -343,7 +357,7 @@ fn get_op8(s: &State, op: Operand) -> u8 {
     }
 }
 
-fn set_op8(s: &mut State, op: Operand, val: u8) {
+fn set_op8<M: MemoryMapper>(s: &mut State<M>, op: Operand, val: u8) {
     // TODO: size
     match op {
         Operand::Reg8(reg) => match reg {
@@ -371,7 +385,7 @@ fn set_op8(s: &mut State, op: Operand, val: u8) {
     }
 }
 
-fn get_op16(s: &State, op: Operand) -> u16 {
+fn get_op16<M: MemoryMapper>(s: &State<M>, op: Operand) -> u16 {
     match op {
         Operand::Imm16(x) => x,
         Operand::Reg16(reg) => s.r.get_regpair(RegPair::from(reg)),
@@ -381,7 +395,7 @@ fn get_op16(s: &State, op: Operand) -> u16 {
     }
 }
 
-fn set_op16(s: &mut State, op: Operand, val: u16) {
+fn set_op16<M: MemoryMapper>(s: &mut State<M>, op: Operand, val: u16) {
     match op {
         Operand::Reg16(reg) => s.r.set_regpair(RegPair::from(reg), val),
         Operand::RegAddr(reg) => s.mem.set_u16(s.r.get_regpair(RegPair::from(reg)), val),
@@ -577,7 +591,7 @@ fn set_conditions_io_block(r: &mut Regs, val: u8, lc: u8) {
     r.set_flag(Flag::N, (val & 0x80) != 0);
 }
 
-fn input_block(s: &mut State, inc: i8) -> Result<(), String> {
+fn input_block<M: MemoryMapper>(s: &mut State<M>, inc: i8) -> Result<(), String> {
     let hl = s.r.get_regpair(RegPair::HL);
     let addr = s.r.get_regpair(RegPair::BC);
     set_conditions_io_block_base(&mut s.r);
@@ -592,7 +606,7 @@ fn input_block(s: &mut State, inc: i8) -> Result<(), String> {
     Ok(())
 }
 
-fn output_block(s: &mut State, inc: i8) -> Result<(), String> {
+fn output_block<M: MemoryMapper>(s: &mut State<M>, inc: i8) -> Result<(), String> {
     let hl = s.r.get_regpair(RegPair::HL);
     let val = s.mem.fetch_u8(hl);
     let addr = s.r.get_regpair(RegPair::BC);
@@ -607,7 +621,7 @@ fn output_block(s: &mut State, inc: i8) -> Result<(), String> {
     Ok(())
 }
 
-fn mem_block_copy(r: &mut Regs, mem: &mut mem::Memory, inc: i8) {
+fn mem_block_copy<M: MemoryMapper>(r: &mut Regs, mem: &mut M, inc: i8) {
     let hl = r.get_regpair(RegPair::HL);
     let de = r.get_regpair(RegPair::DE);
     let bc = r.get_regpair(RegPair::BC).wrapping_sub(1);
@@ -625,7 +639,7 @@ fn mem_block_copy(r: &mut Regs, mem: &mut mem::Memory, inc: i8) {
     r.set_flag(Flag::PV, bc != 0);
 }
 
-fn mem_block_cmp(r: &mut Regs, mem: &mut mem::Memory, inc: i8) -> bool {
+fn mem_block_cmp<M: MemoryMapper>(r: &mut Regs, mem: &mut M, inc: i8) -> bool {
     let hl = r.get_regpair(RegPair::HL);
     let bc = r.get_regpair(RegPair::BC).wrapping_sub(1);
     let a = r.A as i8;
@@ -654,7 +668,12 @@ fn mem_block_copy_repeat(r: &mut Regs, op_len: &mut usize) -> bool {
     false
 }
 
-fn mem_block_cmp_repeat(r: &mut Regs, mem: &mut mem::Memory, inc: i8, op_len: &mut usize) -> bool {
+fn mem_block_cmp_repeat<M: MemoryMapper>(
+    r: &mut Regs,
+    mem: &mut M,
+    inc: i8,
+    op_len: &mut usize,
+) -> bool {
     let found = mem_block_cmp(r, mem, inc);
     let bc = r.get_regpair(RegPair::BC);
     if bc == 0 || found {
@@ -674,775 +693,805 @@ fn io_block_repeat(r: &Regs, op_len: &mut usize) -> bool {
     false
 }
 
-pub fn init() -> State {
-    State::default()
+pub fn init<M: MemoryMapper>(mem: M) -> State<M> {
+    State {
+        mem,
+        r: Regs::default(),
+        q: FChanged::default(),
+        halted: false,
+        io: io::RcDevice::default(),
+        pending_interrupt: false,
+        cycle_counter: 0,
+    }
 }
 
-pub fn run_op(s: &mut State, op: &disas::OpCode) -> Result<usize, String> {
-    let mut update_pc = true;
-    if s.pending_interrupt && s.r.IFF1 {
-        //println!("Processing interrupt");
-        s.pending_interrupt = false;
-        s.r.IFF1 = false;
-        s.r.IFF2 = false;
-        s.halted = false;
-        return run_op(s, &interrupt_op(0x38));
+pub fn init_cpu<M: MemoryMapper>(mem: M, io: io::RcDevice) -> impl Cpu {
+    State {
+        mem,
+        io,
+        r: Regs::default(),
+        q: FChanged::default(),
+        halted: false,
+        pending_interrupt: false,
+        cycle_counter: 0,
     }
-    let mut op_len: usize = op.tstates.iter().sum::<u8>() as usize;
-    s.r.R = (((s.r.R & 0x7F) + 1) & 0x7F) | (s.r.R & 0x80);
-    if op.length > 1 {
-        match op.data[0] {
-            0xCB | 0xDD | 0xFB | 0xED | 0xFD => {
-                s.r.R = (((s.r.R & 0x7F) + 1) & 0x7F) | (s.r.R & 0x80)
-            }
-            _ => {}
+}
+impl<M> State<M>
+where
+    M: MemoryMapper,
+{
+    pub fn run_op(&mut self, op: &disas::OpCode) -> Result<usize, String> {
+        let mut update_pc = true;
+        let s = self;
+        if s.pending_interrupt && s.r.IFF1 {
+            //println!("Processing interrupt");
+            s.pending_interrupt = false;
+            s.r.IFF1 = false;
+            s.r.IFF2 = false;
+            s.halted = false;
+            return s.run_op(&Self::interrupt_op(0x38));
+        }
+        let mut op_len: usize = op.tstates.iter().sum::<u8>() as usize;
+        s.r.R = (((s.r.R & 0x7F) + 1) & 0x7F) | (s.r.R & 0x80);
+        if op.length > 1 {
+            match op.data[0] {
+                0xCB | 0xDD | 0xFB | 0xED | 0xFD => {
+                    s.r.R = (((s.r.R & 0x7F) + 1) & 0x7F) | (s.r.R & 0x80)
+                }
+                _ => {}
+            };
+        }
+        let start_f = s.r.F;
+        let ret = |r: &mut Regs, mem: &M, update_pc: &mut bool| {
+            r.PC = mem.fetch_u16(r.SP);
+            r.SP = r.SP.wrapping_add(2);
+            r.MEMPTR = r.PC;
+            *update_pc = false;
         };
-    }
-    let start_f = s.r.F;
-    let ret = |r: &mut Regs, mem: &mem::Memory, update_pc: &mut bool| {
-        r.PC = mem.fetch_u16(r.SP);
-        r.SP = r.SP.wrapping_add(2);
-        r.MEMPTR = r.PC;
-        *update_pc = false;
-    };
-    match op.ins {
-        Instruction::ADD => {
-            let op1 = op.op1.ok_or("add op1 missing")?;
-            let op2 = op.op2.ok_or("add op2 missing")?;
-            match op1.size().ok_or("unsupported add size")? {
-                OpSize::S1 => {
-                    let a = get_op8(s, op1) as i8;
-                    let b = get_op8(s, op2) as i8;
-                    let res = set_conditions_add_8(&mut s.r, a, b);
-                    set_op8(s, op1, res);
-                }
-                OpSize::S2 => {
-                    let a = get_op16(s, op1) as i16;
-                    let b = get_op16(s, op2) as i16;
-                    let res = set_conditions_add_16(&mut s.r, a, b, 0);
-                    s.r.MEMPTR = a.wrapping_add(1) as u16;
-                    set_op16(s, op1, res);
+        match op.ins {
+            Instruction::ADD => {
+                let op1 = op.op1.ok_or("add op1 missing")?;
+                let op2 = op.op2.ok_or("add op2 missing")?;
+                match op1.size().ok_or("unsupported add size")? {
+                    OpSize::S1 => {
+                        let a = get_op8(s, op1) as i8;
+                        let b = get_op8(s, op2) as i8;
+                        let res = set_conditions_add_8(&mut s.r, a, b);
+                        set_op8(s, op1, res);
+                    }
+                    OpSize::S2 => {
+                        let a = get_op16(s, op1) as i16;
+                        let b = get_op16(s, op2) as i16;
+                        let res = set_conditions_add_16(&mut s.r, a, b, 0);
+                        s.r.MEMPTR = a.wrapping_add(1) as u16;
+                        set_op16(s, op1, res);
+                    }
                 }
             }
-        }
-        Instruction::ADC => {
-            let op1 = op.op1.ok_or("adc op1 missing")?;
-            let op2 = op.op2.ok_or("adc op2 missing")?;
-            match op1.size().ok_or("unsupported add size")? {
-                OpSize::S1 => {
-                    let a = get_op8(s, op1) as i8;
-                    let b = get_op8(s, op2) as i8;
-                    let res = set_conditions_adc_8(&mut s.r, a, b);
-                    set_op8(s, op1, res);
-                }
-                OpSize::S2 => {
-                    let a = get_op16(s, op1) as i16;
-                    let b = get_op16(s, op2) as i16;
-                    let res = set_conditions_adc_16(&mut s.r, a, b);
-                    s.r.MEMPTR = a.wrapping_add(1) as u16;
-                    set_op16(s, op1, res);
-                }
-            }
-        }
-        Instruction::SUB => {
-            let op1 = op.op1.ok_or("sub op1 missing")?;
-            let a = s.r.A as i8;
-            let b = get_op8(s, op1) as i8;
-            let res = set_conditions_sub_8(&mut s.r, a, b);
-            s.r.A = res;
-        }
-        Instruction::SBC => {
-            let op1 = op.op1.ok_or("sbc op1 missing")?;
-            let op2 = op.op2.ok_or("sbc op2 missing")?;
-            match op1.size().ok_or("unsupported sbc size")? {
-                OpSize::S1 => {
-                    let a = get_op8(s, op1) as i8;
-                    let b = get_op8(s, op2) as i8;
-                    let res = set_conditions_sbc_8(&mut s.r, a, b);
-                    set_op8(s, op1, res);
-                }
-                OpSize::S2 => {
-                    let a = get_op16(s, op1) as i16;
-                    let b = get_op16(s, op2) as i16;
-                    let res = set_conditions_sbc_16(&mut s.r, a, b);
-                    s.r.MEMPTR = a.wrapping_add(1) as u16;
-                    set_op16(s, op1, res);
+            Instruction::ADC => {
+                let op1 = op.op1.ok_or("adc op1 missing")?;
+                let op2 = op.op2.ok_or("adc op2 missing")?;
+                match op1.size().ok_or("unsupported add size")? {
+                    OpSize::S1 => {
+                        let a = get_op8(s, op1) as i8;
+                        let b = get_op8(s, op2) as i8;
+                        let res = set_conditions_adc_8(&mut s.r, a, b);
+                        set_op8(s, op1, res);
+                    }
+                    OpSize::S2 => {
+                        let a = get_op16(s, op1) as i16;
+                        let b = get_op16(s, op2) as i16;
+                        let res = set_conditions_adc_16(&mut s.r, a, b);
+                        s.r.MEMPTR = a.wrapping_add(1) as u16;
+                        set_op16(s, op1, res);
+                    }
                 }
             }
-        }
-        Instruction::NOP => {
-            // nothing to do
-        }
-        Instruction::LD => {
-            let op1 = op.op1.ok_or("LD op1 missing")?;
-            let op2 = op.op2.ok_or("LD op2 missing")?;
-            // transfer size == min(op1, op1)
-            let size = op2
-                .size()
-                .or_else(|| op1.size())
-                .ok_or("unsupported ld size")?;
-            match size {
-                OpSize::S1 => {
-                    let val = get_op8(s, op2);
-                    set_op8(s, op1, val);
-                }
-                OpSize::S2 => {
-                    let val = get_op16(s, op2);
-                    set_op16(s, op1, val);
+            Instruction::SUB => {
+                let op1 = op.op1.ok_or("sub op1 missing")?;
+                let a = s.r.A as i8;
+                let b = get_op8(s, op1) as i8;
+                let res = set_conditions_sub_8(&mut s.r, a, b);
+                s.r.A = res;
+            }
+            Instruction::SBC => {
+                let op1 = op.op1.ok_or("sbc op1 missing")?;
+                let op2 = op.op2.ok_or("sbc op2 missing")?;
+                match op1.size().ok_or("unsupported sbc size")? {
+                    OpSize::S1 => {
+                        let a = get_op8(s, op1) as i8;
+                        let b = get_op8(s, op2) as i8;
+                        let res = set_conditions_sbc_8(&mut s.r, a, b);
+                        set_op8(s, op1, res);
+                    }
+                    OpSize::S2 => {
+                        let a = get_op16(s, op1) as i16;
+                        let b = get_op16(s, op2) as i16;
+                        let res = set_conditions_sbc_16(&mut s.r, a, b);
+                        s.r.MEMPTR = a.wrapping_add(1) as u16;
+                        set_op16(s, op1, res);
+                    }
                 }
             }
-            let a_reg = Operand::Reg8(disas::Reg8::A);
-            // LD A, I and LD A, R set condition bits
-            if op1 == a_reg
-                && (op2 == Operand::Reg8(disas::Reg8::R) || op2 == Operand::Reg8(disas::Reg8::I))
-            {
-                s.r.set_flag(Flag::PV, s.r.IFF2);
-                s.r.set_flag(Flag::S, (s.r.A as i8) < 0);
-                s.r.set_flag(Flag::Z, s.r.A == 0);
+            Instruction::NOP => {
+                // nothing to do
+            }
+            Instruction::LD => {
+                let op1 = op.op1.ok_or("LD op1 missing")?;
+                let op2 = op.op2.ok_or("LD op2 missing")?;
+                // transfer size == min(op1, op1)
+                let size = op2
+                    .size()
+                    .or_else(|| op1.size())
+                    .ok_or("unsupported ld size")?;
+                match size {
+                    OpSize::S1 => {
+                        let val = get_op8(s, op2);
+                        set_op8(s, op1, val);
+                    }
+                    OpSize::S2 => {
+                        let val = get_op16(s, op2);
+                        set_op16(s, op1, val);
+                    }
+                }
+                let a_reg = Operand::Reg8(disas::Reg8::A);
+                // LD A, I and LD A, R set condition bits
+                if op1 == a_reg
+                    && (op2 == Operand::Reg8(disas::Reg8::R)
+                        || op2 == Operand::Reg8(disas::Reg8::I))
+                {
+                    s.r.set_flag(Flag::PV, s.r.IFF2);
+                    s.r.set_flag(Flag::S, (s.r.A as i8) < 0);
+                    s.r.set_flag(Flag::Z, s.r.A == 0);
+                    s.r.set_flag(Flag::H, false);
+                    s.r.set_flag(Flag::N, false);
+                    copy_f53_res(s.r.A, &mut s.r);
+                }
+                // MEMPTR
+                if op2 == a_reg {
+                    match op1 {
+                        Operand::Address(addr) => {
+                            // MEMPTR_low = (addr + 1) & #FF,  MEMPTR_hi = A
+                            s.r.MEMPTR = addr.wrapping_add(1) & 0xFF | ((s.r.A as u16) << 8);
+                        }
+                        Operand::RegAddr(x) => {
+                            if x == disas::Reg16::BC || x == disas::Reg16::DE {
+                                let r = s.r.get_regpair(RegPair::from(x));
+                                // MEMPTR_low = (rp + 1) & #FF,  MEMPTR_hi = A
+                                s.r.MEMPTR = (r + 1) & 0xFF | ((s.r.A as u16) << 8);
+                            }
+                        }
+                        _ => {}
+                    }
+                } else if op1 == a_reg || size == OpSize::S2 {
+                    if let Operand::RegAddr(reg) = op2 {
+                        if op1 != a_reg
+                            || op2 == Operand::RegAddr(disas::Reg16::BC)
+                            || op2 == Operand::RegAddr(disas::Reg16::DE)
+                        {
+                            s.r.MEMPTR = s.r.get_regpair(RegPair::from(reg)) + 1
+                        }
+                    } else if let Operand::Address(addr) = op1 {
+                        s.r.MEMPTR = addr.wrapping_add(1);
+                    } else if let Operand::Address(addr) = op2 {
+                        s.r.MEMPTR = addr.wrapping_add(1);
+                    }
+                }
+            }
+            Instruction::INC | Instruction::DEC => {
+                let op1 = op.op1.ok_or("INC op1 missing")?;
+                let inc = if op.ins == Instruction::INC { 1 } else { -1 };
+                let size = match op1 {
+                    Operand::RegAddr(_) => OpSize::S1,
+                    Operand::RegI(_) => OpSize::S1,
+                    _ => op1.size().ok_or("unsupported INC source size")?,
+                };
+                match size {
+                    OpSize::S1 => {
+                        // Sets conditions
+                        let val = get_op8(s, op1) as i8;
+                        let res = set_conditions_inc8_dec8(&mut s.r, val, inc);
+                        set_op8(s, op1, res);
+                    }
+                    OpSize::S2 => {
+                        // Does not set conditions
+                        let val = get_op16(s, op1);
+                        let res = val.wrapping_add(inc as u16);
+                        set_op16(s, op1, res);
+                    }
+                }
+            }
+            Instruction::RLC => {
+                let op1 = op.op1.ok_or("RLC missing op1")?;
+                let val = get_op8(s, op1);
+                let val = val.rotate_left(1);
+                set_op8(s, op1, val);
+                if let Some(op2) = op.op2 {
+                    // Copy result to op2 as well
+                    set_op8(s, op2, val);
+                }
+                set_bitops_flags(val, &mut s.r);
+                s.r.set_flag(Flag::C, val & 0x1 != 0);
+                s.r.set_flag(Flag::H, false);
+            }
+            Instruction::RLCA => {
+                s.r.A = s.r.A.rotate_left(1);
+                s.r.set_flag(Flag::C, s.r.A & 0x1 != 0);
                 s.r.set_flag(Flag::H, false);
                 s.r.set_flag(Flag::N, false);
                 copy_f53_res(s.r.A, &mut s.r);
             }
-            // MEMPTR
-            if op2 == a_reg {
-                match op1 {
-                    Operand::Address(addr) => {
-                        // MEMPTR_low = (addr + 1) & #FF,  MEMPTR_hi = A
-                        s.r.MEMPTR = addr.wrapping_add(1) & 0xFF | ((s.r.A as u16) << 8);
-                    }
-                    Operand::RegAddr(x) => {
-                        if x == disas::Reg16::BC || x == disas::Reg16::DE {
-                            let r = s.r.get_regpair(RegPair::from(x));
-                            // MEMPTR_low = (rp + 1) & #FF,  MEMPTR_hi = A
-                            s.r.MEMPTR = (r + 1) & 0xFF | ((s.r.A as u16) << 8);
-                        }
-                    }
-                    _ => {}
+            Instruction::RL => {
+                let op1 = op.op1.ok_or("RL missing op1")?;
+                let c = s.r.F & C;
+                let val = get_op8(s, op1);
+                let cp = val & 0x80 != 0;
+                let val = val << 1 | c;
+                set_op8(s, op1, val);
+                if let Some(op2) = op.op2 {
+                    // Copy result to op2 as well
+                    set_op8(s, op2, val);
                 }
-            } else if op1 == a_reg || size == OpSize::S2 {
-                if let Operand::RegAddr(reg) = op2 {
-                    if op1 != a_reg
-                        || op2 == Operand::RegAddr(disas::Reg16::BC)
-                        || op2 == Operand::RegAddr(disas::Reg16::DE)
-                    {
-                        s.r.MEMPTR = s.r.get_regpair(RegPair::from(reg)) + 1
-                    }
-                } else if let Operand::Address(addr) = op1 {
-                    s.r.MEMPTR = addr.wrapping_add(1);
-                } else if let Operand::Address(addr) = op2 {
-                    s.r.MEMPTR = addr.wrapping_add(1);
+                set_bitops_flags(val, &mut s.r);
+                s.r.set_flag(Flag::C, cp);
+                s.r.set_flag(Flag::H, false);
+            }
+            Instruction::RLA => {
+                let a = s.r.A;
+                let c = s.r.F & C;
+                s.r.set_flag(Flag::C, s.r.A & 0x80 != 0);
+                s.r.A = a << 1 | c;
+                s.r.set_flag(Flag::H, false);
+                s.r.set_flag(Flag::N, false);
+                copy_f53_res(s.r.A, &mut s.r);
+            }
+            Instruction::RRC => {
+                let op1 = op.op1.ok_or("RRC missing op1")?;
+                let val = get_op8(s, op1);
+                let val = val.rotate_right(1);
+                set_op8(s, op1, val);
+                if let Some(op2) = op.op2 {
+                    // Copy result to op2 as well
+                    set_op8(s, op2, val);
+                }
+                set_bitops_flags(val, &mut s.r);
+                s.r.set_flag(Flag::C, val & 0x80 != 0);
+                s.r.set_flag(Flag::H, false);
+            }
+            Instruction::RRCA => {
+                s.r.A = s.r.A.rotate_right(1);
+                s.r.set_flag(Flag::C, s.r.A & 0x80 != 0);
+                s.r.set_flag(Flag::H, false);
+                s.r.set_flag(Flag::N, false);
+                copy_f53_res(s.r.A, &mut s.r);
+            }
+            Instruction::RR => {
+                let op1 = op.op1.ok_or("RR missing op1")?;
+                let c = s.r.F & C;
+                let val = get_op8(s, op1);
+                let cp = val & 0x1 != 0;
+                let val = val >> 1 | (c << 7);
+                set_op8(s, op1, val);
+                if let Some(op2) = op.op2 {
+                    // Copy result to op2 as well
+                    set_op8(s, op2, val);
+                }
+                set_bitops_flags(val, &mut s.r);
+                s.r.set_flag(Flag::C, cp);
+                s.r.set_flag(Flag::H, false);
+            }
+            Instruction::RRA => {
+                let a = s.r.A;
+                let c = s.r.F & C;
+                s.r.set_flag(Flag::C, s.r.A & 0x1 != 0);
+                s.r.A = a >> 1 | (c << 7);
+                s.r.set_flag(Flag::H, false);
+                s.r.set_flag(Flag::N, false);
+                copy_f53_res(s.r.A, &mut s.r);
+            }
+            Instruction::EX => {
+                let op1 = op.op1.ok_or("EX op1 missing")?;
+                let op2 = op.op2.ok_or("EX op2 missing")?;
+                let a = get_op16(s, op1);
+                let b = get_op16(s, op2);
+                set_op16(s, op1, b);
+                set_op16(s, op2, a);
+                if let Operand::RegAddr(disas::Reg16::SP) = op1 {
+                    // MEMPTR = rp value after the operation
+                    s.r.MEMPTR = a;
                 }
             }
-        }
-        Instruction::INC | Instruction::DEC => {
-            let op1 = op.op1.ok_or("INC op1 missing")?;
-            let inc = if op.ins == Instruction::INC { 1 } else { -1 };
-            let size = match op1 {
-                Operand::RegAddr(_) => OpSize::S1,
-                Operand::RegI(_) => OpSize::S1,
-                _ => op1.size().ok_or("unsupported INC source size")?,
-            };
-            match size {
-                OpSize::S1 => {
-                    // Sets conditions
-                    let val = get_op8(s, op1) as i8;
-                    let res = set_conditions_inc8_dec8(&mut s.r, val, inc);
-                    set_op8(s, op1, res);
-                }
-                OpSize::S2 => {
-                    // Does not set conditions
-                    let val = get_op16(s, op1);
-                    let res = val.wrapping_add(inc as u16);
-                    set_op16(s, op1, res);
+            Instruction::DJNZ => {
+                let op1 = op.op1.ok_or("No immediate arg for DJNZ")?;
+                let jump = if let Operand::RelAddr(j) = op1 {
+                    j
+                } else {
+                    return Err(format!("Arg {} not rel addr for DJNZ", op1));
+                };
+                s.r.B = s.r.B.wrapping_sub(1);
+                if s.r.B != 0 {
+                    s.r.PC = (s.r.PC as i32 + jump as i32) as u16;
+                    s.r.MEMPTR = s.r.PC;
+                    update_pc = false;
+                } else {
+                    op_len = 8 // [5, 3]
                 }
             }
-        }
-        Instruction::RLC => {
-            let op1 = op.op1.ok_or("RLC missing op1")?;
-            let val = get_op8(s, op1);
-            let val = val.rotate_left(1);
-            set_op8(s, op1, val);
-            if let Some(op2) = op.op2 {
-                // Copy result to op2 as well
-                set_op8(s, op2, val);
-            }
-            set_bitops_flags(val, &mut s.r);
-            s.r.set_flag(Flag::C, val & 0x1 != 0);
-            s.r.set_flag(Flag::H, false);
-        }
-        Instruction::RLCA => {
-            s.r.A = s.r.A.rotate_left(1);
-            s.r.set_flag(Flag::C, s.r.A & 0x1 != 0);
-            s.r.set_flag(Flag::H, false);
-            s.r.set_flag(Flag::N, false);
-            copy_f53_res(s.r.A, &mut s.r);
-        }
-        Instruction::RL => {
-            let op1 = op.op1.ok_or("RL missing op1")?;
-            let c = s.r.F & C;
-            let val = get_op8(s, op1);
-            let cp = val & 0x80 != 0;
-            let val = val << 1 | c;
-            set_op8(s, op1, val);
-            if let Some(op2) = op.op2 {
-                // Copy result to op2 as well
-                set_op8(s, op2, val);
-            }
-            set_bitops_flags(val, &mut s.r);
-            s.r.set_flag(Flag::C, cp);
-            s.r.set_flag(Flag::H, false);
-        }
-        Instruction::RLA => {
-            let a = s.r.A;
-            let c = s.r.F & C;
-            s.r.set_flag(Flag::C, s.r.A & 0x80 != 0);
-            s.r.A = a << 1 | c;
-            s.r.set_flag(Flag::H, false);
-            s.r.set_flag(Flag::N, false);
-            copy_f53_res(s.r.A, &mut s.r);
-        }
-        Instruction::RRC => {
-            let op1 = op.op1.ok_or("RRC missing op1")?;
-            let val = get_op8(s, op1);
-            let val = val.rotate_right(1);
-            set_op8(s, op1, val);
-            if let Some(op2) = op.op2 {
-                // Copy result to op2 as well
-                set_op8(s, op2, val);
-            }
-            set_bitops_flags(val, &mut s.r);
-            s.r.set_flag(Flag::C, val & 0x80 != 0);
-            s.r.set_flag(Flag::H, false);
-        }
-        Instruction::RRCA => {
-            s.r.A = s.r.A.rotate_right(1);
-            s.r.set_flag(Flag::C, s.r.A & 0x80 != 0);
-            s.r.set_flag(Flag::H, false);
-            s.r.set_flag(Flag::N, false);
-            copy_f53_res(s.r.A, &mut s.r);
-        }
-        Instruction::RR => {
-            let op1 = op.op1.ok_or("RR missing op1")?;
-            let c = s.r.F & C;
-            let val = get_op8(s, op1);
-            let cp = val & 0x1 != 0;
-            let val = val >> 1 | (c << 7);
-            set_op8(s, op1, val);
-            if let Some(op2) = op.op2 {
-                // Copy result to op2 as well
-                set_op8(s, op2, val);
-            }
-            set_bitops_flags(val, &mut s.r);
-            s.r.set_flag(Flag::C, cp);
-            s.r.set_flag(Flag::H, false);
-        }
-        Instruction::RRA => {
-            let a = s.r.A;
-            let c = s.r.F & C;
-            s.r.set_flag(Flag::C, s.r.A & 0x1 != 0);
-            s.r.A = a >> 1 | (c << 7);
-            s.r.set_flag(Flag::H, false);
-            s.r.set_flag(Flag::N, false);
-            copy_f53_res(s.r.A, &mut s.r);
-        }
-        Instruction::EX => {
-            let op1 = op.op1.ok_or("EX op1 missing")?;
-            let op2 = op.op2.ok_or("EX op2 missing")?;
-            let a = get_op16(s, op1);
-            let b = get_op16(s, op2);
-            set_op16(s, op1, b);
-            set_op16(s, op2, a);
-            if let Operand::RegAddr(disas::Reg16::SP) = op1 {
-                // MEMPTR = rp value after the operation
-                s.r.MEMPTR = a;
-            }
-        }
-        Instruction::DJNZ => {
-            let op1 = op.op1.ok_or("No immediate arg for DJNZ")?;
-            let jump = if let Operand::RelAddr(j) = op1 {
-                j
-            } else {
-                return Err(format!("Arg {} not rel addr for DJNZ", op1));
-            };
-            s.r.B = s.r.B.wrapping_sub(1);
-            if s.r.B != 0 {
-                s.r.PC = (s.r.PC as i32 + jump as i32) as u16;
-                s.r.MEMPTR = s.r.PC;
-                update_pc = false;
-            } else {
-                op_len = 8 // [5, 3]
-            }
-        }
-        Instruction::JR => {
-            let op1 = op.op1.ok_or("No immediate arg for DJNZ")?;
-            if let Operand::RelAddr(j) = op1 {
-                s.r.PC = (s.r.PC as i32 + j as i32) as u16;
-                update_pc = false;
-                s.r.MEMPTR = s.r.PC;
-            } else {
-                let op2 = op.op2.ok_or("No second rel addr operand for JR")?;
-                if let Operand::FlagCondition(cond) = op1 {
-                    if let Operand::RelAddr(j) = op2 {
-                        if cond_valid(&s.r, cond) {
-                            s.r.PC = (s.r.PC as i32 + j as i32) as u16;
-                            update_pc = false;
-                            s.r.MEMPTR = s.r.PC;
+            Instruction::JR => {
+                let op1 = op.op1.ok_or("No immediate arg for DJNZ")?;
+                if let Operand::RelAddr(j) = op1 {
+                    s.r.PC = (s.r.PC as i32 + j as i32) as u16;
+                    update_pc = false;
+                    s.r.MEMPTR = s.r.PC;
+                } else {
+                    let op2 = op.op2.ok_or("No second rel addr operand for JR")?;
+                    if let Operand::FlagCondition(cond) = op1 {
+                        if let Operand::RelAddr(j) = op2 {
+                            if cond_valid(&s.r, cond) {
+                                s.r.PC = (s.r.PC as i32 + j as i32) as u16;
+                                update_pc = false;
+                                s.r.MEMPTR = s.r.PC;
+                            } else {
+                                op_len = 7 // [4, 3]
+                            }
                         } else {
-                            op_len = 7 // [4, 3]
+                            return Err(format!("op2 {:?} should be rel addr for JR", op2));
                         }
                     } else {
-                        return Err(format!("op2 {:?} should be rel addr for JR", op2));
+                        return Err(format!("op1 {:?} should be cond for JR", op1));
+                    }
+                }
+            }
+            Instruction::DAA => daa(&mut s.r),
+            Instruction::CPL => {
+                s.r.A = !s.r.A;
+                s.r.set_flag(Flag::H, true);
+                s.r.set_flag(Flag::N, true);
+                copy_f53_res(s.r.A, &mut s.r);
+            }
+            Instruction::SCF => {
+                s.r.set_flag(Flag::C, true);
+                s.r.set_flag(Flag::H, false);
+                s.r.set_flag(Flag::N, false);
+                if s.q.changed {
+                    copy_f53_res(s.r.A, &mut s.r);
+                } else {
+                    // OR instead
+                    s.r.set_flag(Flag::F5, ((s.r.A & F5) | (s.r.F & F5)) != 0);
+                    s.r.set_flag(Flag::F3, ((s.r.A & F3) | (s.r.F & F3)) != 0);
+                }
+            }
+            Instruction::CCF => {
+                s.r.set_flag(Flag::H, s.r.F & C != 0);
+                s.r.set_flag(Flag::C, s.r.F & C == 0);
+                s.r.set_flag(Flag::N, false);
+                if s.q.changed {
+                    copy_f53_res(s.r.A, &mut s.r);
+                } else {
+                    // OR instead
+                    s.r.set_flag(Flag::F5, ((s.r.A & F5) | (s.r.F & F5)) != 0);
+                    s.r.set_flag(Flag::F3, ((s.r.A & F3) | (s.r.F & F3)) != 0);
+                }
+            }
+            Instruction::HALT => {
+                s.halted = true;
+                update_pc = false;
+            }
+            Instruction::AND => {
+                let op1 = op.op1.ok_or("AND op1 missing")?;
+                s.r.A &= get_op8(s, op1);
+                s.r.set_flag(Flag::H, true);
+                set_bitops_flags_c(s.r.A, &mut s.r);
+            }
+            Instruction::OR => {
+                let op1 = op.op1.ok_or("AND op1 missing")?;
+                s.r.A |= get_op8(s, op1);
+                s.r.set_flag(Flag::H, false);
+                set_bitops_flags_c(s.r.A, &mut s.r);
+            }
+            Instruction::XOR => {
+                let op1 = op.op1.ok_or("AND op1 missing")?;
+                s.r.A ^= get_op8(s, op1);
+                s.r.set_flag(Flag::H, false);
+                set_bitops_flags_c(s.r.A, &mut s.r);
+            }
+            Instruction::CP => {
+                let op1 = op.op1.ok_or("CP op1 missing")?;
+                let a = s.r.A as i8;
+                let b = get_op8(s, op1) as i8;
+                set_conditions_sub_8(&mut s.r, a, b);
+                copy_f53_res(b as u8, &mut s.r);
+            }
+            Instruction::RET => {
+                let mut jump = true;
+                if let Some(Operand::FlagCondition(cond)) = op.op1 {
+                    if !cond_valid(&s.r, cond) {
+                        op_len = 5;
+                        jump = false;
+                    }
+                }
+                if jump {
+                    ret(&mut s.r, &s.mem, &mut update_pc);
+                }
+            }
+            Instruction::POP => {
+                let op1 = op.op1.ok_or("POP op1 missing")?;
+                let val = s.mem.fetch_u16(s.r.SP);
+                set_op16(s, op1, val);
+                s.r.SP = s.r.SP.wrapping_add(2);
+            }
+            Instruction::PUSH => {
+                let op1 = op.op1.ok_or("PUSH op1 missing")?;
+                let arg = get_op16(s, op1);
+                s.r.SP = s.r.SP.wrapping_sub(2);
+                s.mem.set_u16(s.r.SP, arg);
+            }
+            Instruction::JP => {
+                if let Some(Operand::FlagCondition(cond)) = op.op1 {
+                    let op2 = op.op2.ok_or("JP op2 missing")?;
+                    let addr = get_op16(s, op2);
+                    if cond_valid(&s.r, cond) {
+                        s.r.PC = addr;
+                        update_pc = false;
+                    }
+                    s.r.MEMPTR = addr;
+                } else {
+                    let op1 = op.op1.ok_or("JP op1 missing")?;
+                    let addr = get_op16(s, op1);
+                    s.r.PC = addr;
+                    update_pc = false;
+                    if let Operand::Imm16(_) = op1 {
+                        s.r.MEMPTR = addr;
+                    }
+                }
+            }
+            Instruction::CALL => {
+                let mut jump = true;
+                let addr;
+                if let Some(Operand::FlagCondition(cond)) = op.op1 {
+                    addr = get_op16(s, op.op2.ok_or("CALL missing op2")?);
+                    if !cond_valid(&s.r, cond) {
+                        op_len = 10; // [4, 3, 3]
+                        jump = false;
                     }
                 } else {
-                    return Err(format!("op1 {:?} should be cond for JR", op1));
+                    addr = get_op16(s, op.op1.ok_or("CALL missing op1")?);
                 }
-            }
-        }
-        Instruction::DAA => daa(&mut s.r),
-        Instruction::CPL => {
-            s.r.A = !s.r.A;
-            s.r.set_flag(Flag::H, true);
-            s.r.set_flag(Flag::N, true);
-            copy_f53_res(s.r.A, &mut s.r);
-        }
-        Instruction::SCF => {
-            s.r.set_flag(Flag::C, true);
-            s.r.set_flag(Flag::H, false);
-            s.r.set_flag(Flag::N, false);
-            if s.q.changed {
-                copy_f53_res(s.r.A, &mut s.r);
-            } else {
-                // OR instead
-                s.r.set_flag(Flag::F5, ((s.r.A & F5) | (s.r.F & F5)) != 0);
-                s.r.set_flag(Flag::F3, ((s.r.A & F3) | (s.r.F & F3)) != 0);
-            }
-        }
-        Instruction::CCF => {
-            s.r.set_flag(Flag::H, s.r.F & C != 0);
-            s.r.set_flag(Flag::C, s.r.F & C == 0);
-            s.r.set_flag(Flag::N, false);
-            if s.q.changed {
-                copy_f53_res(s.r.A, &mut s.r);
-            } else {
-                // OR instead
-                s.r.set_flag(Flag::F5, ((s.r.A & F5) | (s.r.F & F5)) != 0);
-                s.r.set_flag(Flag::F3, ((s.r.A & F3) | (s.r.F & F3)) != 0);
-            }
-        }
-        Instruction::HALT => {
-            s.halted = true;
-            update_pc = false;
-        }
-        Instruction::AND => {
-            let op1 = op.op1.ok_or("AND op1 missing")?;
-            s.r.A &= get_op8(s, op1);
-            s.r.set_flag(Flag::H, true);
-            set_bitops_flags_c(s.r.A, &mut s.r);
-        }
-        Instruction::OR => {
-            let op1 = op.op1.ok_or("AND op1 missing")?;
-            s.r.A |= get_op8(s, op1);
-            s.r.set_flag(Flag::H, false);
-            set_bitops_flags_c(s.r.A, &mut s.r);
-        }
-        Instruction::XOR => {
-            let op1 = op.op1.ok_or("AND op1 missing")?;
-            s.r.A ^= get_op8(s, op1);
-            s.r.set_flag(Flag::H, false);
-            set_bitops_flags_c(s.r.A, &mut s.r);
-        }
-        Instruction::CP => {
-            let op1 = op.op1.ok_or("CP op1 missing")?;
-            let a = s.r.A as i8;
-            let b = get_op8(s, op1) as i8;
-            set_conditions_sub_8(&mut s.r, a, b);
-            copy_f53_res(b as u8, &mut s.r);
-        }
-        Instruction::RET => {
-            let mut jump = true;
-            if let Some(Operand::FlagCondition(cond)) = op.op1 {
-                if !cond_valid(&s.r, cond) {
-                    op_len = 5;
-                    jump = false;
-                }
-            }
-            if jump {
-                ret(&mut s.r, &s.mem, &mut update_pc);
-            }
-        }
-        Instruction::POP => {
-            let op1 = op.op1.ok_or("POP op1 missing")?;
-            let val = s.mem.fetch_u16(s.r.SP);
-            set_op16(s, op1, val);
-            s.r.SP = s.r.SP.wrapping_add(2);
-        }
-        Instruction::PUSH => {
-            let op1 = op.op1.ok_or("PUSH op1 missing")?;
-            let arg = get_op16(s, op1);
-            s.r.SP = s.r.SP.wrapping_sub(2);
-            s.mem.set_u16(s.r.SP, arg);
-        }
-        Instruction::JP => {
-            if let Some(Operand::FlagCondition(cond)) = op.op1 {
-                let op2 = op.op2.ok_or("JP op2 missing")?;
-                let addr = get_op16(s, op2);
-                if cond_valid(&s.r, cond) {
+                if jump {
+                    s.r.SP = s.r.SP.wrapping_sub(2);
+                    s.mem.set_u16(s.r.SP, s.r.PC.wrapping_add(op.length as u16));
                     s.r.PC = addr;
                     update_pc = false;
                 }
                 s.r.MEMPTR = addr;
-            } else {
-                let op1 = op.op1.ok_or("JP op1 missing")?;
-                let addr = get_op16(s, op1);
-                s.r.PC = addr;
-                update_pc = false;
-                if let Operand::Imm16(_) = op1 {
-                    s.r.MEMPTR = addr;
-                }
             }
-        }
-        Instruction::CALL => {
-            let mut jump = true;
-            let addr;
-            if let Some(Operand::FlagCondition(cond)) = op.op1 {
-                addr = get_op16(s, op.op2.ok_or("CALL missing op2")?);
-                if !cond_valid(&s.r, cond) {
-                    op_len = 10; // [4, 3, 3]
-                    jump = false;
-                }
-            } else {
-                addr = get_op16(s, op.op1.ok_or("CALL missing op1")?);
-            }
-            if jump {
+            Instruction::RST => {
+                let op1 = op.op1.ok_or("RST op1 missing")?;
                 s.r.SP = s.r.SP.wrapping_sub(2);
                 s.mem.set_u16(s.r.SP, s.r.PC.wrapping_add(op.length as u16));
+                let addr = get_op8(s, op1) as u16;
                 s.r.PC = addr;
+                s.r.MEMPTR = addr;
                 update_pc = false;
             }
-            s.r.MEMPTR = addr;
-        }
-        Instruction::RST => {
-            let op1 = op.op1.ok_or("RST op1 missing")?;
-            s.r.SP = s.r.SP.wrapping_sub(2);
-            s.mem.set_u16(s.r.SP, s.r.PC.wrapping_add(op.length as u16));
-            let addr = get_op8(s, op1) as u16;
-            s.r.PC = addr;
-            s.r.MEMPTR = addr;
-            update_pc = false;
-        }
-        Instruction::SLA => {
-            let op1 = op.op1.ok_or("SLA missing op1")?;
-            let val = get_op8(s, op1);
-            let cp = val & 0x80 != 0;
-            let val = val << 1;
-            set_op8(s, op1, val);
-            if let Some(op2) = op.op2 {
-                // Copy result to op2 as well
-                set_op8(s, op2, val);
-            }
-            set_bitops_flags(val, &mut s.r);
-            s.r.set_flag(Flag::C, cp);
-            s.r.set_flag(Flag::H, false);
-        }
-        Instruction::SRA => {
-            let op1 = op.op1.ok_or("SRA missing op1")?;
-            let val = get_op8(s, op1);
-            let cp = val & 0x1 != 0;
-            let hi = val & 0x80;
-            let val = (val >> 1) | hi;
-            set_op8(s, op1, val);
-            if let Some(op2) = op.op2 {
-                // Copy result to op2 as well
-                set_op8(s, op2, val);
-            }
-            set_bitops_flags(val, &mut s.r);
-            s.r.set_flag(Flag::C, cp);
-            s.r.set_flag(Flag::H, false);
-        }
-        Instruction::SLL => {
-            let op1 = op.op1.ok_or("SLL missing op1")?;
-            let val = get_op8(s, op1);
-            let cp = val & 0x80 != 0;
-            let val = val << 1 | 1;
-            set_op8(s, op1, val);
-            if let Some(op2) = op.op2 {
-                // Copy result to op2 as well
-                set_op8(s, op2, val);
-            }
-            set_bitops_flags(val, &mut s.r);
-            s.r.set_flag(Flag::C, cp);
-            s.r.set_flag(Flag::H, false);
-        }
-        Instruction::SRL => {
-            let op1 = op.op1.ok_or("SRL missing op1")?;
-            let val = get_op8(s, op1);
-            let cp = val & 0x1 != 0;
-            let val = val >> 1;
-            set_op8(s, op1, val);
-            if let Some(op2) = op.op2 {
-                // Copy result to op2 as well
-                set_op8(s, op2, val);
-            }
-            set_bitops_flags(val, &mut s.r);
-            s.r.set_flag(Flag::C, cp);
-            s.r.set_flag(Flag::H, false);
-        }
-        Instruction::BIT => {
-            let op1 = op.op1.ok_or("BIT missing op1")?;
-            let op2 = op.op2.ok_or("BIT missing op2")?;
-            let shift = get_op8(s, op1);
-            let val = get_op8(s, op2);
-
-            s.r.set_flag(Flag::H, true);
-            set_bitops_flags(val & (1 << shift), &mut s.r);
-            /* According to the FUSE test suite, real hardware uses all bits for F5 and F3,
-             * opposite to what Sean Young's Z80 undocumented says; we'll need to verify this
-             * later, but trust the more recent FUSE interpretation for now */
-            copy_f53_res(val, &mut s.r);
-            if let Operand::RegI(i) = op2 {
-                let val = reg_i_addr(&i, &s.r);
-                copy_f53_res(((val >> 8) & 0xFF) as u8, &mut s.r);
-            } else if op2 == Operand::RegAddr(disas::Reg16::HL) {
-                // infamous MEMPTR leaking
-                copy_f53_res(((s.r.MEMPTR >> 8) & 0xFF) as u8, &mut s.r);
-            }
-        }
-        Instruction::RES => {
-            let op1 = op.op1.ok_or("RES missing op1")?;
-            let op2 = op.op2.ok_or("RES missing op2")?;
-            let shift = get_op8(s, op1);
-            let val = get_op8(s, op2) & (!(1 << shift));
-            set_op8(s, op2, val);
-            if let Some(op3) = op.op3 {
-                // Copy result to op3 as well
-                set_op8(s, op3, val);
-            }
-        }
-        Instruction::SET => {
-            let op1 = op.op1.ok_or("SET missing op1")?;
-            let op2 = op.op2.ok_or("SET missing op2")?;
-            let shift = get_op8(s, op1);
-            let val = get_op8(s, op2) | (1 << shift);
-            set_op8(s, op2, val);
-            if let Some(op3) = op.op3 {
-                // Copy result to op3 as well
-                set_op8(s, op3, val);
-            }
-        }
-        Instruction::OUT => {
-            let op1 = op.op1.ok_or("OUT missing op1")?;
-            let op2 = op.op2.ok_or("OUT missing op2")?;
-            if let Operand::IOAddress(addr) = op1 {
-                if op2 != Operand::Reg8(disas::Reg8::A) {
-                    return Err("Op2 should be A".to_string());
-                }
-                let val = match op.op3 {
-                    Some(Operand::IgnoreIO) => 0,
-                    _ => s.r.A,
-                };
-                let addr = addr as u16 | ((s.r.A as u16) << 8);
-                s.io.out(addr, val, s.cycle_counter)?;
-                // MEMPTR_low = (port + 1) & #FF,  MEMPTR_hi = A
-                let low = addr.wrapping_add(1);
-                s.r.MEMPTR = low & 0xFF | ((val as u16) << 8);
-            } else if Operand::RegIOAddr(disas::Reg8::C) == op1 {
-                let val = get_op8(s, op2);
-                let addr = s.r.get_regpair(RegPair::BC);
-                s.io.out(addr, val, s.cycle_counter)?;
-
-                // MEMPTR = BC + 1
-                s.r.MEMPTR = addr.wrapping_add(1);
-            }
-        }
-        Instruction::IN => {
-            let op1 = op.op1.ok_or("IN missing op1")?;
-            let op2 = op.op2.ok_or("IN missing op2")?;
-            if let Operand::IOAddress(addr) = op2 {
-                if op1 != Operand::Reg8(disas::Reg8::A) {
-                    return Err("IN op1 should be A".to_string());
-                }
-                // MEMPTR = (A_before_operation << 8) + port + 1
-                let low = addr.wrapping_add(1) as u16;
-                let addr = addr as u16 | ((s.r.A as u16) << 8);
-                s.r.MEMPTR = low & 0xFF | ((s.r.A as u16) << 8);
-                let val = s.io.input(addr, s.cycle_counter)?;
+            Instruction::SLA => {
+                let op1 = op.op1.ok_or("SLA missing op1")?;
+                let val = get_op8(s, op1);
+                let cp = val & 0x80 != 0;
+                let val = val << 1;
                 set_op8(s, op1, val);
-            } else if Operand::RegIOAddr(disas::Reg8::C) == op2 {
-                // MEMPTR = BC + 1
-                let addr = s.r.get_regpair(RegPair::BC);
-                s.r.MEMPTR = addr.wrapping_add(1);
-                let val = s.io.input(addr, s.cycle_counter)?;
-                if op.op3 != Some(Operand::IgnoreIO) {
-                    set_op8(s, op1, val);
+                if let Some(op2) = op.op2 {
+                    // Copy result to op2 as well
+                    set_op8(s, op2, val);
                 }
-                //flags
                 set_bitops_flags(val, &mut s.r);
+                s.r.set_flag(Flag::C, cp);
                 s.r.set_flag(Flag::H, false);
             }
-        }
-        Instruction::EXX => {
-            fn swap(a: &mut u8, b: &mut u8) {
-                (*a, *b) = (*b, *a);
+            Instruction::SRA => {
+                let op1 = op.op1.ok_or("SRA missing op1")?;
+                let val = get_op8(s, op1);
+                let cp = val & 0x1 != 0;
+                let hi = val & 0x80;
+                let val = (val >> 1) | hi;
+                set_op8(s, op1, val);
+                if let Some(op2) = op.op2 {
+                    // Copy result to op2 as well
+                    set_op8(s, op2, val);
+                }
+                set_bitops_flags(val, &mut s.r);
+                s.r.set_flag(Flag::C, cp);
+                s.r.set_flag(Flag::H, false);
             }
-            swap(&mut s.r.B, &mut s.r.Bp);
-            swap(&mut s.r.C, &mut s.r.Cp);
-            swap(&mut s.r.D, &mut s.r.Dp);
-            swap(&mut s.r.E, &mut s.r.Ep);
-            swap(&mut s.r.H, &mut s.r.Hp);
-            swap(&mut s.r.L, &mut s.r.Lp);
-        }
-        Instruction::NEG => {
-            let a = s.r.A as i8;
-            let res = set_conditions_sub_8(&mut s.r, 0, a);
-            s.r.A = res;
-        }
-        Instruction::RETN => {
-            ret(&mut s.r, &s.mem, &mut update_pc);
-            s.r.IFF1 = s.r.IFF2;
-        }
-        Instruction::RETI => {
-            ret(&mut s.r, &s.mem, &mut update_pc);
-        }
-        Instruction::IM => {
-            let op1 = op.op1.ok_or("IM missing op1")?;
-            s.r.IM = get_op8(s, op1);
-        }
-        Instruction::RRD => {
-            let a = s.r.A;
-            let addr = s.r.get_regpair(RegPair::HL);
-            let b = s.mem.fetch_u8(addr);
-            s.mem.set_u8(addr, b >> 4 | (a << 4));
-            s.r.A = (a & 0xF0) | (b & 0x0F);
-            s.r.set_flag(Flag::H, false);
-            set_bitops_flags(s.r.A, &mut s.r);
-            s.r.MEMPTR = addr.wrapping_add(1);
-        }
-        Instruction::RLD => {
-            let a = s.r.A;
-            let addr = s.r.get_regpair(RegPair::HL);
-            let b = s.mem.fetch_u8(addr);
-            s.mem.set_u8(addr, b << 4 | (a & 0x0F));
-            s.r.A = (a & 0xF0) | (b >> 4);
-            s.r.set_flag(Flag::H, false);
-            set_bitops_flags(s.r.A, &mut s.r);
-            s.r.MEMPTR = addr.wrapping_add(1);
-        }
-        Instruction::LDI => mem_block_copy(&mut s.r, &mut s.mem, 1),
-        Instruction::LDIR => {
-            mem_block_copy(&mut s.r, &mut s.mem, 1);
-            update_pc = mem_block_copy_repeat(&mut s.r, &mut op_len);
-        }
-        Instruction::LDD => mem_block_copy(&mut s.r, &mut s.mem, -1),
-        Instruction::LDDR => {
-            mem_block_copy(&mut s.r, &mut s.mem, -1);
-            update_pc = mem_block_copy_repeat(&mut s.r, &mut op_len);
-        }
-        Instruction::CPI => {
-            mem_block_cmp(&mut s.r, &mut s.mem, 1);
-        }
-        Instruction::CPIR => {
-            update_pc = mem_block_cmp_repeat(&mut s.r, &mut s.mem, 1, &mut op_len);
-        }
-        Instruction::CPD => {
-            mem_block_cmp(&mut s.r, &mut s.mem, -1);
-        }
-        Instruction::CPDR => {
-            update_pc = mem_block_cmp_repeat(&mut s.r, &mut s.mem, -1, &mut op_len);
-        }
-        Instruction::INI => input_block(s, 1)?,
-        Instruction::INIR => {
-            input_block(s, 1)?;
-            update_pc = io_block_repeat(&s.r, &mut op_len);
-        }
-        Instruction::IND => input_block(s, -1)?,
-        Instruction::INDR => {
-            input_block(s, -1)?;
-            update_pc = io_block_repeat(&s.r, &mut op_len);
-        }
-        Instruction::OUTI => output_block(s, 1)?,
-        Instruction::OTIR => {
-            output_block(s, 1)?;
-            update_pc = io_block_repeat(&s.r, &mut op_len);
-        }
-        Instruction::OUTD => output_block(s, -1)?,
-        Instruction::OTDR => {
-            output_block(s, -1)?;
-            update_pc = io_block_repeat(&s.r, &mut op_len);
-        }
-        Instruction::DI => {
-            s.r.IFF1 = false;
-            s.r.IFF2 = false;
-        }
-        Instruction::EI => {
-            s.r.IFF1 = true;
-            s.r.IFF2 = true;
-        }
-    }
-    memptr_index(op, &mut s.r);
-    s.q.changed = start_f != s.r.F || op.ins == Instruction::SCF;
-    if update_pc {
-        s.r.PC = s.r.PC.wrapping_add(op.length as u16);
-    }
-
-    s.cycle_counter = s.cycle_counter.wrapping_add(op_len as u32);
-    Ok(op_len)
-}
-
-fn interrupt_op(vector: u8) -> disas::OpCode {
-    disas::OpCode {
-        data: [0; 4],
-        length: 0,
-        ins: Instruction::RST,
-        op1: Some(Operand::Imm8(vector)),
-        op2: None,
-        op3: None,
-        tstates: [4, 5, 3, 3, 0, 0],
-        mcycles: 4,
-    }
-}
-pub fn interrupt_mode_1(s: &mut State) -> Result<usize, String> {
-    if s.r.IFF1 {
-        s.r.IFF1 = false;
-        s.r.IFF2 = false;
-        if s.halted {
-            s.r.PC += 1;
-        }
-        s.halted = false;
-        run_op(s, &interrupt_op(0x38))
-    } else {
-        s.pending_interrupt = true;
-        Ok(0)
-    }
-}
-
-pub fn run(s: &mut State, tstates_len: usize, debug: bool) -> Result<usize, String> {
-    let mut tstates_ran = 0;
-    let mut disas_target = [0_u8; 4];
-    while tstates_ran < tstates_len {
-        // TODO: split into m states, fetch etc
-        s.mem.fetch_range_safe(s.r.PC, &mut disas_target);
-        if let Some(op) = disas::disas(&disas_target) {
-            if debug {
-                println!("{:04X}: {:?}", s.r.PC, op);
-                //println!("{}", s.r);
+            Instruction::SLL => {
+                let op1 = op.op1.ok_or("SLL missing op1")?;
+                let val = get_op8(s, op1);
+                let cp = val & 0x80 != 0;
+                let val = val << 1 | 1;
+                set_op8(s, op1, val);
+                if let Some(op2) = op.op2 {
+                    // Copy result to op2 as well
+                    set_op8(s, op2, val);
+                }
+                set_bitops_flags(val, &mut s.r);
+                s.r.set_flag(Flag::C, cp);
+                s.r.set_flag(Flag::H, false);
             }
-            tstates_ran += run_op(s, &op)?;
+            Instruction::SRL => {
+                let op1 = op.op1.ok_or("SRL missing op1")?;
+                let val = get_op8(s, op1);
+                let cp = val & 0x1 != 0;
+                let val = val >> 1;
+                set_op8(s, op1, val);
+                if let Some(op2) = op.op2 {
+                    // Copy result to op2 as well
+                    set_op8(s, op2, val);
+                }
+                set_bitops_flags(val, &mut s.r);
+                s.r.set_flag(Flag::C, cp);
+                s.r.set_flag(Flag::H, false);
+            }
+            Instruction::BIT => {
+                let op1 = op.op1.ok_or("BIT missing op1")?;
+                let op2 = op.op2.ok_or("BIT missing op2")?;
+                let shift = get_op8(s, op1);
+                let val = get_op8(s, op2);
+
+                s.r.set_flag(Flag::H, true);
+                set_bitops_flags(val & (1 << shift), &mut s.r);
+                /* According to the FUSE test suite, real hardware uses all bits for F5 and F3,
+                 * opposite to what Sean Young's Z80 undocumented says; we'll need to verify this
+                 * later, but trust the more recent FUSE interpretation for now */
+                copy_f53_res(val, &mut s.r);
+                if let Operand::RegI(i) = op2 {
+                    let val = reg_i_addr(&i, &s.r);
+                    copy_f53_res(((val >> 8) & 0xFF) as u8, &mut s.r);
+                } else if op2 == Operand::RegAddr(disas::Reg16::HL) {
+                    // infamous MEMPTR leaking
+                    copy_f53_res(((s.r.MEMPTR >> 8) & 0xFF) as u8, &mut s.r);
+                }
+            }
+            Instruction::RES => {
+                let op1 = op.op1.ok_or("RES missing op1")?;
+                let op2 = op.op2.ok_or("RES missing op2")?;
+                let shift = get_op8(s, op1);
+                let val = get_op8(s, op2) & (!(1 << shift));
+                set_op8(s, op2, val);
+                if let Some(op3) = op.op3 {
+                    // Copy result to op3 as well
+                    set_op8(s, op3, val);
+                }
+            }
+            Instruction::SET => {
+                let op1 = op.op1.ok_or("SET missing op1")?;
+                let op2 = op.op2.ok_or("SET missing op2")?;
+                let shift = get_op8(s, op1);
+                let val = get_op8(s, op2) | (1 << shift);
+                set_op8(s, op2, val);
+                if let Some(op3) = op.op3 {
+                    // Copy result to op3 as well
+                    set_op8(s, op3, val);
+                }
+            }
+            Instruction::OUT => {
+                let op1 = op.op1.ok_or("OUT missing op1")?;
+                let op2 = op.op2.ok_or("OUT missing op2")?;
+                if let Operand::IOAddress(addr) = op1 {
+                    if op2 != Operand::Reg8(disas::Reg8::A) {
+                        return Err("Op2 should be A".to_string());
+                    }
+                    let val = match op.op3 {
+                        Some(Operand::IgnoreIO) => 0,
+                        _ => s.r.A,
+                    };
+                    let addr = addr as u16 | ((s.r.A as u16) << 8);
+                    s.io.out(addr, val, s.cycle_counter)?;
+                    // MEMPTR_low = (port + 1) & #FF,  MEMPTR_hi = A
+                    let low = addr.wrapping_add(1);
+                    s.r.MEMPTR = low & 0xFF | ((val as u16) << 8);
+                } else if Operand::RegIOAddr(disas::Reg8::C) == op1 {
+                    let val = get_op8(s, op2);
+                    let addr = s.r.get_regpair(RegPair::BC);
+                    s.io.out(addr, val, s.cycle_counter)?;
+
+                    // MEMPTR = BC + 1
+                    s.r.MEMPTR = addr.wrapping_add(1);
+                }
+            }
+            Instruction::IN => {
+                let op1 = op.op1.ok_or("IN missing op1")?;
+                let op2 = op.op2.ok_or("IN missing op2")?;
+                if let Operand::IOAddress(addr) = op2 {
+                    if op1 != Operand::Reg8(disas::Reg8::A) {
+                        return Err("IN op1 should be A".to_string());
+                    }
+                    // MEMPTR = (A_before_operation << 8) + port + 1
+                    let low = addr.wrapping_add(1) as u16;
+                    let addr = addr as u16 | ((s.r.A as u16) << 8);
+                    s.r.MEMPTR = low & 0xFF | ((s.r.A as u16) << 8);
+                    let val = s.io.input(addr, s.cycle_counter)?;
+                    set_op8(s, op1, val);
+                } else if Operand::RegIOAddr(disas::Reg8::C) == op2 {
+                    // MEMPTR = BC + 1
+                    let addr = s.r.get_regpair(RegPair::BC);
+                    s.r.MEMPTR = addr.wrapping_add(1);
+                    let val = s.io.input(addr, s.cycle_counter)?;
+                    if op.op3 != Some(Operand::IgnoreIO) {
+                        set_op8(s, op1, val);
+                    }
+                    //flags
+                    set_bitops_flags(val, &mut s.r);
+                    s.r.set_flag(Flag::H, false);
+                }
+            }
+            Instruction::EXX => {
+                fn swap(a: &mut u8, b: &mut u8) {
+                    (*a, *b) = (*b, *a);
+                }
+                swap(&mut s.r.B, &mut s.r.Bp);
+                swap(&mut s.r.C, &mut s.r.Cp);
+                swap(&mut s.r.D, &mut s.r.Dp);
+                swap(&mut s.r.E, &mut s.r.Ep);
+                swap(&mut s.r.H, &mut s.r.Hp);
+                swap(&mut s.r.L, &mut s.r.Lp);
+            }
+            Instruction::NEG => {
+                let a = s.r.A as i8;
+                let res = set_conditions_sub_8(&mut s.r, 0, a);
+                s.r.A = res;
+            }
+            Instruction::RETN => {
+                ret(&mut s.r, &s.mem, &mut update_pc);
+                s.r.IFF1 = s.r.IFF2;
+            }
+            Instruction::RETI => {
+                ret(&mut s.r, &s.mem, &mut update_pc);
+            }
+            Instruction::IM => {
+                let op1 = op.op1.ok_or("IM missing op1")?;
+                s.r.IM = get_op8(s, op1);
+            }
+            Instruction::RRD => {
+                let a = s.r.A;
+                let addr = s.r.get_regpair(RegPair::HL);
+                let b = s.mem.fetch_u8(addr);
+                s.mem.set_u8(addr, b >> 4 | (a << 4));
+                s.r.A = (a & 0xF0) | (b & 0x0F);
+                s.r.set_flag(Flag::H, false);
+                set_bitops_flags(s.r.A, &mut s.r);
+                s.r.MEMPTR = addr.wrapping_add(1);
+            }
+            Instruction::RLD => {
+                let a = s.r.A;
+                let addr = s.r.get_regpair(RegPair::HL);
+                let b = s.mem.fetch_u8(addr);
+                s.mem.set_u8(addr, b << 4 | (a & 0x0F));
+                s.r.A = (a & 0xF0) | (b >> 4);
+                s.r.set_flag(Flag::H, false);
+                set_bitops_flags(s.r.A, &mut s.r);
+                s.r.MEMPTR = addr.wrapping_add(1);
+            }
+            Instruction::LDI => mem_block_copy(&mut s.r, &mut s.mem, 1),
+            Instruction::LDIR => {
+                mem_block_copy(&mut s.r, &mut s.mem, 1);
+                update_pc = mem_block_copy_repeat(&mut s.r, &mut op_len);
+            }
+            Instruction::LDD => mem_block_copy(&mut s.r, &mut s.mem, -1),
+            Instruction::LDDR => {
+                mem_block_copy(&mut s.r, &mut s.mem, -1);
+                update_pc = mem_block_copy_repeat(&mut s.r, &mut op_len);
+            }
+            Instruction::CPI => {
+                mem_block_cmp(&mut s.r, &mut s.mem, 1);
+            }
+            Instruction::CPIR => {
+                update_pc = mem_block_cmp_repeat(&mut s.r, &mut s.mem, 1, &mut op_len);
+            }
+            Instruction::CPD => {
+                mem_block_cmp(&mut s.r, &mut s.mem, -1);
+            }
+            Instruction::CPDR => {
+                update_pc = mem_block_cmp_repeat(&mut s.r, &mut s.mem, -1, &mut op_len);
+            }
+            Instruction::INI => input_block(s, 1)?,
+            Instruction::INIR => {
+                input_block(s, 1)?;
+                update_pc = io_block_repeat(&s.r, &mut op_len);
+            }
+            Instruction::IND => input_block(s, -1)?,
+            Instruction::INDR => {
+                input_block(s, -1)?;
+                update_pc = io_block_repeat(&s.r, &mut op_len);
+            }
+            Instruction::OUTI => output_block(s, 1)?,
+            Instruction::OTIR => {
+                output_block(s, 1)?;
+                update_pc = io_block_repeat(&s.r, &mut op_len);
+            }
+            Instruction::OUTD => output_block(s, -1)?,
+            Instruction::OTDR => {
+                output_block(s, -1)?;
+                update_pc = io_block_repeat(&s.r, &mut op_len);
+            }
+            Instruction::DI => {
+                s.r.IFF1 = false;
+                s.r.IFF2 = false;
+            }
+            Instruction::EI => {
+                s.r.IFF1 = true;
+                s.r.IFF2 = true;
+            }
+        }
+        memptr_index(op, &mut s.r);
+        s.q.changed = start_f != s.r.F || op.ins == Instruction::SCF;
+        if update_pc {
+            s.r.PC = s.r.PC.wrapping_add(op.length as u16);
+        }
+
+        s.cycle_counter = s.cycle_counter.wrapping_add(op_len as u32);
+        Ok(op_len)
+    }
+
+    fn interrupt_op(vector: u8) -> disas::OpCode {
+        disas::OpCode {
+            data: [0; 4],
+            length: 0,
+            ins: Instruction::RST,
+            op1: Some(Operand::Imm8(vector)),
+            op2: None,
+            op3: None,
+            tstates: [4, 5, 3, 3, 0, 0],
+            mcycles: 4,
+        }
+    }
+}
+impl<M> Cpu for State<M>
+where
+    M: MemoryMapper,
+{
+    fn run(&mut self, tstates_len: usize, debug: bool) -> Result<usize, String> {
+        let mut tstates_ran = 0;
+        let mut disas_target = [0_u8; 4];
+        while tstates_ran < tstates_len {
+            // TODO: split into m states, fetch etc
+            self.mem.fetch_range_safe(self.r.PC, &mut disas_target);
+            if let Some(op) = disas::disas(&disas_target) {
+                if debug {
+                    println!("{:04X}: {:?}", self.r.PC, op);
+                    //println!("{}", s.r);
+                }
+                tstates_ran += self.run_op(&op)?;
+            } else {
+                return Err(format!("Unknown instruction(s)) {:02X?}", disas_target));
+            }
+        }
+        Ok(tstates_ran)
+    }
+    fn interrupt_mode_1(&mut self) -> Result<usize, String> {
+        if self.r.IFF1 {
+            self.r.IFF1 = false;
+            self.r.IFF2 = false;
+            if self.halted {
+                self.r.PC += 1;
+            }
+            self.halted = false;
+            self.run_op(&Self::interrupt_op(0x38))
         } else {
-            return Err(format!("Unknown instruction(s)) {:02X?}", disas_target));
+            self.pending_interrupt = true;
+            Ok(0)
         }
     }
-    Ok(tstates_ran)
 }
 #[cfg(test)]
 mod tests {
     use crate::cpu::*;
+    use crate::mem;
     #[test]
     fn run_add() {
-        let mut s = init();
+        let mut s = init(mem::ZX64kMapper::from(vec![0x87]));
         s.r.A = 1;
         let default = Regs::default();
-        s.mem = mem::Memory::from(vec![0x87]);
-        run(&mut s, 1, true).unwrap();
+        s.run(1, true).unwrap();
         assert_eq!(
             s.r,
             Regs {
@@ -1456,7 +1505,7 @@ mod tests {
         s.r = default;
         s.r.A = 64;
         s.mem.set_u8(0, 0x87); // same instruction
-        run(&mut s, 1, true).unwrap();
+        s.run(1, true).unwrap();
         assert_eq!(
             s.r,
             Regs {
@@ -1470,7 +1519,7 @@ mod tests {
         s.r = default;
         s.r.A = -1_i8 as u8;
         s.mem.set_u8(0, 0x87); // same instruction
-        run(&mut s, 1, true).unwrap();
+        s.run(1, true).unwrap();
         assert_eq!(
             s.r,
             Regs {
@@ -1484,7 +1533,7 @@ mod tests {
     }
     #[test]
     fn run_adc() {
-        let mut s = init();
+        let mut s = init(mem::ZX64kMapper::from(vec![0xCE, 0x00]));
         s.r.A = 1;
         //7FFF BBCC DDEE 4411 DD88 FD77 C000
         s.r.set_regpair(RegPair::AF, 0x7FFF);
@@ -1494,8 +1543,7 @@ mod tests {
 
         let default = s.r;
         dbg!(&default);
-        s.mem = mem::Memory::from(vec![0xCE, 0x00]);
-        run(&mut s, 1, true).unwrap();
+        s.run(1, true).unwrap();
         assert_eq!(
             s.r,
             Regs {
@@ -1511,8 +1559,8 @@ mod tests {
         //FFFF BBCC DDEE 4411 DD88 FD77 C000
         s.r.set_regpair(RegPair::AF, 0xFFFF);
         dbg!(&s.r);
-        s.mem = mem::Memory::from(vec![0xCE, 0x80]);
-        run(&mut s, 1, true).unwrap();
+        s.mem.set_u16(0, 0x80CE);
+        s.run(1, true).unwrap();
         assert_eq!(
             s.r,
             Regs {
@@ -1527,8 +1575,8 @@ mod tests {
         s.r = default;
         //7FFF BBCC DDEE 4411 DD88 FD77 C000
         dbg!(&s.r);
-        s.mem = mem::Memory::from(vec![0xCE, 0x80]);
-        run(&mut s, 1, true).unwrap();
+        s.mem.set_u16(0, 0x80CE);
+        s.run(1, true).unwrap();
         assert_eq!(
             s.r,
             Regs {
@@ -1543,8 +1591,8 @@ mod tests {
         //00FF BBCC DDEE 4411 DD88 FD77 C000
         s.r.set_regpair(RegPair::AF, 0x00FF);
         dbg!(&s.r);
-        s.mem = mem::Memory::from(vec![0xCE, 0x00]);
-        run(&mut s, 1, true).unwrap();
+        s.mem.set_u16(0, 0x00CE);
+        s.run(1, true).unwrap();
         assert_eq!(
             s.r,
             Regs {
@@ -1559,8 +1607,8 @@ mod tests {
         //FFFF BBCC DDEE 4411 DD88 FD77 C000
         s.r.set_regpair(RegPair::AF, 0xFFFF);
         dbg!(&s.r);
-        s.mem = mem::Memory::from(vec![0xCE, 0x01]);
-        run(&mut s, 1, true).unwrap();
+        s.mem.set_u16(0, 0x01CE);
+        s.run(1, true).unwrap();
         assert_eq!(
             s.r,
             Regs {
@@ -1575,8 +1623,8 @@ mod tests {
         //55FF BBCC DDEE 4411 DD88 FD77 C000
         s.r.set_regpair(RegPair::AF, 0x55FF);
         dbg!(&s.r);
-        s.mem = mem::Memory::from(vec![0xCE, 0x80]);
-        run(&mut s, 1, true).unwrap();
+        s.mem.set_u16(0, 0x80CE);
+        s.run(1, true).unwrap();
         assert_eq!(
             s.r,
             Regs {

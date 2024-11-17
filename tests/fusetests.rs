@@ -1,3 +1,4 @@
+use gears::cpu::Cpu;
 use gears::cpu::RegPair;
 use gears::{cpu, io, mem};
 
@@ -253,7 +254,7 @@ fn parse_tests(input: &str, expected: &str) -> Option<Vec<Test>> {
 }
 
 // TODO can panic ?
-fn setup_memory(values: &[MemValues], mem: &mut mem::Memory) {
+fn setup_memory(values: &[MemValues], mem: &mut dyn mem::MemoryMapper) {
     //let mut mem = Vec::new();
     for m in values.iter() {
         for (j, v) in m.values.iter().enumerate() {
@@ -282,23 +283,21 @@ fn fuse_tests() {
     .unwrap();
 
     for t in tests.iter() {
-        let mut state = cpu::State::default();
+        let mut state = cpu::init(mem::ZX64kMapper::default());
         state.r = t.start_regs;
         state.halted = t.start_halted;
-        let mut data = mem::Memory::init(mem::Mapper::ZX64K); // This test suite is for machines with more RAM
-        setup_memory(&t.memory_values, &mut data);
-        let mut end_state = cpu::State::default();
+        setup_memory(&t.memory_values, &mut state.mem);
+        let mut end_state = cpu::State::<mem::ZX64kMapper>::default();
         end_state.r = t.end_regs;
         end_state.halted = t.end_halted;
-        end_state.mem = data.clone();
+        end_state.mem = state.mem.clone();
         end_state.cycle_counter = t.tstate_ran as u32;
         setup_memory(&t.changed_mem_values, &mut end_state.mem);
-        state.mem = data;
         state.io = io::RcDevice::new(ZxSpectrumIODevice {});
         end_state.io = io::RcDevice::new(ZxSpectrumIODevice {});
 
         dbg!(t);
-        cpu::run(&mut state, t.tstate_to_run as usize, true).unwrap();
+        state.run(t.tstate_to_run as usize, true).unwrap();
         assert_eq!(state, end_state, "test {}", t.desc);
     }
 }

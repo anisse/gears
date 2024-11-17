@@ -1,7 +1,6 @@
-use std::any::Any;
 use std::fmt;
 
-trait MemoryMapper: EqDyn + CloneDyn + fmt::Debug {
+pub trait MemoryMapper: fmt::Debug {
     fn fetch_u8(&self, addr: u16) -> u8;
     fn fetch_range_safe(&self, addr: u16, dest: &mut [u8]) {
         for (i, d) in dest.iter_mut().enumerate() {
@@ -18,44 +17,8 @@ trait MemoryMapper: EqDyn + CloneDyn + fmt::Debug {
     }
 }
 
-trait EqDyn: Any {
-    fn eq_dyn(&self, other: &dyn Any) -> bool;
-    fn as_any(&self) -> &dyn Any;
-}
-
-impl<T: Eq + 'static> EqDyn for T {
-    fn eq_dyn(&self, other: &dyn Any) -> bool {
-        other.downcast_ref().map_or(false, |o| self == o)
-    }
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-impl PartialEq for dyn MemoryMapper {
-    fn eq(&self, other: &Self) -> bool {
-        self.eq_dyn(other.as_any())
-    }
-}
-impl Eq for Box<dyn MemoryMapper> {}
-
-impl PartialEq<&Self> for Box<dyn MemoryMapper> {
-    fn eq(&self, other: &&Self) -> bool {
-        self == *other
-    }
-}
-
-trait CloneDyn {
-    fn clone_dyn(&self) -> Box<dyn MemoryMapper>;
-}
-
-impl<T: MemoryMapper + Clone> CloneDyn for T {
-    fn clone_dyn(&self) -> Box<dyn MemoryMapper> {
-        Box::new(std::clone::Clone::clone(self))
-    }
-}
-
 #[derive(PartialEq, Eq, Clone)]
-struct ZX64kMapper {
+pub struct ZX64kMapper {
     ram: [u8; 0x10000],
 }
 impl Default for ZX64kMapper {
@@ -85,7 +48,7 @@ impl From<Vec<u8>> for ZX64kMapper {
 }
 
 #[derive(PartialEq, Eq, Clone)]
-struct SegaGGMapper {
+pub struct SegaGGMapper {
     ram: [u8; 8192],
     map: [Dest; 8],
     rom: Vec<u8>,
@@ -93,7 +56,7 @@ struct SegaGGMapper {
 }
 
 impl SegaGGMapper {
-    fn new(rom: Vec<u8>, backup_ram: Option<Vec<u8>>) -> Self {
+    pub fn new(rom: Vec<u8>, backup_ram: Option<Vec<u8>>) -> Self {
         Self {
             ram: [0; 8192],
             map: [
@@ -231,74 +194,6 @@ enum Dest {
     Panic,
 }
 
-#[derive(PartialEq, Eq, Clone)]
-pub enum Mapper {
-    ZX64K, // useful for testing
-    SegaGG {
-        rom: Vec<u8>,
-        backup_ram: Option<Vec<u8>>,
-    },
-    // Leave possibility to add codemasters mapper later
-}
-
-#[derive(PartialEq, Eq, Debug)]
-pub struct Memory {
-    mapper: Box<dyn MemoryMapper>,
-}
-
-impl Clone for Memory {
-    fn clone(&self) -> Self {
-        Self {
-            mapper: self.mapper.clone_dyn(),
-        }
-    }
-}
-
-impl Memory {
-    pub fn init(mapper: Mapper) -> Memory {
-        match mapper {
-            Mapper::ZX64K => Memory {
-                mapper: Box::new(ZX64kMapper::default()),
-            },
-            Mapper::SegaGG { rom, backup_ram } => Memory {
-                mapper: Box::new(SegaGGMapper::new(rom, backup_ram)),
-            },
-        }
-    }
-    pub fn fetch_u8(&self, addr: u16) -> u8 {
-        self.mapper.fetch_u8(addr)
-    }
-    pub fn fetch_u16(&self, addr: u16) -> u16 {
-        self.mapper.fetch_u16(addr)
-    }
-
-    pub fn fetch_range_safe(&self, addr: u16, dest: &mut [u8]) {
-        self.mapper.fetch_range_safe(addr, dest)
-    }
-
-    pub fn set_u8(&mut self, addr: u16, val: u8) {
-        self.mapper.set_u8(addr, val)
-    }
-    pub fn set_u16(&mut self, addr: u16, val: u16) {
-        self.mapper.set_u16(addr, val)
-    }
-}
-
-impl From<Vec<u8>> for Memory {
-    fn from(value: Vec<u8>) -> Self {
-        Memory {
-            mapper: Box::new(ZX64kMapper::from(value)),
-        }
-    }
-}
-impl Default for Memory {
-    fn default() -> Self {
-        Memory {
-            mapper: Box::new(ZX64kMapper::default()),
-        }
-    }
-}
-
 fn dbg_mem(block: &[u8], f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let mut i = 0;
     let mut star = false; // line repeat marker
@@ -347,7 +242,7 @@ mod tests {
     use crate::mem::*;
     #[test]
     fn basic_set() {
-        let mut mem = Memory::init(Mapper::ZX64K);
+        let mut mem = ZX64kMapper::default();
         mem.set_u8(32768, 19);
         dbg!(&mem);
         assert_eq!(mem.fetch_u8(32768), 19);
