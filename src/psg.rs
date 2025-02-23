@@ -347,7 +347,7 @@ pub struct Synth {
 #[derive(Debug, Clone)]
 pub struct AudioConf {
     channels: u16,
-    sample_rate: u32,
+    pub sample_rate: u32,
     //TODO. sample type ?
 }
 impl AudioConf {

@@ -5,6 +5,7 @@ mod disas;
 pub mod emu;
 pub mod io;
 mod joystick;
+mod lowpass;
 pub mod mem;
 pub mod psg;
 mod system;

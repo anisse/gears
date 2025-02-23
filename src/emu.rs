@@ -9,6 +9,7 @@ use crate::cpu;
 use crate::devices;
 use crate::io;
 use crate::joystick;
+use crate::lowpass;
 use crate::mem::SegaGGMapper;
 use crate::psg;
 use crate::vdp;
@@ -117,12 +118,15 @@ impl Emulator {
         audio_conf: AudioConf,
         running: Arc<AtomicBool>,
     ) -> AudioCallback {
+        let mut filter = lowpass::Filter::new(audio_conf.sample_rate as f32, 2700.0);
         let psg_render = psg::PsgRender::new(cmds, audio_conf);
         Box::new(move |dest: &mut [f32]| {
             if running.load(Ordering::Acquire) {
                 psg_render
                     .synth_audio_f32(dest)
                     .expect("synth audio failed");
+                // Filter
+                dest.iter_mut().for_each(|s| *s = filter.step(*s))
             } else {
                 // go back to zero, for silence
                 let len = dest.len();
