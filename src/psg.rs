@@ -7,6 +7,7 @@ const PSG_CMD: u16 = 0x7F;
 const PSG_STEREO: u16 = 0x06;
 const CPU_CLOCK_HZ: u64 = 3579545;
 const CPU_TO_PSG_CLOCK_DIVIDER: u64 = 16;
+pub const NATIVE_SAMPLE_RATE: u32 = (CPU_CLOCK_HZ / (CPU_TO_PSG_CLOCK_DIVIDER * 2)) as u32;
 
 const REG_MASK: u8 = 0b1000_0000;
 const REG_DATA_MASK: u8 = 0b0000_1111;
@@ -353,12 +354,7 @@ pub struct AudioConf {
 impl AudioConf {
     pub fn new(channels: u16, sample_rate: u32) -> Result<Self, String> {
         match (channels, sample_rate) {
-            (2, 44100) => Ok(Self {
-                channels,
-                sample_rate,
-            }),
-            (1, 44100) => Ok(Self {
-                // for tests
+            (1 | 2, 44100 | 22050 | NATIVE_SAMPLE_RATE) => Ok(Self {
                 channels,
                 sample_rate,
             }),

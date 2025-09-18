@@ -10,6 +10,7 @@ use instant::{Duration, Instant};
 use std::time::{Duration, Instant};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::{SampleFormat, SampleRate, SupportedOutputConfigs, SupportedStreamConfig};
 use gilrs::Gilrs;
 use log::{debug, info, trace};
 use pixels::{Pixels, SurfaceTexture};
@@ -20,6 +21,7 @@ use winit::window::{Window, WindowBuilder};
 
 use gears::emu;
 use gears::emu::testcmd;
+use gears::psg::NATIVE_SAMPLE_RATE;
 
 type PlatformWindowInitFn = fn(Rc<Window>) -> Result<(), Box<dyn Error>>;
 
@@ -202,23 +204,14 @@ fn audio_init() -> Result<(cpal::Device, cpal::StreamConfig), String> {
             }
         )
     })?;
-    trace!(
-        "Audio device default output config: {:?}",
-        audio_device.default_output_config()
-    );
-    let audio_config = audio_device
-        .default_output_config()
-        .map_err(|e| format!("output config error: {e}"))?;
-    let channels = audio_config.channels() as usize;
-    let sample_rate = audio_config.sample_rate().0 as usize;
-    if sample_rate != 44100 {
-        return Err(format!("Unsupported sample_rate: {sample_rate}"));
-    }
-    if channels != 2 {
-        return Err(format!("Only two channels are supported, not: {channels}"));
-    }
-    let supported_buffer_size = audio_config.buffer_size().clone();
-    trace!("Audio config possible buffer sizes: {supported_buffer_size:?}");
+    let audio_config = audio_find_best_config(
+        audio_device
+            .supported_output_configs()
+            .map_err(|e| format!("output config error: {e}"))?,
+    )?;
+    info!("Audio device selected output config: {:?}", audio_config);
+    let supported_buffer_size = *audio_config.buffer_size();
+    info!("Audio config possible buffer sizes: {supported_buffer_size:?}");
     let mut stream_config: cpal::StreamConfig = audio_config.into();
     let default_buffer_size = 1472; // ~ 16ms buffer, about a frame. This is a manually rounded-up
                                     // buffer
@@ -234,6 +227,40 @@ fn audio_init() -> Result<(cpal::Device, cpal::StreamConfig), String> {
     } as cpal::FrameCount);
     Ok((audio_device, stream_config))
 }
+
+fn audio_find_best_config(
+    configs: SupportedOutputConfigs,
+) -> Result<SupportedStreamConfig, String> {
+    let mut cfg_found = String::new();
+    for c in configs {
+        if c.channels() != 2 {
+            continue;
+        }
+        let sample_format = c.sample_format();
+        if sample_format != SampleFormat::F32 {
+            cfg_found += &format!("format={sample_format} ");
+            continue;
+        }
+        if let Some(conf) = c.try_with_sample_rate(SampleRate(NATIVE_SAMPLE_RATE)) {
+            return Ok(conf);
+        }
+        if let Some(conf) = c.try_with_sample_rate(SampleRate(22050)) {
+            return Ok(conf);
+        }
+        if let Some(conf) = c.try_with_sample_rate(SampleRate(44100)) {
+            return Ok(conf);
+        }
+        cfg_found += &format!(
+            "sample_rate=[{},{}] ",
+            c.min_sample_rate().0,
+            c.max_sample_rate().0,
+        );
+    }
+    Err(format!(
+        "No adequate audio config found amongst: {cfg_found}"
+    ))
+}
+
 fn audio_init_stream(
     audio_device: cpal::Device,
     stream_config: cpal::StreamConfig,
