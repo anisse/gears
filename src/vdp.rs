@@ -361,19 +361,8 @@ impl VdpState {
             } else {
                 0
             };
-        debugrd!(
-            "{} char {}: @{:04X} : {} {}x{} (char line length: {}) from ({}->{})x{}",
-            if sprite { "Sprite" } else { "BG" },
-            c.char_num,
-            base,
-            palette_base,
-            c.x,
-            c.y,
-            c.line_length,
-            c.x_start,
-            c.x_end,
-            c.src_line
-        );
+        debugrd!("{} char {}: @{base:04X} : {palette_base} {}x{} (char line length: {}) from ({}->{})x{}",
+                if sprite { "Sprite" } else { "BG" }, c.char_num, c.x, c.y, c.line_length, c.x_start, c.x_end, c.src_line );
         let src_line = if matches!(m, MoreSettings::BgSettings { rvv, .. } if rvv) {
             CHAR_SIZE - 1 - c.src_line
         } else {
@@ -402,10 +391,8 @@ impl VdpState {
 
                 if priority & (1 << col) != 0 {
                     debugrd!(
-                        "Skipping prio sprite pixel {} at dest coord x={} b1 = {:02X}",
-                        pix,
-                        x + col,
-                        priority,
+                        "Skipping prio sprite pixel {pix} at dest coord x={} b1 = {priority:02X}",
+                        x + col
                     );
                     continue;
                 }
@@ -502,12 +489,8 @@ impl VdpState {
             let palette1 = b1 & PNAME_CPT != 0;
             let prio = b1 & PNAME_PRI != 0;
             if character != 0 {
-                debugrd!(
-                    "BG src {}x{} dest {}x{} Pattern: {:03X} @{:04X} (base @{:04X} character {:03X} revh {} revv {} pallette1 {} prio {}",
-                    src_x, scroll_start_y - ch_start_y, x, line,
-                    ch, addr, pattern_base,
-                    character, rvh, rvv, palette1, prio
-                );
+                debugrd!("BG src {src_x}x{} dest {x}x{line} Pattern: {ch:03X} @{addr:04X} (base @{pattern_base:04X} character {character:03X} revh {rvh} revv {rvv} pallette1 {palette1} prio {prio}",
+                    scroll_start_y - ch_start_y );
             }
             let x_end = if (x + CHAR_SIZE as usize) <= line_length_px {
                 CHAR_SIZE
@@ -548,7 +531,7 @@ impl VdpState {
                 break;
             }
         }
-        debugrd!("L{line:3}priority map: {:?}", priorities);
+        debugrd!("L{line:3}priority map: {priorities:?}");
     }
     fn sprite_double_size_src_line(double_size: bool, char_num: u16, ldiff: u8) -> (u16, u8) {
         if !double_size {
@@ -642,14 +625,8 @@ impl VdpState {
             if v.wrapping_sub(1) == 0xD0 {
                 break;
             }
-            debugrd!(
-                "Sprite {}, on dest vline: {} v: {} h: {} sprite height: {}",
-                sprite,
-                vcoord_line,
-                v,
-                self.vram[sprite_base + 0x80 + sprite * 2] as usize,
-                sprite_height
-            );
+            debugrd!("Sprite {sprite}, on dest vline: {vcoord_line} v: {v} h: {} sprite height: {sprite_height}",
+                self.vram[sprite_base + 0x80 + sprite * 2] as usize);
             if v <= vcoord_line && (vcoord_line as u16) < (v as u16) + sprite_height {
                 if rendered_sprites >= 8 {
                     // We have reached sprite 9
@@ -1038,7 +1015,7 @@ impl Vdp {
     }
     fn _blank(state: &VdpState, pixels: &mut [u8], render_area: RenderArea) {
         let bc = state.rgb(32, state.reg[7]);
-        debugrd!("Filling with backdrop color {:?}", bc);
+        debugrd!("Filling with backdrop color {bc:?}");
         let ranges = if let RenderArea::VisibleOnly = render_area {
             (0..VISIBLE_PIXEL_HEIGHT, 0..VISIBLE_PIXEL_WIDTH)
         } else {

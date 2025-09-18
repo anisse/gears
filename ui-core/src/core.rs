@@ -149,14 +149,14 @@ fn joystick_events(emu: &mut emu::Emulator, gilrs: &mut Gilrs) {
 }
 
 fn handle_joystick_event(emu: &mut emu::Emulator, ev: gilrs::EventType) {
-    trace!("joy ev: {:?}", ev);
+    trace!("joy ev: {ev:?}");
     let (emu_action, btn): (fn(&mut emu::Emulator, emu::Button), _) = match ev {
         gilrs::EventType::ButtonPressed(button, _) => (emu::Emulator::press, button),
         gilrs::EventType::ButtonReleased(button, _) => (emu::Emulator::release, button),
         //gilrs::EventType::AxisValueChanged(button, val, _) => todo!(),
         _ => return,
     };
-    debug!("joy btn: {:?}", btn);
+    debug!("joy btn: {btn:?}");
     let button = match btn {
         gilrs::Button::DPadUp => emu::Button::Up,
         gilrs::Button::DPadDown => emu::Button::Down,
@@ -209,7 +209,7 @@ fn audio_init() -> Result<(cpal::Device, cpal::StreamConfig), String> {
             .supported_output_configs()
             .map_err(|e| format!("output config error: {e}"))?,
     )?;
-    info!("Audio device selected output config: {:?}", audio_config);
+    info!("Audio device selected output config: {audio_config:?}");
     let supported_buffer_size = *audio_config.buffer_size();
     info!("Audio config possible buffer sizes: {supported_buffer_size:?}");
     let mut stream_config: cpal::StreamConfig = audio_config.into();

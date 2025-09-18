@@ -1457,7 +1457,7 @@ where
             self.mem.fetch_range_safe(self.r.PC, &mut disas_target);
             if let Some(op) = disas::disas(&disas_target) {
                 if debug {
-                    println!("{:04X}: {:?}", self.r.PC, op);
+                    println!("{:04X}: {op:?}", self.r.PC);
                     //println!("{}", s.r);
                 }
                 tstates_ran += self.run_op(&op)?;

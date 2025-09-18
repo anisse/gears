@@ -114,7 +114,7 @@ impl SegaGGMapper {
                     }
                 }
                 if val & 0x3 != 0 {
-                    panic!("Unimplemented bank shifting: {:02X}", val);
+                    panic!("Unimplemented bank shifting: {val:02X}");
                 }
             }
             0xFFFD => {
@@ -161,9 +161,7 @@ impl MemoryMapper for SegaGGMapper {
         match self.map[addr as usize >> 13] {
             Dest::Rom { .. } => {
                 println!(
-                    "Ignoring write to ROM address: @{:04X} = {:02X} (old:{:02X})",
-                    addr,
-                    val,
+                    "Ignoring write to ROM address: @{addr:04X} = {val:02X} (old:{:02X})",
                     self.fetch_u8(addr)
                 );
             }

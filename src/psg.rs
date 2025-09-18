@@ -617,6 +617,6 @@ impl io::Device for PsgDevice {
         }
     }
     fn input(&self, addr: u16, _: u32) -> Result<u8, String> {
-        panic!("Unsupported PSG read @{:04X}", addr);
+        panic!("Unsupported PSG read @{addr:04X}");
     }
 }

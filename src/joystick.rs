@@ -44,7 +44,7 @@ impl io::Device for Joystick {
     fn out(&self, addr: u16, val: u8, _: u32) -> Result<(), String> {
         match addr & 0xFF {
             0xDC => {
-                panic!("Joystick write: @{:04X} {:02X}", addr, val);
+                panic!("Joystick write: @{addr:04X} {val:02X}");
             }
             _ => Err(format!(
                 "unknown system port output write address @{:04X} {:02X}",

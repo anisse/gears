@@ -63,7 +63,7 @@ fn zex(prog: &[u8]) {
                 2 => {
                     let ch = state.r.E as char;
                     msg.push(ch);
-                    print!("{}", ch);
+                    print!("{ch}");
                 }
                 9 => {
                     let mut addr = state.r.get_regpair(cpu::RegPair::DE);
@@ -73,7 +73,7 @@ fn zex(prog: &[u8]) {
                         if ch == '$' {
                             break;
                         }
-                        print!("{}", ch);
+                        print!("{ch}");
                         msg.push(ch);
                     }
                 }

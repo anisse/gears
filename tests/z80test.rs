@@ -47,9 +47,9 @@ fn z80common(prog: &[u8]) {
     if run_single_test {
         state.mem.set_u16(0x802b, single_test); // ld bc, 0 to ld bc, test
         let mut test_start = state.mem.fetch_u16(0x802e);
-        println!("Test table {:x}", test_start);
+        println!("Test table {test_start:x}");
         test_start += single_test * 2;
-        println!("Test table {:x}", test_start);
+        println!("Test table {test_start:x}");
         state.mem.set_u16(0x802e, test_start); // Move start
         state.mem.set_u16(test_start + 2, 0); // NUL terminate test
     }
@@ -87,7 +87,7 @@ fn z80common(prog: &[u8]) {
                 ch = ' '
             }
             //print!("{}[{}]", ch, ch as u8);
-            print!("{}", ch);
+            print!("{ch}");
             msg.push(ch);
         }
     }

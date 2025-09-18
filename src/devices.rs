@@ -145,12 +145,12 @@ impl io::Device for Rc<Devices> {
 struct DebugIO {}
 impl io::Device for DebugIO {
     fn out(&self, addr: u16, val: u8, _: u32) -> Result<(), String> {
-        println!("Unknown I/O write: @{:04X} {:02X} ", addr, val);
+        println!("Unknown I/O write: @{addr:04X} {val:02X} ");
         //panic!();
         Ok(())
     }
     fn input(&self, addr: u16, _: u32) -> Result<u8, String> {
-        println!("Unknown I/O read: @{:04X}, sending 0", addr);
+        println!("Unknown I/O read: @{addr:04X}, sending 0");
         //panic!();
         Ok(0)
     }
