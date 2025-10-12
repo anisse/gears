@@ -8,5 +8,6 @@ mod joystick;
 mod lowpass;
 pub mod mem;
 pub mod psg;
+pub mod rom;
 mod system;
 mod vdp;
