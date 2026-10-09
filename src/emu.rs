@@ -118,7 +118,7 @@ impl Emulator {
         audio_conf: AudioConf,
         running: Arc<AtomicBool>,
     ) -> AudioCallback {
-        let mut filter = lowpass::Filter::new(audio_conf.sample_rate as f32, 2700.0);
+        let mut filter = lowpass::Filter::new(audio_conf.sample_rate as f32, 8000.0);
         let psg_render = psg::PsgRender::new(cmds, audio_conf);
         Box::new(move |dest: &mut [f32]| {
             if running.load(Ordering::Acquire) {
