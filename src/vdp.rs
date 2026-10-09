@@ -89,18 +89,18 @@ const SCROLL_SCREEN_WIDTH: usize = 32;
 const SCROLL_SCREEN_HEIGHT: usize = 28;
 const SCROLL_PIXEL_WIDTH: usize = SCROLL_SCREEN_WIDTH * CHAR_SIZE as usize;
 const SCROLL_PIXEL_HEIGHT: usize = SCROLL_SCREEN_HEIGHT * CHAR_SIZE as usize;
-const VISIBLE_AREA_WIDTH: usize = 20;
-const VISIBLE_AREA_HEIGHT: usize = 18;
-pub const VISIBLE_PIXEL_HEIGHT: usize = VISIBLE_AREA_HEIGHT * CHAR_SIZE as usize;
-pub const VISIBLE_PIXEL_WIDTH: usize = VISIBLE_AREA_WIDTH * CHAR_SIZE as usize;
+const GG_VISIBLE_AREA_WIDTH: usize = 20;
+const GG_VISIBLE_AREA_HEIGHT: usize = 18;
+pub const GG_VISIBLE_PIXEL_HEIGHT: usize = GG_VISIBLE_AREA_HEIGHT * CHAR_SIZE as usize;
+pub const GG_VISIBLE_PIXEL_WIDTH: usize = GG_VISIBLE_AREA_WIDTH * CHAR_SIZE as usize;
 const CHAR_SIZE: u8 = 8;
-const VISIBLE_AREA_START_X: usize =
-    ((SCROLL_SCREEN_WIDTH - VISIBLE_AREA_WIDTH) / 2) * CHAR_SIZE as usize;
-const VISIBLE_AREA_START_Y: usize = 3 * CHAR_SIZE as usize;
-const VISIBLE_AREA_END_X: usize = VISIBLE_PIXEL_WIDTH + VISIBLE_AREA_START_X;
-const VISIBLE_AREA_END_Y: usize = VISIBLE_PIXEL_HEIGHT + VISIBLE_AREA_START_Y;
+const GG_VISIBLE_AREA_START_X: usize =
+    ((SCROLL_SCREEN_WIDTH - GG_VISIBLE_AREA_WIDTH) / 2) * CHAR_SIZE as usize;
+const GG_VISIBLE_AREA_START_Y: usize = 3 * CHAR_SIZE as usize;
+const GG_VISIBLE_AREA_END_X: usize = GG_VISIBLE_PIXEL_WIDTH + GG_VISIBLE_AREA_START_X;
+const GG_VISIBLE_AREA_END_Y: usize = GG_VISIBLE_PIXEL_HEIGHT + GG_VISIBLE_AREA_START_Y;
 // size added at the end is the same as the one at the start (3 characters)
-const EFFECTIVE_AREA_END_Y: usize = VISIBLE_AREA_END_Y + VISIBLE_AREA_START_Y;
+const EFFECTIVE_AREA_END_Y: usize = GG_VISIBLE_AREA_END_Y + GG_VISIBLE_AREA_START_Y;
 
 #[derive(Debug, Clone, Copy)]
 enum WriteDest {
@@ -330,10 +330,10 @@ impl VdpState {
                 if c.char_num >= 448 {
                     // TODO: remove overflow tracking code
                     // TODO: dump those overflow chars
-                    let visible = c.x + c.x_end > VISIBLE_AREA_START_X as u8
-                        && c.x + c.x_start < VISIBLE_AREA_END_X as u8
-                        && c.y >= VISIBLE_AREA_START_Y as u8
-                        && c.y < VISIBLE_AREA_END_Y as u8;
+                    let visible = c.x + c.x_end > GG_VISIBLE_AREA_START_X as u8
+                        && c.x + c.x_start < GG_VISIBLE_AREA_END_X as u8
+                        && c.y >= GG_VISIBLE_AREA_START_Y as u8
+                        && c.y < GG_VISIBLE_AREA_END_Y as u8;
                     if OVERFLOW_TRACK && visible {
                         debugln!(
                             DBG_OVERFLOW,
@@ -451,17 +451,17 @@ impl VdpState {
         priorities: &mut Bitmap<u8, SCROLL_SCREEN_WIDTH>,
     ) {
         let scroll_offset_x = if visible_only {
-            SCROLL_PIXEL_WIDTH - (self.reg[8] as usize) + VISIBLE_AREA_START_X
+            SCROLL_PIXEL_WIDTH - (self.reg[8] as usize) + GG_VISIBLE_AREA_START_X
         } else {
             0
         };
         let scroll_offset_y = if visible_only {
-            self.vertical_scroll as usize + VISIBLE_AREA_START_Y
+            self.vertical_scroll as usize + GG_VISIBLE_AREA_START_Y
         } else {
             0
         };
         let line_length = if visible_only {
-            VISIBLE_AREA_WIDTH as u8
+            GG_VISIBLE_AREA_WIDTH as u8
         } else {
             SCROLL_SCREEN_WIDTH as u8
         };
@@ -557,17 +557,20 @@ impl VdpState {
         v: u8,
         h: u8,
     ) -> CharSettings {
-        let line_length = VISIBLE_AREA_WIDTH as u8;
+        let line_length = GG_VISIBLE_AREA_WIDTH as u8;
         let sub = if early_clock { 8 } else { 0 };
-        let x = std::cmp::max(h as i16 - VISIBLE_AREA_START_X as i16 - sub, 0) as u8;
-        let x_start = std::cmp::max(VISIBLE_AREA_START_X as i16 + sub - h as i16, 0) as u8;
-        let x_end = std::cmp::min(((VISIBLE_PIXEL_WIDTH as i16) - x as i16) as u8, CHAR_SIZE);
+        let x = std::cmp::max(h as i16 - GG_VISIBLE_AREA_START_X as i16 - sub, 0) as u8;
+        let x_start = std::cmp::max(GG_VISIBLE_AREA_START_X as i16 + sub - h as i16, 0) as u8;
+        let x_end = std::cmp::min(
+            ((GG_VISIBLE_PIXEL_WIDTH as i16) - x as i16) as u8,
+            CHAR_SIZE,
+        );
         let ldiff = vline - v;
         let (char_num, src_line) = Self::sprite_double_size_src_line(double_size, char_num, ldiff);
         CharSettings {
             char_num,
             x,
-            y: vline - VISIBLE_AREA_START_Y as u8,
+            y: vline - GG_VISIBLE_AREA_START_Y as u8,
             line_length,
             src_line,
             x_start,
@@ -706,10 +709,10 @@ impl VdpState {
         self.render_background_line(pixels, line, true, &mut priority);
         self.render_sprites_line(
             pixels,
-            line + VISIBLE_AREA_START_Y as u8,
+            line + GG_VISIBLE_AREA_START_Y as u8,
             |h| {
-                (h as usize + CHAR_SIZE as usize) <= VISIBLE_AREA_START_X
-                    || h as usize >= VISIBLE_AREA_END_X
+                (h as usize + CHAR_SIZE as usize) <= GG_VISIBLE_AREA_START_X
+                    || h as usize >= GG_VISIBLE_AREA_END_X
             },
             Self::sprite_line_settings_visible,
             &priority,
@@ -932,10 +935,10 @@ impl Vdp {
             state.v_counter = 0xD5
         }
         if let RenderArea::VisibleOnly = render_area {
-            if state.v_counter >= VISIBLE_AREA_START_Y as u8
-                && state.v_counter < VISIBLE_AREA_END_Y as u8
+            if state.v_counter >= GG_VISIBLE_AREA_START_Y as u8
+                && state.v_counter < GG_VISIBLE_AREA_END_Y as u8
             {
-                let line = state.v_counter - VISIBLE_AREA_START_Y as u8;
+                let line = state.v_counter - GG_VISIBLE_AREA_START_Y as u8;
                 state.render_line(pixels, line, render_area);
             }
         } else if state.v_counter < SCROLL_PIXEL_HEIGHT as u8 {
@@ -1017,7 +1020,7 @@ impl Vdp {
         let bc = state.rgb(32, state.reg[7]);
         debugrd!("Filling with backdrop color {bc:?}");
         let ranges = if let RenderArea::VisibleOnly = render_area {
-            (0..VISIBLE_PIXEL_HEIGHT, 0..VISIBLE_PIXEL_WIDTH)
+            (0..GG_VISIBLE_PIXEL_HEIGHT, 0..GG_VISIBLE_PIXEL_WIDTH)
         } else {
             (0..SCROLL_PIXEL_HEIGHT, 0..SCROLL_PIXEL_WIDTH)
         };

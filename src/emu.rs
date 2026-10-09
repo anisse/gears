@@ -27,8 +27,8 @@ pub enum Button {
     Right,
 }
 
-pub const LCD_HEIGHT: usize = vdp::VISIBLE_PIXEL_HEIGHT;
-pub const LCD_WIDTH: usize = vdp::VISIBLE_PIXEL_WIDTH;
+pub const LCD_HEIGHT: usize = vdp::GG_VISIBLE_PIXEL_HEIGHT;
+pub const LCD_WIDTH: usize = vdp::GG_VISIBLE_PIXEL_WIDTH;
 const FRAMES_PER_SECOND_GAMEGEAR: usize = 60;
 
 const CPU_CYCLES_PER_LINE: usize = 228;
